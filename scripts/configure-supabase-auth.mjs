@@ -25,7 +25,6 @@ const desired = {
   mailer_subjects_recovery: "Reset your whytab password / 重置 whytab 密码",
   mailer_templates_confirmation_content: confirmationTemplate,
   mailer_templates_recovery_content: recoveryTemplate,
-  smtp_admin_email: "",
   smtp_host: "",
   smtp_port: "",
   smtp_user: "",

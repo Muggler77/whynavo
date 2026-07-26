@@ -1467,7 +1467,7 @@ try {
   assert.match(authConfigurator, /site_url: officialOrigin[\s\S]*uri_allow_list: officialOrigin/, "the reviewed Auth configuration must remove every retired redirect origin");
   assert.match(authConfigurator, /rate_limit_verify: 360[\s\S]*rate_limit_token_refresh: 1800/, "the reviewed Auth configuration must match Supabase's current verification and refresh limits");
   assert.match(authConfigurator, /mailer_templates_confirmation_content: confirmationTemplate[\s\S]*mailer_templates_recovery_content: recoveryTemplate/, "the reviewed Auth configurator must publish the tracked prefetch-safe email templates");
-  assert.match(authConfigurator, /smtp_admin_email: ""[\s\S]*smtp_host: ""[\s\S]*smtp_pass: ""/, "the reviewed Auth configurator must clear retired SMTP settings");
+  assert.match(authConfigurator, /smtp_host: ""[\s\S]*smtp_pass: ""[\s\S]*smtp_sender_name: ""/, "the reviewed Auth configurator must clear retired SMTP settings");
   assert.match(deployWorkflow, /configure:supabase-auth/, "every production deployment must converge the reviewed Auth origin and rate limits");
   const supabaseProductionGate = await readFile(join(repoRoot, "scripts/verify-supabase-production.mjs"), "utf8");
   assert.match(supabaseProductionGate, /serverLeakedPasswordProtectionEnabled[\s\S]*client-side k-anonymous check remains mandatory/, "the free-plan production gate must explicitly preserve and disclose the mandatory client-side leaked-password mitigation");
