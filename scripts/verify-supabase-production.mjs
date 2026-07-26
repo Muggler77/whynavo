@@ -318,7 +318,10 @@ for (const finding of advisorFindings) {
   if (!["WARN", "ERROR"].includes(String(finding?.level || "").toUpperCase())) continue;
   const objectName = [finding?.metadata?.schema, finding?.metadata?.name].filter(Boolean).join(".");
   const key = `${finding?.name}:${objectName}`;
-  requireCondition(allowedAdvisorFindings.has(key), `Unreviewed Supabase Security Advisor finding: ${finding?.name || "unknown"}`);
+  requireCondition(
+    allowedAdvisorFindings.has(key),
+    `Unreviewed Supabase Security Advisor finding: ${finding?.name || "unknown"} (${objectName || "unknown object"})`
+  );
 }
 
 if (failures.length) {
