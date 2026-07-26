@@ -14,11 +14,12 @@
     "verify:repository-history": "node scripts/repository-history-safety-test.mjs",
     "verify:public-images": "node scripts/verify-public-images.mjs",
     "verify:edge-functions": "node scripts/verify-edge-functions.mjs",
-    "verify:backup-tools": "node scripts/backup-envelope-test.mjs",
+    "verify:backup-tools": "node scripts/backup-envelope-test.mjs && node scripts/backup-export-test.mjs",
     "verify:production-config": "node scripts/verify-production-config.mjs",
     "verify:supabase-production": "node scripts/verify-supabase-production.mjs",
+    "configure:supabase-auth": "node scripts/configure-supabase-auth.mjs",
     "deploy:supabase-migrations": "node scripts/apply-supabase-migrations.mjs",
-    "verify:release": "node scripts/verify-release-version.mjs",
+    "verify:release": "node scripts/version-manifest-test.mjs && node scripts/verify-release-version.mjs",
     "verify:extension-package": "node scripts/verify-extension-package.mjs"
   },
   "workspaces": [

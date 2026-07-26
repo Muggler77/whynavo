@@ -25,7 +25,7 @@ npm run build
 
 6. Confirm GitHub `main` matches the authoritative local release commit.
 
-7. If the sync protocol changed, prepare a backward-compatible server API first, build the verified client into a private draft Release, deploy and verify the hosted client, then apply a separate migration that revokes the retired API. Publish the draft only after final production checks pass. Run two-device concurrent-write tests.
+7. If the sync protocol changed, prepare a backward-compatible server API first, build the verified client into a private draft Release, then deploy and smoke-test the hosted client while the compatibility API remains available. Publish the verified archive and activate its update manifest before applying the separate migration that revokes the retired API. Run final production checks and two-device concurrent-write tests after the cutover.
 
 8. Confirm private local media, weather city, current-location preference, coordinates, and weather responses are absent from cloud snapshots; confirm complete export/import round-trips supported user content while intentionally preserving device-local weather choices.
 
@@ -51,8 +51,8 @@ npm run build
 - If a future cloud snapshot has a higher data schema than the current client supports, stop sync and ask the user to upgrade.
 - If a migration changes data shape, add a test fixture that proves shortcuts, folders, todos, notes, countdowns, settings, and sync metadata survive.
 - If new extension permissions are added, treat the release as higher risk because browser stores may require users to accept the permission before updating.
-- Apply migrations through `0012_rate_limit_sync_writes.sql` before the 0.6.0 client deployment. These create and rate-limit the account-bound RPC without disabling the currently published client. After the Pages deployment succeeds, immediately apply `0013_retire_unbound_sync_rpc.sql` and run the production Supabase gate. Unsupported clients then fail closed without creating an avoidable deployment outage.
-- Prepare the verified extension artifact as a private draft only after the backward-compatible migrations and Edge Functions are ready. Switch the hosted `latest-version.json`, retire the old API, and pass production smoke tests before publishing the draft. Ordinary `main` pushes and failed rollouts must not expose a downloadable version whose cloud cutover is incomplete.
+- Apply migrations through `0013_enforce_sync_session_policy.sql` before the 0.6.0 client deployment. These add the account-bound read API, rate-limited writes, server-enforced 90-day/30-day session limits, a session-bound RLS read policy, and a temporary old-signature wrapper that delegates to the same protected write path for published 0.5.x clients. Apply `0014_retire_legacy_sync_access.sql` only after the 0.6.0 archive is public and its update manifest is live. A 0.5.x client stops syncing when it encounters a 0.6.0 snapshot's minimum-client marker, without losing local data.
+- Prepare the verified extension artifact as a private draft only after the backward-compatible migrations and Edge Functions are ready. Deploy and smoke-test the hosted client while preserving the old manifest and compatibility API, publish the draft, activate the matching manifest, and only then retire the old API. Ordinary `main` pushes and failed rollouts must not advertise a missing archive or strand users without an available upgrade.
 - Keep local uploaded media out of cloud snapshots and preserve it during pull or merge operations.
 - Enforce the cloud snapshot payload boundary in both the client and database function.
 - Merge ordinary local saves inside one IndexedDB read-write transaction; a same-account tab must never replace another tab's newer records with an unmerged whole-state write.

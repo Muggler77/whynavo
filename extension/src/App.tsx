@@ -57,7 +57,7 @@ import {
 } from "lucide-react";
 import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type FocusEvent, type KeyboardEvent, type MouseEvent } from "react";
 import { createPortal } from "react-dom";
-import { accountScopedKey, commitAnonymousStateAdoption, deleteAllLocalAccountData, deleteKey, deleteLocalAccountData, downloadJson, loadStateForAccount, mergeAndSaveStateForAccount, readKey, saveStateForAccount, writeKey } from "./db";
+import { accountScopedKey, clearLocalAccountDeletionPending, clearLocalDeletedAccountMarkerForVerifiedUser, commitAnonymousStateAdoption, deleteKey, deleteLocalAccountData, downloadJson, loadStateForAccount, markLocalAccountDeletionPending, mergeAndSaveStateForAccount, readKey, readPendingLocalAccountDeletionIds, saveStateForAccount, writeKey } from "./db";
 import { defaultState, defaultWidgetOrder, defaultWidgetSizes, nowIso, uid } from "./defaultState";
 import { MAX_IMPORTED_SHORTCUTS, MAX_IMPORT_TEXT_CHARS, colorFor, curatedIconCount, curatedIconFor, fallbackFaviconFor, faviconFor, importedToShortcuts, normalizeIconReference, parseImportText, siteIconCandidatesFor } from "./importers";
 import { MIGRATION_BACKUP_KEY, type StateBackup } from "./migrations";
@@ -68,6 +68,8 @@ import { fetchWeather, fetchWeatherByCoordinates, getCachedWeather, getDevicePos
 import { checkForUpdate, type UpdateCheckResult } from "./updates";
 import { APP_VERSION, DATA_SCHEMA_VERSION, UPDATE_TARGET_URL } from "./version";
 import {
+  AccountDeletionOutcomeUnknownError,
+  AccountDeletionRejectedError,
   adoptPortableStateForAccount,
   AuthAccountChangedError,
   deleteAccount,
@@ -87,6 +89,7 @@ import {
   pushSnapshot,
   reconcileCompletedSync,
   requestPasswordReset,
+  resendSignupConfirmation,
   restoreCompleteBackupForDevice,
   signIn,
   signOut,
@@ -163,7 +166,6 @@ const isStrongPassword = (value: string) => (
 );
 const LEGACY_RESOLVED_ICON_CACHE_KEY = "whytab:resolved-icons:v1";
 const RESOLVED_ICON_CACHE_KEY_PREFIX = "whytab:resolved-icons:v2";
-const PENDING_ACCOUNT_CLEANUP_KEY = "whytab:pending-account-cleanup:v1";
 const LOCAL_STATE_CHANNEL = "whytab-local-state:v1";
 const MAX_RESOLVED_ICON_CACHE_ENTRIES = 300;
 const FAILED_ICON_CACHE_PREFIX = "failed:";
@@ -448,54 +450,9 @@ const deleteResolvedIconCacheForAccount = (userId: string) => {
   }
 };
 
-const accountCleanupPending = () => {
-  try {
-    return localStorage.getItem(PENDING_ACCOUNT_CLEANUP_KEY) === "1";
-  } catch {
-    return false;
-  }
-};
-
-const setAccountCleanupPending = () => {
-  try {
-    localStorage.setItem(PENDING_ACCOUNT_CLEANUP_KEY, "1");
-    return true;
-  } catch {
-    return false;
-  }
-};
-
-const clearAccountCleanupPending = () => {
-  try {
-    localStorage.removeItem(PENDING_ACCOUNT_CLEANUP_KEY);
-  } catch {
-    // A later startup can retry the idempotent account cleanup.
-  }
-};
-
-const deleteAllResolvedIconCaches = () => {
-  if (resolvedIconCachePersistTimer !== undefined) {
-    window.clearTimeout(resolvedIconCachePersistTimer);
-    resolvedIconCachePersistTimer = undefined;
-  }
-  resolvedIconCache.clear();
-  resolvedIconCacheDirty = false;
-  try {
-    for (let index = localStorage.length - 1; index >= 0; index -= 1) {
-      const key = localStorage.key(index);
-      if (key?.startsWith(`${RESOLVED_ICON_CACHE_KEY_PREFIX}:user:`)) {
-        localStorage.removeItem(key);
-      }
-    }
-  } catch {
-    // The account database cleanup remains authoritative if localStorage is unavailable.
-  }
-};
-
 const cleanupDeletedAccountData = async (userId: string) => {
   await deleteLocalAccountData(userId);
   deleteResolvedIconCacheForAccount(userId);
-  clearAccountCleanupPending();
 };
 
 try {
@@ -917,6 +874,7 @@ export default function App() {
   const localAuthTransitionRef = useRef(false);
   const pendingOfflineUserRef = useRef<NonNullable<SyncStatus["user"]> | undefined>();
   const pendingOfflineActivationRef = useRef(false);
+  const pendingAccountDeletionIdsRef = useRef<string[]>([]);
   const localStateChannelRef = useRef<BroadcastChannel | undefined>();
   const localStatePeerIdRef = useRef(uid());
   const shellRef = useRef<HTMLDivElement>(null);
@@ -998,6 +956,35 @@ export default function App() {
     accountEpochRef.current === epoch && activeUserIdRef.current === userId
   );
 
+  const resolvePendingAccountDeletionForVerifiedUser = async (verifiedUserId?: string) => {
+    if (!verifiedUserId) return;
+    try {
+      await clearLocalDeletedAccountMarkerForVerifiedUser(verifiedUserId);
+      if (pendingAccountDeletionIdsRef.current.includes(verifiedUserId)) {
+        await clearLocalAccountDeletionPending(verifiedUserId);
+        pendingAccountDeletionIdsRef.current = pendingAccountDeletionIdsRef.current
+          .filter((pendingUserId) => pendingUserId !== verifiedUserId);
+      }
+    } catch {
+      // Keep this account hidden until its marker can be cleared safely.
+    }
+  };
+
+  const finishPendingAccountDeletionAfterTerminalAuth = async (candidateUserId?: string) => {
+    const candidates = candidateUserId
+      ? pendingAccountDeletionIdsRef.current.filter((pendingUserId) => pendingUserId === candidateUserId)
+      : [...pendingAccountDeletionIdsRef.current];
+    if (!candidates.length) return false;
+
+    const results = await Promise.allSettled(candidates.map(cleanupDeletedAccountData));
+    const completed = new Set(
+      candidates.filter((_, index) => results[index]?.status === "fulfilled")
+    );
+    pendingAccountDeletionIdsRef.current = pendingAccountDeletionIdsRef.current
+      .filter((pendingUserId) => !completed.has(pendingUserId));
+    return completed.size > 0;
+  };
+
   const syncRestoreKey = (userId = activeUserIdRef.current) => accountScopedKey(SYNC_RESTORE_KEY, userId);
   const migrationBackupKey = (userId = activeUserIdRef.current) => accountScopedKey(MIGRATION_BACKUP_KEY, userId);
   const broadcastLocalStateSaved = (userId = activeUserIdRef.current) => {
@@ -1054,13 +1041,17 @@ export default function App() {
     }
   });
 
-  const transitionToAnonymousState = async (message: string, notification: string) => {
+  const transitionToAnonymousState = async (
+    message: string,
+    notification: string,
+    options: { persistPrevious?: boolean } = {}
+  ) => {
     const transitionEpoch = accountEpochRef.current + 1;
     const previousUserId = activeUserIdRef.current;
     const previousState = stateRef.current;
     accountEpochRef.current = transitionEpoch;
 
-    if (previousUserId) {
+    if (previousUserId && options.persistPrevious !== false) {
       try {
         await mergeAndSaveStateForAccount(previousState, previousUserId);
         broadcastLocalStateSaved(previousUserId);
@@ -1107,13 +1098,19 @@ export default function App() {
 
   const handleTerminalAuthFailure = async (error: unknown, current: AppState) => {
     if (!isTerminalAuthError(error)) return false;
+    const candidateUserId = activeUserIdRef.current || pendingOfflineUserRef.current?.id;
+    const pendingDeletionFinished = await finishPendingAccountDeletionAfterTerminalAuth(candidateUserId);
     localAuthTransitionRef.current = true;
     try {
       await signOut(current.settings.supabaseUrl, current.settings.supabaseAnonKey).catch(() => undefined);
     } finally {
       localAuthTransitionRef.current = false;
     }
-    await transitionToAnonymousState("登录会话已失效", "登录会话已失效，已切换到未登录数据");
+    await transitionToAnonymousState(
+      pendingDeletionFinished ? "账号删除已完成" : "登录会话已失效",
+      pendingDeletionFinished ? "账号删除已完成，本设备账号数据已清除" : "登录会话已失效，已切换到未登录数据",
+      { persistPrevious: !pendingDeletionFinished }
+    );
     return true;
   };
 
@@ -1162,23 +1159,26 @@ export default function App() {
     let anonymousAdopted = false;
     let finalAnonymousCommitRequired = false;
     let finalAnonymousCommitCompleted = false;
+    let outgoingPersistenceFailed = false;
     setSync((old) => ({ ...old, syncing: true, message: reason }));
-    if (previousUserId && previousUserId !== user.id) {
-      try {
-        await mergeAndSaveStateForAccount(previousState, previousUserId);
-        broadcastLocalStateSaved(previousUserId);
-      } catch {
-        if (accountEpochRef.current === operationEpoch) {
-          setSync((old) => ({ ...old, syncing: false, message: "当前账号数据无法安全保存，已取消账号切换" }));
-        }
-        throw new Error("当前账号数据无法安全保存，请先导出备份并检查浏览器存储空间");
-      }
-      if (accountEpochRef.current !== operationEpoch) throw new Error("账号操作已取消");
-    }
-    setResolvedIconCacheScope(user.id);
-    if (previousUserId !== user.id) setWeather(undefined);
-
     try {
+      await resolvePendingAccountDeletionForVerifiedUser(user.id);
+      if (pendingAccountDeletionIdsRef.current.includes(user.id)) {
+        throw new Error("无法确认此账号此前的删除请求，请检查浏览器存储权限后重试");
+      }
+      if (previousUserId && previousUserId !== user.id) {
+        try {
+          await mergeAndSaveStateForAccount(previousState, previousUserId);
+          broadcastLocalStateSaved(previousUserId);
+        } catch {
+          outgoingPersistenceFailed = true;
+          throw new Error("当前账号数据无法安全保存，请先导出备份并检查浏览器存储空间");
+        }
+        if (accountEpochRef.current !== operationEpoch) throw new Error("账号操作已取消");
+      }
+      setResolvedIconCacheScope(user.id);
+      if (previousUserId !== user.id) setWeather(undefined);
+
       const local = await loadStateForAccount(user.id);
       localStateExisted = local.existed;
       if (accountEpochRef.current !== operationEpoch) throw new Error("账号操作已取消");
@@ -1272,6 +1272,21 @@ export default function App() {
       return next;
     } catch (error) {
       if (accountEpochRef.current === operationEpoch) {
+        if (outgoingPersistenceFailed && previousUserId) {
+          activeUserIdRef.current = previousUserId;
+          pendingOfflineUserRef.current = user;
+          setResolvedIconCacheScope(previousUserId);
+          applyState(previousState);
+          setSync((old) => ({
+            ...old,
+            user: null,
+            syncing: false,
+            autoSync: previousState.sync.autoSync,
+            message: "账号切换已暂停；当前数据只保留在内存中，存储恢复后会重试"
+          }));
+          showToast("当前账号数据无法安全保存，已暂停切换；请立即导出完整备份");
+          throw error;
+        }
         if (error instanceof AuthAccountChangedError) {
           const changedUser = await getUser(previousState.settings.supabaseUrl, previousState.settings.supabaseAnonKey).catch(() => null);
           if (changedUser && changedUser.id !== user.id) {
@@ -1366,7 +1381,16 @@ export default function App() {
         }
         if (event !== "SIGNED_OUT" || (!activeUserIdRef.current && !pendingOfflineUserRef.current)) return;
         window.setTimeout(() => {
-          if (!cancelled) void transitionToAnonymousState("登录会话已失效", "登录会话已失效，已切换到未登录数据");
+          if (cancelled) return;
+          const candidateUserId = activeUserIdRef.current || pendingOfflineUserRef.current?.id;
+          void (async () => {
+            const pendingDeletionFinished = await finishPendingAccountDeletionAfterTerminalAuth(candidateUserId);
+            await transitionToAnonymousState(
+              pendingDeletionFinished ? "账号删除已完成" : "登录会话已失效",
+              pendingDeletionFinished ? "账号删除已完成，本设备账号数据已清除" : "登录会话已失效，已切换到未登录数据",
+              { persistPrevious: !pendingDeletionFinished }
+            );
+          })();
         }, 0);
       });
       unsubscribe = () => data.subscription.unsubscribe();
@@ -1379,36 +1403,45 @@ export default function App() {
 
   useEffect(() => {
     void (async () => {
-      if (accountCleanupPending()) {
-        try {
-          await deleteAllLocalAccountData();
-          deleteAllResolvedIconCaches();
-          clearAccountCleanupPending();
-        } catch {
-          // Keep the marker so a later startup can retry the privacy cleanup.
-        }
-      }
+      const pendingAccountDeletionIds = await readPendingLocalAccountDeletionIds();
+      pendingAccountDeletionIdsRef.current = pendingAccountDeletionIds;
       const bootState = defaultState();
       let authVerifiedOnline = false;
       let user = await getCachedUser(bootState.settings.supabaseUrl, bootState.settings.supabaseAnonKey).catch(() => null);
+      const cachedUserId = user?.id;
       if (navigator.onLine) {
         try {
           user = await getUser(bootState.settings.supabaseUrl, bootState.settings.supabaseAnonKey);
           authVerifiedOnline = true;
         } catch (error) {
           if (isTerminalAuthError(error)) {
+            await finishPendingAccountDeletionAfterTerminalAuth(cachedUserId);
             user = null;
+            authVerifiedOnline = true;
             await signOut(bootState.settings.supabaseUrl, bootState.settings.supabaseAnonKey).catch(() => undefined);
           }
           // Keep the cached account available only when Auth is temporarily unreachable.
         }
+      }
+      if (authVerifiedOnline && user) {
+        await resolvePendingAccountDeletionForVerifiedUser(user.id);
       }
       let normalized: AppState;
       let recovered = false;
       let activatedOnline = false;
       let waitingForAccountRecovery = false;
 
-      if (user && authVerifiedOnline) {
+      if (user && pendingAccountDeletionIdsRef.current.includes(user.id)) {
+        pendingOfflineUserRef.current = user || undefined;
+        waitingForAccountRecovery = true;
+        activeUserIdRef.current = undefined;
+        setResolvedIconCacheScope();
+        const anonymousState = await loadStateForAccount();
+        recovered = anonymousState.recovered;
+        normalized = normalizeState(anonymousState.state);
+        user = null;
+        applyState(normalized);
+      } else if (user && authVerifiedOnline) {
         const anonymousState = await loadStateForAccount();
         recovered = anonymousState.recovered;
         activeUserIdRef.current = undefined;
@@ -1547,7 +1580,6 @@ export default function App() {
       }
 
       if (message.type === "account-deleted" && messageUserId) {
-        setAccountCleanupPending();
         void cleanupDeletedAccountData(messageUserId).catch(() => undefined);
         if (messageUserId !== activeUserIdRef.current) return;
         accountEpochRef.current = expectedEpoch + 1;
@@ -2052,17 +2084,24 @@ export default function App() {
     const resumeSync = () => {
       if (document.visibilityState !== "visible" || !navigator.onLine) return;
       const pendingUser = pendingOfflineUserRef.current;
-      if (pendingUser) {
+      if (pendingUser || pendingAccountDeletionIdsRef.current.length) {
         if (pendingOfflineActivationRef.current) return;
         pendingOfflineActivationRef.current = true;
         const current = stateRef.current;
         void getUser(current.settings.supabaseUrl, current.settings.supabaseAnonKey)
           .then(async (verifiedUser) => {
-            if (!pendingOfflineUserRef.current || pendingOfflineUserRef.current.id !== pendingUser.id) return;
-            if (!verifiedUser || verifiedUser.id !== pendingUser.id) {
-              await transitionToAnonymousState("登录会话已失效", "登录会话已失效，请重新登录");
+            if (!verifiedUser) {
+              const pendingDeletionFinished = await finishPendingAccountDeletionAfterTerminalAuth(
+                activeUserIdRef.current || pendingOfflineUserRef.current?.id
+              );
+              await transitionToAnonymousState(
+                pendingDeletionFinished ? "账号删除已完成" : "登录会话已失效",
+                pendingDeletionFinished ? "账号删除已完成，本设备账号数据已清除" : "登录会话已失效，请重新登录",
+                { persistPrevious: !pendingDeletionFinished }
+              );
               return;
             }
+            if (pendingUser && pendingOfflineUserRef.current?.id !== pendingUser.id) return;
             await activateSignedInUser(verifiedUser, "网络已恢复，正在安全加载账号数据");
             // The verified Supabase user above is authoritative; this marker only selects feedback.
             if (signupVerificationRef.current) {
@@ -2100,6 +2139,7 @@ export default function App() {
     window.addEventListener("online", resumeSync);
     window.addEventListener("focus", resumeSync);
     document.addEventListener("visibilitychange", onVisibility);
+    resumeSync();
     return () => {
       window.removeEventListener("online", resumeSync);
       window.removeEventListener("focus", resumeSync);
@@ -3580,10 +3620,19 @@ export default function App() {
             localAuthTransitionRef.current = true;
             try {
               if (mode === "login") {
-                const user = await signIn(supabaseUrl, supabaseAnonKey, email, password, captchaToken);
+                const { user, passwordSafetyWarning } = await signIn(
+                  supabaseUrl,
+                  supabaseAnonKey,
+                  email,
+                  password,
+                  captchaToken
+                );
                 if (!user) throw new Error("登录成功但没有返回账号信息，请重试");
                 await activateSignedInUser(user, "正在加载账号数据");
-                return { status: "signed-in", message: "登录成功，已加载此账号的数据。" };
+                return {
+                  status: "signed-in",
+                  message: passwordSafetyWarning || "登录成功，已加载此账号的数据。"
+                };
               }
 
               const result = await signUp(supabaseUrl, supabaseAnonKey, email, password, getAuthRedirectUrl(), captchaToken);
@@ -3613,6 +3662,9 @@ export default function App() {
             accountEpochRef.current = deletionEpoch;
             localAuthTransitionRef.current = true;
             try {
+              await mergeAndSaveStateForAccount(current, deletingUserId);
+              broadcastLocalStateSaved(deletingUserId);
+              await markLocalAccountDeletionPending(deletingUserId);
               await deleteAccount(
                 current.settings.supabaseUrl || "",
                 current.settings.supabaseAnonKey || "",
@@ -3621,14 +3673,45 @@ export default function App() {
                 captchaToken
               );
             } catch (error) {
+              if (error instanceof AccountDeletionRejectedError) {
+                await clearLocalAccountDeletionPending(deletingUserId).catch(() => undefined);
+                pendingAccountDeletionIdsRef.current = pendingAccountDeletionIdsRef.current
+                  .filter((userId) => userId !== deletingUserId);
+                localAuthTransitionRef.current = false;
+                if (accountEpochRef.current === deletionEpoch) accountEpochRef.current = deletionEpoch - 1;
+                throw error;
+              }
+              if (error instanceof AccountDeletionOutcomeUnknownError) {
+                pendingAccountDeletionIdsRef.current = Array.from(new Set([
+                  ...pendingAccountDeletionIdsRef.current,
+                  deletingUserId
+                ]));
+                await transitionToAnonymousState(
+                  "账号删除状态待核验",
+                  "删除请求结果待联网核验；本设备已退出并隐藏账号数据",
+                  { persistPrevious: false }
+                );
+                pendingOfflineUserRef.current = sync.user || undefined;
+                localAuthTransitionRef.current = false;
+                throw error;
+              }
+              await clearLocalAccountDeletionPending(deletingUserId).catch(() => undefined);
               localAuthTransitionRef.current = false;
               if (accountEpochRef.current === deletionEpoch) accountEpochRef.current = deletionEpoch - 1;
               throw error;
             }
-            const cleanupQueued = setAccountCleanupPending();
             const accountCleanup = await Promise.allSettled([
               cleanupDeletedAccountData(deletingUserId)
             ]);
+            if (accountCleanup.some((result) => result.status === "rejected")) {
+              pendingAccountDeletionIdsRef.current = Array.from(new Set([
+                ...pendingAccountDeletionIdsRef.current,
+                deletingUserId
+              ]));
+            } else {
+              pendingAccountDeletionIdsRef.current = pendingAccountDeletionIdsRef.current
+                .filter((userId) => userId !== deletingUserId);
+            }
             localStateChannelRef.current?.postMessage({
               type: "account-deleted",
               senderId: localStatePeerIdRef.current,
@@ -3654,15 +3737,24 @@ export default function App() {
             lastSyncedUpdatedAtRef.current = undefined;
             setDialog(null);
             showToast(cleanup.some((result) => result.status === "rejected")
-              ? cleanupQueued
-                ? "账号和云端数据已删除；本机缓存将在下次启动时继续清理"
-                : "账号和云端数据已删除；本机缓存清理失败，请清理浏览器网站数据"
+              ? "账号和云端数据已删除；此账号的本机缓存将在下次启动时继续清理"
               : "账号、云端数据和此设备上的账号数据已永久删除");
           }}
           onResetPassword={async (email, captchaToken) => {
             const { supabaseUrl, supabaseAnonKey } = state.settings;
             if (!supabaseUrl || !supabaseAnonKey) throw new Error("同步服务暂未配置，请稍后再试");
             await requestPasswordReset(supabaseUrl, supabaseAnonKey, email, getAuthRedirectUrl(), captchaToken);
+          }}
+          onResendVerification={async (email, captchaToken) => {
+            const { supabaseUrl, supabaseAnonKey } = state.settings;
+            if (!supabaseUrl || !supabaseAnonKey) throw new Error("同步服务暂未配置，请稍后再试");
+            await resendSignupConfirmation(
+              supabaseUrl,
+              supabaseAnonKey,
+              email,
+              getAuthRedirectUrl(),
+              captchaToken
+            );
           }}
           onUpdatePassword={async (password, currentPassword, captchaToken) => {
             const { supabaseUrl, supabaseAnonKey } = state.settings;
@@ -5714,7 +5806,7 @@ function TimeZoneDialog({ current, onClose, onChoose }: { current: string; onClo
   );
 }
 
-function SyncDialog({ state, sync, updateState, onClose, onLogin, onSignOut, onSignOutAll, onDeleteAccount, onResetPassword, onUpdatePassword, passwordRecovery, onPasswordRecoveryComplete, onSync, restoreAvailable, onRestore }: {
+function SyncDialog({ state, sync, updateState, onClose, onLogin, onSignOut, onSignOutAll, onDeleteAccount, onResetPassword, onResendVerification, onUpdatePassword, passwordRecovery, onPasswordRecoveryComplete, onSync, restoreAvailable, onRestore }: {
   state: AppState;
   sync: SyncStatus;
   updateState: (updater: (state: AppState) => AppState) => void;
@@ -5724,6 +5816,7 @@ function SyncDialog({ state, sync, updateState, onClose, onLogin, onSignOut, onS
   onSignOutAll: () => Promise<void>;
   onDeleteAccount: (password: string, captchaToken: string) => Promise<void>;
   onResetPassword: (email: string, captchaToken: string) => Promise<void>;
+  onResendVerification: (email: string, captchaToken: string) => Promise<void>;
   onUpdatePassword: (password: string, currentPassword?: string, captchaToken?: string) => Promise<void>;
   passwordRecovery: boolean;
   onPasswordRecoveryComplete: () => void;
@@ -5803,6 +5896,30 @@ function SyncDialog({ state, sync, updateState, onClose, onLogin, onSignOut, onS
       setNotice("密码重置邮件已发送，请前往邮箱继续操作。");
     } catch (err) {
       setError(friendlyAuthError(err, "重置邮件发送失败，请稍后重试"));
+    } finally {
+      authChallengeRef.current?.reset();
+      setBusy(false);
+    }
+  };
+  const resendVerification = async () => {
+    const normalizedEmail = email.trim().toLowerCase();
+    if (!normalizedEmail || normalizedEmail.length > 320) {
+      setError("请先填写邮箱地址");
+      return;
+    }
+    if (!captchaToken) {
+      setError("请先完成安全验证");
+      return;
+    }
+    setBusy(true);
+    setError("");
+    setNotice("");
+    try {
+      setEmail(normalizedEmail);
+      await onResendVerification(normalizedEmail, captchaToken);
+      setNotice("如果该邮箱存在待验证注册，验证邮件已重新发送，请同时检查垃圾邮件。");
+    } catch (err) {
+      setError(friendlyAuthError(err, "验证邮件暂时无法重新发送，请稍后重试"));
     } finally {
       authChallengeRef.current?.reset();
       setBusy(false);
@@ -6047,7 +6164,12 @@ function SyncDialog({ state, sync, updateState, onClose, onLogin, onSignOut, onS
           <button className="primary sync-submit" disabled={busy || !email || !password || !captchaToken || !CAPTCHA_CONFIGURED || (authMode === "signup" && !legalConsent)} onClick={() => submit(authMode)}>
             {busy ? "处理中" : authMode === "login" ? "登录并同步" : "注册并同步"}
           </button>
-          {authMode === "login" && <button type="button" className="sync-reset-password" disabled={busy || !email || !captchaToken || !CAPTCHA_CONFIGURED} onClick={() => void resetPassword()}>忘记密码</button>}
+          {authMode === "login" && (
+            <div className="sync-auth-secondary-actions">
+              <button type="button" className="sync-reset-password" disabled={busy || !email || !captchaToken || !CAPTCHA_CONFIGURED} onClick={() => void resetPassword()}>忘记密码</button>
+              <button type="button" className="sync-reset-password" disabled={busy || !email || !captchaToken || !CAPTCHA_CONFIGURED} onClick={() => void resendVerification()}>重新发送验证邮件</button>
+            </div>
+          )}
         </div>
       )}
       {sync.user && (

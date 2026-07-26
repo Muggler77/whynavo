@@ -22,6 +22,8 @@ whytab is both a ready-to-use product and a publicly auditable, configurable cod
 - Local-first data: shortcuts, widgets, todos, notes, countdowns, settings, and layout are stored in the browser's IndexedDB.
 - Optional cloud sync: users can register or sign in with email and password to sync across devices.
 - User data isolation: cloud data is protected by Supabase Auth and Row Level Security.
+- Password safety: login, registration, and replacement passwords are checked against Have I Been Pwned with a k-anonymous five-character hash prefix; the full password and full hash stay on the device.
+- Bounded cloud sessions: account-bound database functions reject whytab cloud-data access after 90 days or 30 days of inactivity without forcing single-device sign-in.
 - Editable home workspace: enable layout editing to reorder shortcuts and widgets without changing their data.
 - Full-bleed website icons: real site artwork fills the icon itself without an extra colored container.
 - Translucent workspace: neutral, wallpaper-aware materials keep cards readable without imposing random widget colors.
@@ -52,7 +54,7 @@ The web app does not replace the browser's new tab page, but it provides the sam
 
 Cloudflare Pages deployment uses the root `wrangler.toml` and publishes `extension/web-dist`. The Chrome/Edge package is built separately in `extension/dist`, so Cloudflare-only files such as `_headers` can never make the browser extension invalid. The shared `pages.dev` hostname is free and can later be replaced by an owned custom domain without changing the Supabase project or synchronized user data.
 
-Automatic production deployment requires `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, `VITE_TURNSTILE_SITE_KEY`, and `SUPABASE_ACCESS_TOKEN` repository secrets. No database password or connection string is stored in GitHub. Reviewed migrations use the authenticated Supabase Management API while direct database ingress remains closed. The workflow first prepares backward-compatible database and Edge Function changes and a private draft Release, switches the Pages bundle, revokes the unsupported sync API, and runs strict production security checks. Only then does it make the matching Release public. Release and deployment jobs also require the explicit `WHYTAB_PRODUCTION_ENABLED` repository variable. The Cloudflare token must be restricted to Pages edit access for the whytab account. Missing production configuration fails the deployment instead of reporting a misleading successful run.
+Automatic production deployment requires `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, `VITE_TURNSTILE_SITE_KEY`, and `SUPABASE_ACCESS_TOKEN` repository secrets. No database password or connection string is stored in GitHub. Reviewed migrations use the authenticated Supabase Management API while direct database ingress remains closed. The workflow prepares backward-compatible database and Edge Function changes, passes a strict production predeployment gate, and creates a private draft Release. It first deploys and smoke-tests the new web bundle while preserving the already-public update manifest and the protected old-client compatibility path. After the matching Release is public, a second atomic Pages deployment activates the update manifest; only then does the workflow revoke the retired write API and repeat final checks. A failed rollout therefore cannot advertise a missing archive or strand older users without an available upgrade. Release and deployment jobs also require the explicit `WHYTAB_PRODUCTION_ENABLED` repository variable.
 
 ### Install as a Chrome or Edge new tab extension
 
@@ -99,6 +101,7 @@ Sign-in is optional.
 - You can use whytab without an account. Your data stays in the current browser profile.
 - To sync across devices, open the account/sync panel and register with email and password.
 - Registration and replacement passwords require at least 12 characters with uppercase letters, lowercase letters, and numbers. The login panel can send a password-reset email, and signed-in users can update their password only after confirming the current password.
+- Registration and replacement-password operations fail closed when the privacy-preserving leaked-password check is unavailable. A successful login remains available if that third-party check is down, but whytab displays a warning; a known leaked login password also produces an immediate change-password warning. Only the first five characters of a locally computed SHA-1 digest are sent to the Pwned Passwords range API.
 - Public authentication actions include a Cloudflare Turnstile anti-abuse check; the one-time challenge token is never saved as user data.
 - Use the same account on another device to sync shortcuts, widgets, notes, todos, countdowns, settings, and layout.
 - If you created data before signing in, whytab keeps it locally and carries it into your account when you sign in.
@@ -425,7 +428,7 @@ For public distribution, publish the packaged extension through the Chrome Web S
 
 For Chrome Web Store submission, upload a zip whose root contains `manifest.json` and the built assets from `extension/dist`.
 
-Security release 0.6.0 retires the earlier sync-write API. Version 0.5.7 and older keep their local data but cannot upload after the production cutover. Replace the unpacked extension with the latest release directory and reload it from the extension-management page before continuing cloud synchronization.
+Security release 0.6.0 retires the account-unbound sync-write API. Version 0.5.7 can still read its own pre-0.6 snapshot through session-bound RLS, but it stops syncing safely after a 0.6.0 client writes the new minimum-version marker. Older clients that used the retired write API are rejected immediately. Local data remains intact; replace an unpacked extension with the latest release directory and reload it from the extension-management page before continuing cloud synchronization.
 
 ## Edge Installation
 
@@ -455,7 +458,7 @@ Public users do not need to enter service URLs or API keys. The official hosted 
 
 Only developers who fork the repository and self-host their own independent copy need to configure `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, and `VITE_AUTH_REDIRECT_URL`, apply every SQL migration in `supabase/migrations/` in numeric order, configure the required function secrets, and deploy the Edge Functions in `supabase/functions/`. In that mode, this repository works as a configurable framework: the frontend, Auth provider, database project, email domain, and deployment target can be replaced by the self-hosting developer.
 
-For email verification, configure the Supabase Auth Site URL and Redirect URLs to the hosted app URL. A `pages.dev` subdomain cannot be used as a custom email sender domain. Supabase's built-in sender is suitable only for restricted testing and must not be used for public registration. Before public signup is enabled, configure an owned sender domain with production SMTP or the audited Send Email Hook. The branded confirmation template in `docs/supabase-confirm-signup-email.html` keeps the `{{ .ConfirmationURL }}` variable intact.
+For email verification, configure the Supabase Auth Site URL and Redirect URLs to the hosted app URL. A `pages.dev` subdomain cannot be used as a custom email sender domain. Supabase's built-in sender is suitable only for restricted testing and must not be used for public registration. Before public signup is enabled, configure an owned sender domain with production SMTP or the audited Send Email Hook. The production Hook and the tracked built-in sender templates route one-time tokens through `confirm.html` so mailbox link prefetch cannot consume them before the user explicitly continues.
 
 ## Import and Backup
 

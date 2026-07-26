@@ -5144,6 +5144,13 @@ a svg {
   border: 0;
 }
 
+.sync-auth-secondary-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 4px 10px;
+}
+
 .sync-password-update {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

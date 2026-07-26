@@ -88,3 +88,5 @@ supabase functions deploy send-auth-email
 ```
 
 Then enable the Supabase Auth "Send Email" hook and point it to the deployed function URL. With the hook enabled, Supabase delegates Auth email delivery to the hook instead of using the built-in SMTP sender.
+
+The Hook does not place the Supabase one-time verification endpoint directly in the email. It places the endpoint in the URL fragment of `https://whytab.pages.dev/confirm.html`; URL fragments are not sent to Cloudflare. The static page validates the exact Supabase project, endpoint, action, token shape, and redirect origin, then proceeds only after a trusted user click. This follows Supabase's documented mitigation for email-provider link prefetch. Disable click/open tracking in the email provider because rewritten authentication links are unsupported.

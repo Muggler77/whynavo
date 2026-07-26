@@ -45,7 +45,7 @@ For the official Cloudflare Pages workflow, configure repository secrets for the
 - `VITE_SUPABASE_ANON_KEY`
 - `VITE_TURNSTILE_SITE_KEY`
 
-The workflow fixes `VITE_AUTH_REDIRECT_URL` and `VITE_CAPTCHA_FRAME_URL` to the official Pages origin. Cloudflare deployment also requires the repository secrets `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`; the API token must be restricted to Pages write access for the whytab account. `SUPABASE_ACCESS_TOKEN` lets the workflow apply reviewed SQL through the official Management API and deploy versioned Edge Functions without storing a database password or connection string. Direct database ingress remains closed throughout deployment. Backward-compatible sync changes are prepared first, and the old sync API is revoked only after the new Pages client is live.
+The workflow fixes `VITE_AUTH_REDIRECT_URL` and `VITE_CAPTCHA_FRAME_URL` to the official Pages origin. Cloudflare deployment also requires the repository secrets `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`; the API token must be restricted to Pages write access for the whytab account. `SUPABASE_ACCESS_TOKEN` lets the workflow apply reviewed SQL through the official Management API and deploy versioned Edge Functions without storing a database password or connection string. Direct database ingress remains closed throughout deployment. Backward-compatible sync changes are prepared first; the legacy entry point is revoked only after the replacement Release is public and its update manifest is active.
 
 Do not commit real values to source control.
 
@@ -66,7 +66,7 @@ Recommended sender settings:
 - Sender name: `whytab`
 - Sender email: use a verified sender/domain that belongs to the project.
 
-The built-in Supabase Auth sender may be used only for restricted administrator testing with the branded bilingual confirmation template tracked in `docs/supabase-confirm-signup-email.html`. It is not a production delivery path.
+The built-in Supabase Auth sender may be used only for restricted administrator testing. Its branded bilingual registration and recovery templates are tracked in `docs/supabase-confirm-signup-email.html` and `docs/supabase-reset-password-email.html`. Both templates use whytab's explicit-click confirmation page so mailbox link scanners cannot consume the one-time token.
 
 Cloudflare's shared `pages.dev` zone cannot be verified as a custom email sender domain. Keep public registration disabled until an owned domain has been verified and Custom SMTP or the audited Send Email Hook in `docs/auth-email-delivery.md` is configured and delivery-tested.
 
@@ -76,9 +76,9 @@ Recommended confirmation email subject:
 Verify your whytab email / 验证 whytab 邮箱
 ```
 
-Use the full HTML body in `docs/supabase-confirm-signup-email.html`. It includes the public whytab logo at `https://whytab.pages.dev/icons/icon128.png`, explains why the email was sent, and keeps the wording focused on verifying a sync account.
+Use the full HTML body in `docs/supabase-confirm-signup-email.html`. It includes the public whytab logo at `https://whytab.pages.dev/icons/icon128.png`, explains why the email was sent, and keeps the wording focused on verifying a sync account. Use `docs/supabase-reset-password-email.html` for recovery messages.
 
-The template should keep Supabase's `{{ .ConfirmationURL }}` variable unchanged. Supabase replaces it with the real verification link.
+The templates must keep Supabase's `{{ .TokenHash }}` variable unchanged. The token is placed in the URL fragment of `confirm.html`, validated locally, and sent to Supabase only after the user explicitly continues.
 
 ## Secret Handling Rules
 
@@ -120,7 +120,7 @@ This ensures signed-in users can only read and write their own rows.
 
 Current app versions use `sync_snapshots` for full-state sync. The migration also includes finer-grained tables so future versions can move toward per-record sync.
 
-Every write uses the `push_sync_snapshot_for_user` RPC. The client supplies the account ID of the currently visible local partition, and the database rejects the write unless it exactly matches `auth.uid()`. Snapshot reads are also filtered and verified against that expected account. The older account-unbound write RPC is revoked by migration `0011`.
+Current clients use account-bound read and write RPCs. The client supplies the account ID of the currently visible local partition, and the database rejects the request unless it exactly matches `auth.uid()`. The database also verifies the JWT session against `auth.sessions` and enforces a 90-day maximum lifetime plus a 30-day inactivity limit for whytab cloud-data access. The older account-unbound write RPC is revoked after the compatible client is live. Published 0.5.x clients temporarily retain direct read permission, but RLS restricts it to the authenticated user's row and invokes the same session-expiry policy.
 
 Sync actions:
 

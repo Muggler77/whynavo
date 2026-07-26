@@ -47,10 +47,16 @@ const emailPattern = /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi;
 const jwtPattern = /\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\b/g;
 
 const findings = [];
+let scannedFileCount = 0;
 for (const path of candidateFiles) {
   if (path === "scripts/repository-safety-test.mjs" || path === "scripts/repository-history-safety-test.mjs") continue;
   if (binaryExtensions.has(extname(path).toLowerCase())) continue;
-  const content = await readFile(path, "utf8");
+  const content = await readFile(path, "utf8").catch((error) => {
+    if (error?.code === "ENOENT") return undefined;
+    throw error;
+  });
+  if (content === undefined) continue;
+  scannedFileCount += 1;
   for (const rule of forbiddenContent) {
     if (rule.pattern.test(content)) findings.push(`${path}: ${rule.label}`);
   }
@@ -69,4 +75,4 @@ for (const path of candidateFiles) {
 }
 
 assert.deepEqual(findings, [], `repository privacy or secret findings:\n${findings.join("\n")}`);
-console.log(`Repository safety check passed for ${candidateFiles.length} publishable files.`);
+console.log(`Repository safety check passed for ${scannedFileCount} publishable text files.`);

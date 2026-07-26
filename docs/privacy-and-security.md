@@ -36,9 +36,11 @@ Cloud sync includes:
 
 Private photo-frame images and filenames, inline wallpaper data, uploaded custom wallpapers, and uploaded shortcut or folder icons are deliberately removed from cloud snapshots. They remain on the device and can be moved through a user-created complete backup.
 
-Supabase Auth maintains browser-local access and refresh session tokens so a signed-in device can keep its session. whytab does not place those tokens in application state, IndexedDB, exported backups, or synchronization snapshots. Local sign-out removes the current device session; global sign-out revokes the account's refresh sessions.
+Supabase Auth maintains browser-local access and refresh session tokens so a signed-in device can keep its session. whytab does not place those tokens in application state, IndexedDB, exported backups, or synchronization snapshots. Local sign-out removes the current device session; global sign-out revokes the account's refresh sessions. Cloud-data reads and writes also enforce a server-side 90-day maximum session lifetime and a 30-day inactivity limit.
 
-Cloud snapshots are protected by Auth, RLS, account-scoped restore points, optimistic concurrency, a fixed `primary` snapshot name, and a 2 MB server-side payload boundary. Legacy direct table access is revoked for public clients; writes go through one authenticated atomic RPC. Cloud fields are not end-to-end encrypted, so the hosted database operator can technically access synchronized content. Do not place passwords or highly sensitive secrets in notes or shortcut titles.
+Cloud snapshots are protected by Auth, RLS, account-scoped restore points, optimistic concurrency, a fixed `primary` snapshot name, and a 2 MB server-side payload boundary. Current clients read and write through account-bound authenticated RPCs. During the 0.6.0 transition, published 0.5.x clients may still read only their own row through an RLS policy that enforces the same session-expiry check; the legacy account-unbound write RPC is revoked. Cloud fields are not end-to-end encrypted, so the hosted database operator can technically access synchronized content. Do not place passwords or highly sensitive secrets in notes or shortcut titles.
+
+For registration and password replacement, the browser checks the password before submission by computing its SHA-1 hash locally and sending only the first five hash characters to the free Have I Been Pwned Pwned Passwords range API. Those operations stop if the check fails or finds a known leak. Login first sends the password over HTTPS to Supabase Auth; after successful authentication, whytab performs the same k-anonymous check and shows a warning instead of locking an existing user out when the third-party check is unavailable. The complete password and complete hash are never sent to Have I Been Pwned, padded responses are compared locally, and no result is stored.
 
 ## Website Icons
 
@@ -113,7 +115,7 @@ Never commit:
 - Tombstones for custom navigation page deletion
 - Account-operation cancellation guards during login, logout, and sync
 - Client and server 2 MB cloud snapshot limits
-- Read-only snapshot table access with authenticated atomic writes
+- Account-bound snapshot read and write RPCs with server-enforced session limits
 - Device-local handling for private photos and custom wallpaper data
 - Bounded external icon caches and explicit local persistence errors
 - CSP, HSTS, frame blocking, and browser permission policy on the hosted app

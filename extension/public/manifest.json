@@ -15,6 +15,7 @@
   ],
   "host_permissions": [
     "https://api.open-meteo.com/*",
+    "https://api.pwnedpasswords.com/*",
     "https://geocoding-api.open-meteo.com/*",
     "https://keafulupzvfljvbzwgrq.supabase.co/*",
     "https://whytab.pages.dev/*"

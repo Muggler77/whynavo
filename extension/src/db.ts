@@ -10,16 +10,11 @@ const STATE_KEY = "app-state";
 const ANONYMOUS_STATE_KEY = "app-state:anonymous";
 const accountStateKey = (userId?: string) => userId ? `app-state:user:${userId}` : ANONYMOUS_STATE_KEY;
 const deletedAccountMarkerKey = (userId: string) => `deleted-account:user:${userId}`;
+const pendingAccountDeletionKey = (userId: string) => `pending-account-deletion:user:${userId}`;
+const PENDING_ACCOUNT_DELETION_PREFIX = "pending-account-deletion:user:";
 const RATES_KEY = "rates-cache";
 const WEATHER_KEY = "weather-cache";
 export const CORRUPT_STATE_BACKUP_KEY = "corrupt-state-backup";
-const ACCOUNT_DATA_KEY_PREFIXES = [
-  "app-state:user:",
-  `${WEATHER_KEY}:user:`,
-  "sync-restore-point:user:",
-  `${MIGRATION_BACKUP_KEY}:user:`,
-  `${CORRUPT_STATE_BACKUP_KEY}:user:`
-];
 
 export const accountScopedKey = (base: string, userId?: string) => `${base}:${userId ? `user:${userId}` : "anonymous"}`;
 
@@ -280,7 +275,8 @@ export async function deleteLocalAccountData(userId: string): Promise<void> {
     accountScopedKey(WEATHER_KEY, userId),
     accountScopedKey("sync-restore-point", userId),
     accountScopedKey(MIGRATION_BACKUP_KEY, userId),
-    accountScopedKey(CORRUPT_STATE_BACKUP_KEY, userId)
+    accountScopedKey(CORRUPT_STATE_BACKUP_KEY, userId),
+    pendingAccountDeletionKey(userId)
   ];
   const db = await openDb();
   return new Promise((resolve, reject) => {
@@ -294,10 +290,25 @@ export async function deleteLocalAccountData(userId: string): Promise<void> {
   });
 }
 
-export async function deleteAllLocalAccountData(): Promise<void> {
+export async function markLocalAccountDeletionPending(userId: string): Promise<void> {
+  await writeKey(pendingAccountDeletionKey(userId), {
+    requestedAt: new Date().toISOString()
+  });
+}
+
+export async function clearLocalAccountDeletionPending(userId: string): Promise<void> {
+  await deleteKey(pendingAccountDeletionKey(userId));
+}
+
+export async function clearLocalDeletedAccountMarkerForVerifiedUser(userId: string): Promise<void> {
+  await deleteKey(deletedAccountMarkerKey(userId));
+}
+
+export async function readPendingLocalAccountDeletionIds(): Promise<string[]> {
   const db = await openDb();
   return new Promise((resolve, reject) => {
-    const tx = db.transaction(STORE, "readwrite");
+    const ids: string[] = [];
+    const tx = db.transaction(STORE, "readonly");
     const store = tx.objectStore(STORE);
     const request = store.openCursor();
     request.onsuccess = () => {
@@ -306,14 +317,17 @@ export async function deleteAllLocalAccountData(): Promise<void> {
       const key = cursor.key;
       if (
         typeof key === "string"
-        && ACCOUNT_DATA_KEY_PREFIXES.some((prefix) => key.startsWith(prefix))
+        && key.startsWith(PENDING_ACCOUNT_DELETION_PREFIX)
       ) {
-        cursor.delete();
+        const userId = key.slice(PENDING_ACCOUNT_DELETION_PREFIX.length);
+        if (/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(userId)) {
+          ids.push(userId);
+        }
       }
       cursor.continue();
     };
     request.onerror = () => tx.abort();
-    tx.oncomplete = () => resolve();
+    tx.oncomplete = () => resolve(ids);
     tx.onerror = () => reject(tx.error);
     tx.onabort = () => reject(tx.error || request.error || new Error("IndexedDB transaction aborted"));
   });

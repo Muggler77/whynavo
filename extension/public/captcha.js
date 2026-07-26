@@ -6,11 +6,9 @@
   const size = params.get("size") === "compact" ? "compact" : "flexible";
   const parentOrigin = params.get("parentOrigin") || "";
   const error = document.getElementById("error");
-  let widgetId;
 
   const allowedParent = parentOrigin === "https://whytab.pages.dev"
-    || /^chrome-extension:\/\/[a-p]{32}$/.test(parentOrigin)
-    || /^https?:\/\/(?:localhost|127\.0\.0\.1)(?::\d+)?$/.test(parentOrigin);
+    || /^chrome-extension:\/\/[a-p]{32}$/.test(parentOrigin);
 
   const send = (type, extra = {}) => {
     if (allowedParent) window.parent.postMessage({ type, instance, ...extra }, parentOrigin);
@@ -35,7 +33,7 @@
     }
 
     try {
-      widgetId = window.turnstile.render("#turnstile-widget", {
+      window.turnstile.render("#turnstile-widget", {
         sitekey,
         action,
         size,
@@ -56,12 +54,4 @@
       showError("安全验证加载失败");
     }
   };
-
-  window.addEventListener("message", (event) => {
-    if (event.origin !== parentOrigin || event.source !== window.parent || event.data?.type !== "whytab-turnstile-reset") return;
-    if (event.data?.instance !== instance || widgetId === undefined || !window.turnstile) return;
-    if (error) error.hidden = true;
-    window.turnstile.reset(widgetId);
-    send("whytab-turnstile-ready");
-  });
 })();

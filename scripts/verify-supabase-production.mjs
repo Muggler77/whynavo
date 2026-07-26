@@ -1,4 +1,4 @@
-import { readdir } from "node:fs/promises";
+import { readFile, readdir } from "node:fs/promises";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
@@ -11,8 +11,25 @@ const repoRoot = fileURLToPath(new URL("..", import.meta.url));
 const projectRef = supabaseProjectRef();
 const officialOrigin = "https://whytab.pages.dev/";
 const migrationPattern = /^(\d{4})_[a-z0-9_]+\.sql$/;
+const phaseIndex = process.argv.indexOf("--phase");
+const phase = phaseIndex >= 0 ? process.argv[phaseIndex + 1] : "final";
+if (
+  !["predeploy", "final"].includes(phase)
+  || process.argv.slice(2).some((argument, index, argumentsList) => (
+    argument !== "--phase" && argumentsList[index - 1] !== "--phase"
+  ))
+) {
+  throw new Error("Usage: verify-supabase-production.mjs [--phase predeploy|final]");
+}
+const isFinal = phase === "final";
 const requiredPasswordCharacters = "abcdefghijklmnopqrstuvwxyz:ABCDEFGHIJKLMNOPQRSTUVWXYZ:0123456789";
 const retiredDomainPattern = /why[.-]tool[.-]com|whytab[.-]is-a[.-]dev/i;
+const confirmationSubject = "Verify your whytab email / 验证 whytab 邮箱";
+const recoverySubject = "Reset your whytab password / 重置 whytab 密码";
+const [confirmationTemplate, recoveryTemplate] = await Promise.all([
+  readFile(join(repoRoot, "docs/supabase-confirm-signup-email.html"), "utf8"),
+  readFile(join(repoRoot, "docs/supabase-reset-password-email.html"), "utf8")
+]);
 const failures = [];
 const requireCondition = (condition, message) => {
   if (!condition) failures.push(message);
@@ -38,12 +55,25 @@ const [
   databaseQuery(`
     select
       to_regprocedure('public.push_sync_snapshot_for_user(uuid,text,jsonb,bigint)') is not null as current_rpc_exists,
+      to_regprocedure('public.pull_sync_snapshot_for_user(uuid,text)') is not null as current_pull_rpc_exists,
       to_regprocedure('public.push_sync_snapshot(text,jsonb,bigint)') is not null as retired_rpc_exists,
+      to_regclass('public.sync_session_activity') is not null as session_activity_exists,
       has_function_privilege('authenticated', 'public.push_sync_snapshot_for_user(uuid,text,jsonb,bigint)', 'execute') as authenticated_can_sync,
+      has_function_privilege('authenticated', 'public.pull_sync_snapshot_for_user(uuid,text)', 'execute') as authenticated_can_pull,
       has_function_privilege('anon', 'public.push_sync_snapshot_for_user(uuid,text,jsonb,bigint)', 'execute') as anonymous_can_sync,
+      has_function_privilege('anon', 'public.pull_sync_snapshot_for_user(uuid,text)', 'execute') as anonymous_can_pull,
       has_function_privilege('authenticated', 'public.push_sync_snapshot(text,jsonb,bigint)', 'execute') as authenticated_can_use_retired_rpc,
       has_table_privilege('anon', 'public.sync_snapshots', 'select') as anonymous_can_read_snapshots,
+      has_table_privilege('authenticated', 'public.sync_snapshots', 'select') as authenticated_can_read_snapshots_directly,
       has_table_privilege('authenticated', 'public.sync_snapshots', 'insert,update,delete') as authenticated_can_write_snapshots_directly,
+      (
+        select policy.qual
+        from pg_catalog.pg_policies as policy
+        where policy.schemaname = 'public'
+          and policy.tablename = 'sync_snapshots'
+          and policy.policyname = 'Users own sync snapshots'
+        limit 1
+      ) as snapshot_select_policy,
       has_table_privilege('anon', 'public.exchange_rate_cache', 'select') as anonymous_can_read_rate_cache,
       has_table_privilege('authenticated', 'public.exchange_rate_cache', 'select') as authenticated_can_read_rate_cache
   `)
@@ -71,7 +101,7 @@ requireCondition(
   auth?.password_required_characters === requiredPasswordCharacters,
   "Auth passwords must require lowercase, uppercase, and numeric characters"
 );
-requireCondition(auth?.password_hibp_enabled === true, "Leaked-password protection must be enabled");
+const serverLeakedPasswordProtectionEnabled = auth?.password_hibp_enabled === true;
 requireCondition(auth?.security_captcha_enabled === true, "Auth CAPTCHA protection is disabled");
 requireCondition(auth?.security_captcha_provider === "turnstile", "Auth CAPTCHA must use Cloudflare Turnstile");
 requireCondition(
@@ -96,15 +126,6 @@ requireCondition(
   "Access-token lifetime must be between five minutes and one hour"
 );
 requireCondition(auth?.sessions_single_per_user === false, "Multiple devices cannot remain signed in");
-requireCondition(
-  Number(auth?.sessions_timebox) > 0 && Number(auth?.sessions_timebox) <= 90 * 24 * 60 * 60,
-  "Sessions must have an absolute lifetime of no more than 90 days"
-);
-requireCondition(
-  Number(auth?.sessions_inactivity_timeout) > 0
-    && Number(auth?.sessions_inactivity_timeout) <= 30 * 24 * 60 * 60,
-  "Inactive sessions must expire within 30 days"
-);
 requireCondition(auth?.security_manual_linking_enabled === false, "Manual identity linking must remain disabled");
 requireCondition(auth?.external_anonymous_users_enabled === false, "Anonymous Auth accounts must remain disabled");
 requireCondition(auth?.external_phone_enabled === false, "Unsupported phone authentication must remain disabled");
@@ -132,6 +153,22 @@ requireCondition(
   "OTP request rate limits are outside the reviewed range"
 );
 requireCondition(
+  auth?.mailer_subjects_confirmation === confirmationSubject,
+  "Signup email subject does not match the reviewed repository value"
+);
+requireCondition(
+  auth?.mailer_subjects_recovery === recoverySubject,
+  "Password-recovery email subject does not match the reviewed repository value"
+);
+requireCondition(
+  auth?.mailer_templates_confirmation_content === confirmationTemplate,
+  "Signup email template does not exactly match the reviewed repository file"
+);
+requireCondition(
+  auth?.mailer_templates_recovery_content === recoveryTemplate,
+  "Password-recovery email template does not exactly match the reviewed repository file"
+);
+requireCondition(
   auth?.mailer_notifications_password_changed_enabled === true,
   "Password-change security notifications are disabled"
 );
@@ -153,7 +190,9 @@ requireCondition(
     auth?.smtp_admin_email,
     auth?.smtp_host,
     auth?.site_url,
-    auth?.uri_allow_list
+    auth?.uri_allow_list,
+    auth?.mailer_templates_confirmation_content,
+    auth?.mailer_templates_recovery_content
   ].filter(Boolean).join(" ")),
   "Auth configuration still references a retired domain"
 );
@@ -193,21 +232,51 @@ const localMigrationVersions = (await readdir(join(repoRoot, "supabase/migration
 const remoteMigrationVersions = Array.isArray(migrationRows)
   ? migrationRows.map((row) => String(row.version)).sort()
   : [];
-requireCondition(
-  JSON.stringify(remoteMigrationVersions) === JSON.stringify(localMigrationVersions),
-  "Production database migrations do not exactly match the repository"
-);
+if (isFinal) {
+  requireCondition(
+    JSON.stringify(remoteMigrationVersions) === JSON.stringify(localMigrationVersions),
+    "Production database migrations do not exactly match the repository"
+  );
+} else {
+  const requiredPredeployVersions = localMigrationVersions.filter((version) => version <= "0013");
+  const unknownRemoteVersions = remoteMigrationVersions.filter((version) => !localMigrationVersions.includes(version));
+  requireCondition(unknownRemoteVersions.length === 0, "Production contains an unreviewed migration");
+  requireCondition(
+    requiredPredeployVersions.every((version) => remoteMigrationVersions.includes(version)),
+    "Production is missing a backward-compatible predeployment migration"
+  );
+}
 
 const databaseSecurity = Array.isArray(databaseSecurityRows) ? databaseSecurityRows[0] : undefined;
 requireCondition(databaseSecurity?.current_rpc_exists === true, "The account-bound sync RPC is missing");
+requireCondition(databaseSecurity?.current_pull_rpc_exists === true, "The account-bound snapshot read RPC is missing");
 requireCondition(databaseSecurity?.retired_rpc_exists === true, "The retired sync RPC definition is unexpectedly missing");
+requireCondition(databaseSecurity?.session_activity_exists === true, "The server-enforced sync session policy is missing");
 requireCondition(databaseSecurity?.authenticated_can_sync === true, "Signed-in users cannot call the account-bound sync RPC");
+requireCondition(databaseSecurity?.authenticated_can_pull === true, "Signed-in users cannot call the account-bound read RPC");
 requireCondition(databaseSecurity?.anonymous_can_sync === false, "Anonymous users can call the sync RPC");
-requireCondition(
-  databaseSecurity?.authenticated_can_use_retired_rpc === false,
-  "Signed-in users can still call the retired unbound sync RPC"
-);
+requireCondition(databaseSecurity?.anonymous_can_pull === false, "Anonymous users can call the snapshot read RPC");
 requireCondition(databaseSecurity?.anonymous_can_read_snapshots === false, "Anonymous users can read sync snapshots");
+if (isFinal) {
+  requireCondition(
+    databaseSecurity?.authenticated_can_use_retired_rpc === false,
+    "Signed-in users can still call the retired unbound sync RPC"
+  );
+} else {
+  requireCondition(
+    databaseSecurity?.authenticated_can_use_retired_rpc === true,
+    "Published 0.5.x clients cannot write through the compatibility sync RPC during rollout"
+  );
+}
+requireCondition(
+  databaseSecurity?.authenticated_can_read_snapshots_directly === true,
+  "Published 0.5.x clients cannot read their own snapshots during the 0.6.0 transition"
+);
+requireCondition(
+  /auth\.uid\(\).*user_id/i.test(String(databaseSecurity?.snapshot_select_policy || ""))
+    && /has_whytab_sync_session/i.test(String(databaseSecurity?.snapshot_select_policy || "")),
+  "The compatibility snapshot-read policy does not enforce account ownership and session expiry"
+);
 requireCondition(
   databaseSecurity?.authenticated_can_write_snapshots_directly === false,
   "Signed-in users can bypass revision-checked snapshot writes"
@@ -234,12 +303,16 @@ requireCondition(
 
 const allowedAdvisorFindings = new Set([
   "rls_enabled_no_policy:public.exchange_rate_cache",
+  "authenticated_security_definer_function_executable:public.has_whytab_sync_session",
+  "authenticated_security_definer_function_executable:public.pull_sync_snapshot_for_user",
   "authenticated_security_definer_function_executable:public.push_sync_snapshot_for_user"
 ]);
 const advisorFindings = Array.isArray(advisors?.lints) ? advisors.lints : [];
 for (const finding of advisorFindings) {
   if (finding?.name === "auth_leaked_password_protection") {
-    failures.push("Supabase Security Advisor reports leaked-password protection disabled");
+    if (serverLeakedPasswordProtectionEnabled) {
+      failures.push("Supabase Security Advisor disagrees with the enabled leaked-password setting");
+    }
     continue;
   }
   if (!["WARN", "ERROR"].includes(String(finding?.level || "").toUpperCase())) continue;
@@ -252,4 +325,10 @@ if (failures.length) {
   throw new Error(`Supabase production gate failed:\n- ${failures.join("\n- ")}`);
 }
 
-console.log("Supabase production Auth, database, function, and network gates passed.");
+if (!serverLeakedPasswordProtectionEnabled) {
+  console.warn(
+    "Supabase server-side leaked-password protection is unavailable on the selected Free plan; "
+      + "the reviewed whytab client-side k-anonymous check remains mandatory and is not equivalent to a backend control."
+  );
+}
+console.log(`Supabase production ${phase} Auth, database, function, and network gates passed.`);

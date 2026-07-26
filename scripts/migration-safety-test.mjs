@@ -108,13 +108,42 @@ try {
   });
 
   const { createStateBackup, isAppState, migrateState, stateSchemaVersion } = await import(pathToFileURL(migrationsOutput).href);
-  const { adoptPortableStateForAccount, cloudStatesEquivalent, isTerminalAuthError, localStatesEquivalent, markPulled, markPushed, mergeLocalPeerState, mergePortableStateIntoAccount, mergeRemote, normalizeState, nowIso: logicalNowIso, prepareCloudState, prepareCompleteBackupState, reconcileCompletedSync, restoreCompleteBackupForDevice, stampSettingsChanges, stampStateSnapshot, validateAppStatePayload } = await import(pathToFileURL(syncOutput).href);
+  const { adoptPortableStateForAccount, assertPasswordNotKnownLeaked, cloudStatesEquivalent, isTerminalAuthError, localStatesEquivalent, markPulled, markPushed, mergeLocalPeerState, mergePortableStateIntoAccount, mergeRemote, normalizeState, nowIso: logicalNowIso, prepareCloudState, prepareCompleteBackupState, reconcileCompletedSync, restoreCompleteBackupForDevice, stampSettingsChanges, stampStateSnapshot, validateAppStatePayload } = await import(pathToFileURL(syncOutput).href);
   const { accountScopedKey } = await import(pathToFileURL(dbOutput).href);
   const { defaultState } = await import(pathToFileURL(defaultStateOutput).href);
   const { normalizeHttpUrl, safeHttpHref } = await import(pathToFileURL(urlsOutput).href);
   const { MAX_IMPORTED_SHORTCUTS, faviconHostFor, importedToShortcuts, normalizeIconReference, parseBookmarksHtml, parseImportText } = await import(pathToFileURL(importersOutput).href);
   const { checkForUpdate } = await import(pathToFileURL(updatesOutput).href);
+  const projectConfigSource = await readFile(join(repoRoot, "extension/src/projectConfig.ts"), "utf8");
+  const privacyNoticeSource = await readFile(join(repoRoot, "extension/public/privacy.html"), "utf8");
+  const termsSource = await readFile(join(repoRoot, "extension/public/terms.html"), "utf8");
+  assert.match(projectConfigSource, /LEGAL_DOCUMENT_VERSION = "2026-07-26"/, "registration consent must use the current public legal-document version");
+  assert.match(privacyNoticeSource, /更新日期：2026 年 7 月 26 日[\s\S]*Effective date: July 26, 2026/, "the bilingual privacy notice must expose the consent version date");
+  assert.match(termsSource, /更新日期：2026 年 7 月 26 日[\s\S]*Effective date: July 26, 2026/, "the bilingual terms must match the recorded consent version");
   const now = new Date("2026-07-15T00:00:00.000Z").toISOString();
+  const originalFetch = globalThis.fetch;
+  let leakedPasswordRequest;
+  try {
+    globalThis.fetch = async (url, options) => {
+      leakedPasswordRequest = { url: String(url), options };
+      return new Response("1E4C9B93F3F0682250B6CF8331B7EE68FD8:100\n", {
+        headers: { "content-length": "42" }
+      });
+    };
+    await assert.rejects(
+      assertPasswordNotKnownLeaked("password"),
+      /已出现在已知数据泄露中/,
+      "known leaked passwords must be rejected"
+    );
+    assert.equal(leakedPasswordRequest?.url, "https://api.pwnedpasswords.com/range/5BAA6", "only the SHA-1 prefix may leave the device");
+    assert.equal(new Headers(leakedPasswordRequest?.options?.headers).get("Add-Padding"), "true", "the HIBP range request must request response padding");
+    assert.equal(leakedPasswordRequest?.options?.credentials, "omit", "the HIBP range request must omit credentials");
+
+    globalThis.fetch = async () => new Response("00000000000000000000000000000000000:0\n");
+    await assertPasswordNotKnownLeaked("a-local-test-password-that-is-not-in-the-mock");
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
   const legacyState = {
     version: 1,
     updatedAt: now,
@@ -925,12 +954,16 @@ try {
   assert.match(syncClientSource, /options: \{ captchaToken \}[\s\S]*verificationData\.user\?\.id !== currentUserData\.user\.id/, "password changes must consume a CAPTCHA token and stay bound to the current account");
   assert.match(syncClientSource, /current_password: currentPassword/, "normal password changes must send the current password to the server-enforced policy");
   assert.match(syncClientSource, /let supabase: SupabaseClient \| undefined[\s\S]*clearLocalAuthSession\(url\)[\s\S]*return false/, "local sign-out must clear the persisted session when the Auth client cannot load");
+  assert.match(syncClientSource, /auth\.resend\(\{[\s\S]*type: "signup"[\s\S]*captchaToken/, "unverified users must be able to request another confirmation email through a fresh CAPTCHA");
   const authEmailFunction = await readFile(join(repoRoot, "supabase/functions/send-auth-email/index.ts"), "utf8");
   assert.match(authEmailFunction, /new Webhook\(hookSecret\)\.verify/, "Auth email requests must verify the Supabase hook signature");
   assert.match(authEmailFunction, /MAX_HOOK_BODY_BYTES/, "the public email hook must reject oversized unauthenticated request bodies");
   assert.match(authEmailFunction, /candidate\.origin === expected\.origin/, "Auth email redirects must stay on the official app origin");
   assert.match(authEmailFunction, /url\.protocol !== "https:"[\s\S]*url\.username[\s\S]*url\.password/, "email branding URLs must reject insecure or credential-bearing configuration");
   assert.match(authEmailFunction, /new URL\("icons\/icon128\.png", normalizedPublicAppUrl\)/, "email logo URLs must be built from a parsed trusted origin");
+  assert.match(authEmailFunction, /url\.searchParams\.set\("token", tokenHash\)/, "Supabase verification URLs must pass the token hash through the endpoint's required token parameter");
+  assert.doesNotMatch(authEmailFunction, /url\.searchParams\.set\("token_hash"/, "email links must not use an unsupported verification query parameter");
+  assert.match(authEmailFunction, /new URL\("confirm\.html", normalizedPublicAppUrl\)[\s\S]*url\.hash = `confirmation_url=/, "one-time verification URLs must be isolated in a Pages URL fragment");
   assert.doesNotMatch(authEmailFunction, /no-reply@example\.com/, "production email code must not silently use a placeholder sender");
   assert.match(authEmailFunction, /password_changed_notification/, "the email hook must handle current Supabase account-security notifications");
   assert.match(authEmailFunction, /payload\.email_data\.old_email \|\| payload\.user\.email/, "email-change security notices must go to the previous address when Supabase provides it");
@@ -979,6 +1012,7 @@ try {
   assert.equal(extensionManifest.permissions.includes("geolocation"), false, "precise location must not be requested from every user at installation");
   assert.equal(extensionManifest.optional_permissions?.includes("geolocation"), true, "precise location must remain available as an explicit optional permission");
   assert.equal(extensionManifest.permissions.includes("search"), true, "new-tab web search must use the browser default provider through the Search API");
+  assert.equal(extensionManifest.host_permissions.includes("https://api.pwnedpasswords.com/*"), true, "the extension must allow the privacy-preserving leaked-password range check");
   assert.match(
     extensionManifest.content_security_policy?.extension_pages || "",
     /frame-src https:\/\/whytab\.pages\.dev/,
@@ -986,16 +1020,25 @@ try {
   );
   const captchaClient = await readFile(join(repoRoot, "extension/public/captcha.js"), "utf8");
   assert.doesNotMatch(captchaClient, /postMessage\([^)]*,\s*["']\*["']\)/, "CAPTCHA tokens must not be broadcast to arbitrary origins");
-  assert.match(captchaClient, /event\.origin !== parentOrigin/, "CAPTCHA reset messages must validate the sender origin");
+  assert.doesNotMatch(captchaClient, /addEventListener\(["']message["']/, "the sandboxed CAPTCHA document must remain write-only toward its validated parent");
+  assert.doesNotMatch(captchaClient, /localhost|127\.0\.0\.1/, "the production CAPTCHA bridge must not trust local development origins");
   const captchaFrame = await readFile(join(repoRoot, "extension/src/TurnstileChallenge.tsx"), "utf8");
   assert.match(captchaFrame, /event\.source !== frameRef\.current\?\.contentWindow/, "CAPTCHA results must come from the expected iframe");
   assert.match(captchaFrame, /event\.origin !== "null"/, "sandboxed CAPTCHA results must come from an opaque iframe origin");
+  assert.doesNotMatch(captchaFrame, /postMessage\(/, "CAPTCHA resets must reload the isolated iframe instead of targeting an opaque origin with a wildcard");
   assert.doesNotMatch(captchaFrame, /sandbox="[^"]*allow-same-origin/, "third-party CAPTCHA scripts must not share the app origin");
   assert.match(captchaFrame, /15_000/, "the CAPTCHA panel must not remain in an indefinite loading state");
   assert.match(captchaFrame, /重新加载安全验证/, "users must be able to recover from a CAPTCHA loading failure");
+  const confirmationPage = await readFile(join(repoRoot, "extension/public/confirm.html"), "utf8");
+  const confirmationClient = await readFile(join(repoRoot, "extension/public/confirm.js"), "utf8");
+  assert.doesNotMatch(confirmationPage, /auth\/v1\/verify|token_hash|confirmation_url=/, "the static confirmation document must never embed a verification target or token");
+  assert.match(confirmationClient, /candidate\.origin !== SUPABASE_ORIGIN[\s\S]*candidate\.pathname !== "\/auth\/v1\/verify"/, "the confirmation page must restrict verification to the reviewed Supabase endpoint");
+  assert.match(confirmationClient, /allowedParameters = new Set\(\["token", "type", "redirect_to"\]\)/, "the confirmation page must allow only the exact Supabase verification parameters");
+  assert.match(confirmationClient, /event\.isTrusted[\s\S]*window\.location\.replace\(verificationUrl\)/, "verification must require a trusted user click and avoid retaining the token page in history");
   const serviceWorker = await readFile(join(repoRoot, "extension/public/sw.js"), "utf8");
   assert.match(serviceWorker, new RegExp(`whytab-shell-v${packageManifest.version.replaceAll(".", "\\.")}`), "Service Worker cache must be versioned with the release");
   assert.match(serviceWorker, /captcha\.html/, "the Service Worker must explicitly handle the CAPTCHA page");
+  assert.match(serviceWorker, /confirm\.html/, "the Service Worker must not replace the email-confirmation page with an offline app shell");
   assert.match(serviceWorker, /cacheKey = isAppShell \? "\.\/" : request/, "document navigation must not overwrite the home-page cache");
   assert.match(serviceWorker, /MAX_SHELL_CACHE_VERSIONS = 2/, "the Service Worker must retain one prior app shell for in-flight upgrade safety");
   assert.match(serviceWorker, /asset-manifest\.json[\s\S]*manifestAssets/, "the installed web app must precache lazy code chunks needed for offline editing");
@@ -1006,6 +1049,7 @@ try {
   assert.match(serviceWorker, /if \(response\.ok\)[\s\S]*cache\.put\(cacheKey, copy\)/, "failed navigation responses must never replace the offline app shell");
   const appSource = await readFile(join(repoRoot, "extension/src/App.tsx"), "utf8");
   const appHtml = await readFile(join(repoRoot, "extension/index.html"), "utf8");
+  const releaseNotes = await readFile(join(repoRoot, "docs/releases/0.6.0.md"), "utf8");
   const syncSource = await readFile(join(repoRoot, "extension/src/sync.ts"), "utf8");
   const updatesSource = await readFile(join(repoRoot, "extension/src/updates.ts"), "utf8");
   assert.match(
@@ -1060,10 +1104,16 @@ try {
   assert.match(syncSource, /getEphemeralSupabase[\s\S]*persistSession: false[\s\S]*autoRefreshToken: false/, "current-password verification must not replace the persistent account session");
   assert.match(syncSource, /confirmedUserData\.user\?\.id !== currentUserData\.user\.id/, "password changes must recheck the persistent account after isolated credential verification");
   assert.match(syncSource, /updateClient = verificationClient[\s\S]*updateClient\.auth\.updateUser/, "normal password changes must update the isolated, reauthenticated account instead of a cross-tab mutable session");
+  assert.match(syncSource, /finally \{[\s\S]*verificationClient\?\.auth\.signOut\(\{ scope: "local" \}\)/, "temporary password-verification sessions must be revoked on success and failure");
   assert.match(syncSource, /data\.user\?\.id !== expectedUserId/, "password updates must verify that the server changed the account that was reauthenticated");
   assert.match(syncSource, /if \(expectedUserId\)[\s\S]*supabase\.auth\.getUser\(\)[\s\S]*confirmedUserData\.user\?\.id !== expectedUserId/, "password updates must recheck the visible persistent account after the isolated update");
   assert.match(syncSource, /body: \{ expectedUserId, password, captchaToken \}/, "account deletion must bind the request to the account shown by the client");
   assert.match(appSource, /const leaveAccount = async[\s\S]*mergeAndSaveStateForAccount\(current, signingOutUserId\)[\s\S]*已取消退出/, "sign-out must preserve concurrent local edits and stop before hiding data when durable storage fails");
+  assert.match(
+    appSource,
+    /outgoingPersistenceFailed = true[\s\S]*activeUserIdRef\.current = previousUserId[\s\S]*pendingOfflineUserRef\.current = user[\s\S]*当前数据只保留在内存中/,
+    "a failed outgoing-account save must retain recoverable in-memory data, pause synchronization, and retry the pending account activation"
+  );
   assert.match(
     appSource,
     /type: "account-signed-out"[\s\S]*userId: signingOutUserId/,
@@ -1151,17 +1201,70 @@ try {
     "cached weather from older releases must migrate away from coordinate-bearing source links immediately"
   );
   assert.match(dbSource, /deleteLocalAccountData[\s\S]*accountStateKey\(userId\)[\s\S]*accountScopedKey\(WEATHER_KEY, userId\)[\s\S]*sync-restore-point[\s\S]*MIGRATION_BACKUP_KEY[\s\S]*CORRUPT_STATE_BACKUP_KEY[\s\S]*deletedAccountMarkerKey\(userId\)/, "permanent account deletion must remove all account-scoped IndexedDB data and atomically install a non-resurrection marker");
-  assert.match(appSource, /localStorage\.setItem\(PENDING_ACCOUNT_CLEANUP_KEY, "1"\)/, "failed local account deletion cleanup must use a non-identifying retry marker");
-  assert.doesNotMatch(appSource, /PENDING_ACCOUNT_CLEANUP_KEY[\s\S]{0,300}JSON\.stringify/, "account identifiers must not be persisted in the deletion retry marker");
   assert.match(
-    dbSource,
-    /deleteAllLocalAccountData[\s\S]*openCursor\(\)[\s\S]*ACCOUNT_DATA_KEY_PREFIXES[\s\S]*cursor\.delete\(\)/,
-    "a privacy cleanup retry must remove every account partition without persisting account identifiers in localStorage"
+    appSource,
+    /markLocalAccountDeletionPending\(deletingUserId\)[\s\S]*deleteAccount\(/,
+    "account deletion must persist an account-scoped cleanup marker before the irreversible server request"
   );
   assert.match(
     appSource,
-    /if \(accountCleanupPending\(\)\)[\s\S]*deleteAllLocalAccountData\(\)[\s\S]*deleteAllResolvedIconCaches\(\)[\s\S]*clearAccountCleanupPending\(\)/,
-    "startup must retry account data cleanup after a prior browser storage failure"
+    /error instanceof AccountDeletionRejectedError[\s\S]*clearLocalAccountDeletionPending\(deletingUserId\)/,
+    "an explicitly rejected server deletion must remove its retry marker instead of deleting valid account data later"
+  );
+  assert.match(
+    appSource,
+    /error instanceof AccountDeletionOutcomeUnknownError[\s\S]*pendingAccountDeletionIdsRef\.current[\s\S]*transitionToAnonymousState\(/,
+    "an ambiguous server deletion result must retain the account-scoped marker and immediately hide account data"
+  );
+  assert.match(
+    syncSource,
+    /status !== undefined && status >= 400 && status < 500[\s\S]*AccountDeletionRejectedError[\s\S]*AccountDeletionOutcomeUnknownError/,
+    "account deletion must distinguish explicit rejection from an unknown network or server outcome"
+  );
+  assert.match(
+    dbSource,
+    /pendingAccountDeletionKey\(userId\)[\s\S]*readPendingLocalAccountDeletionIds[\s\S]*PENDING_ACCOUNT_DELETION_PREFIX/,
+    "crash recovery must identify only the account whose deletion was requested"
+  );
+  assert.match(
+    appSource,
+    /resolvePendingAccountDeletionForVerifiedUser[\s\S]*includes\(verifiedUserId\)[\s\S]*clearLocalAccountDeletionPending\(verifiedUserId\)[\s\S]*filter\(\(pendingUserId\) => pendingUserId !== verifiedUserId\)/,
+    "crash recovery must preserve an account that still exists and clear only that account's deletion marker"
+  );
+  assert.match(
+    appSource,
+    /finishPendingAccountDeletionAfterTerminalAuth[\s\S]*candidateUserId[\s\S]*pendingUserId === candidateUserId[\s\S]*Promise\.allSettled\(candidates\.map\(cleanupDeletedAccountData\)\)[\s\S]*completed\.has\(pendingUserId\)/,
+    "terminal Auth recovery must clean the matching pending account, or every explicitly pending partition when no session identity remains"
+  );
+  assert.match(
+    appSource,
+    /resolvePendingAccountDeletionForVerifiedUser[\s\S]*clearLocalDeletedAccountMarkerForVerifiedUser\(verifiedUserId\)/,
+    "a positively verified account must be able to recover after a previously ambiguous local cleanup"
+  );
+  assert.doesNotMatch(
+    appSource,
+    /finishPendingAccountDeletionAfterTerminalAuth[\s\S]{0,800}deleteAllLocalAccountData/,
+    "an ambiguous deletion must never destroy a different or unverifiable account partition"
+  );
+  assert.match(
+    appSource,
+    /if \(!verifiedUser\) \{[\s\S]*finishPendingAccountDeletionAfterTerminalAuth\([\s\S]*activeUserIdRef\.current \|\| pendingOfflineUserRef\.current\?\.id[\s\S]*persistPrevious: !pendingDeletionFinished/,
+    "a confirmed empty Auth session must finish explicitly pending local deletion without persisting the hidden account again"
+  );
+  assert.match(
+    appSource,
+    /event !== "SIGNED_OUT"[\s\S]*finishPendingAccountDeletionAfterTerminalAuth\(candidateUserId\)[\s\S]*persistPrevious: !pendingDeletionFinished/,
+    "a terminal Auth broadcast must immediately finish explicitly pending account cleanup"
+  );
+  assert.doesNotMatch(
+    releaseNotes,
+    /non-identifying marker|removes all account partitions/,
+    "release notes must not describe the retired global account-cleanup design"
+  );
+  assert.match(
+    appSource,
+    /user && pendingAccountDeletionIdsRef\.current\.includes\(user\.id\)[\s\S]*waitingForAccountRecovery = true[\s\S]*loadStateForAccount\(\)/,
+    "offline startup must hide only the account with an unresolved deletion instead of blocking unrelated accounts"
   );
   assert.match(
     appSource,
@@ -1235,8 +1338,13 @@ try {
   );
   assert.match(appSource, /prepareCompleteBackupState\(stateRef\.current\)/, "complete backups must use the tested privacy boundary");
   assert.match(appSource, /restoreCompleteBackupForDevice\(parsed\.state, current\)/, "backup imports must restore backed-up media without overwriting device-local identity");
-  assert.match(syncSource, /\.eq\("user_id", expectedUserId\)/, "snapshot reads must be restricted to the account expected by the current UI partition");
+  assert.match(syncSource, /pull_sync_snapshot_for_user[\s\S]*p_user_id: expectedUserId/, "snapshot reads must be restricted to the account expected by the current UI partition");
   assert.match(syncSource, /authData\.user\?\.id !== expectedUserId/, "snapshot reads must verify the server-side Auth account after each request");
+  assert.match(syncSource, /crypto\.subtle\.digest\("SHA-1"[\s\S]*hash\.slice\(0, 5\)[\s\S]*Add-Padding/, "password leak checks must hash locally, disclose only the five-character prefix, and request response padding");
+  assert.match(syncSource, /signInWithPassword\([\s\S]*assertPasswordNotKnownLeaked\(password\)[\s\S]*passwordSafetyWarning/, "login must check an authenticated password and surface a warning without making HIBP an availability dependency");
+  assert.match(syncSource, /assertPasswordNotKnownLeaked\(password\)[\s\S]*auth\.signUp/, "registration must reject a known leaked password before contacting Auth");
+  assert.match(syncSource, /updatePassword[\s\S]*assertPasswordNotKnownLeaked\(password\)[\s\S]*updateUser/, "replacement passwords must be checked before submission");
+  assert.match(syncSource, /MAX_PWNED_PASSWORD_RESPONSE_CHARS[\s\S]*content-length[\s\S]*body\.length/, "password range responses must have explicit allocation bounds");
   assert.match(syncSource, /push_sync_snapshot_for_user[\s\S]*p_user_id: expectedUserId/, "snapshot writes must bind the expected UI account inside the database");
   assert.match(appSource, /onAuthStateChange\(\(event, session\)[\s\S]*session\.user\.id !== activeUserIdRef\.current/, "cross-tab Auth account changes must activate the matching local partition");
   assert.match(appSource, /previousUserId && previousUserId !== user\.id[\s\S]*mergeAndSaveStateForAccount\(previousState, previousUserId\)/, "account switching must atomically merge and persist the outgoing partition before loading another account");
@@ -1304,8 +1412,8 @@ try {
   );
   assert.match(
     deployWorkflow,
-    /GITHUB_EVENT_NAME.*workflow_dispatch[\s\S]*Manual redeploys require an existing public release/,
-    "manual production redeploys must require the matching public GitHub Release"
+    /GITHUB_EVENT_NAME.*workflow_dispatch[\s\S]*activate_public_release[\s\S]*Release activation requires an existing public release/,
+    "manual production redeploys and final activation must require the matching public GitHub Release"
   );
   assert.match(
     deployWorkflow,
@@ -1315,7 +1423,8 @@ try {
   assert.match(deployWorkflow, /secrets\.CLOUDFLARE_API_TOKEN/, "Pages deployment must use a repository secret");
   assert.match(deployWorkflow, /secrets\.VITE_TURNSTILE_SITE_KEY/, "Pages deployment must inject the public Turnstile site key from secrets");
   assert.match(deployWorkflow, /verify:repository-history/, "Pages deployment must stop when public history contains private or retired data");
-  assert.match(deployWorkflow, /npm audit --omit=dev --audit-level=high/, "Pages deployment must stop for high-severity production dependency advisories");
+  assert.match(deployWorkflow, /npm audit --audit-level=high/, "Pages deployment must stop for high-severity runtime or build dependency advisories");
+  assert.doesNotMatch(deployWorkflow, /npm audit --omit=dev/, "Pages deployment must audit build tooling that influences production artifacts");
   assert.match(deployWorkflow, /secrets\.SUPABASE_ACCESS_TOKEN/, "production deployment must use an encrypted Supabase access token");
   assert.doesNotMatch(
     deployWorkflow,
@@ -1324,15 +1433,20 @@ try {
   );
   assert.doesNotMatch(deployWorkflow, /SUPABASE_DB_PASSWORD|SUPABASE_DB_URL/, "production deployment must not retain a database credential");
   assert.doesNotMatch(deployWorkflow, /network-restrictions update|supabase db push|supabase link/, "production deployment must keep direct database ingress closed");
-  assert.match(deployWorkflow, /deploy:supabase-migrations -- --through 0012/, "production deployment must prepare the backward-compatible sync API before publishing the client");
+  assert.match(deployWorkflow, /deploy:supabase-migrations -- --through 0013/, "production deployment must prepare the backward-compatible sync and session APIs before publishing the client");
   assert.match(deployWorkflow, /supabase functions deploy[\s\S]*--use-api/, "production Edge Functions must deploy without opening direct database ingress");
-  assert.match(deployWorkflow, /pages deploy extension\/web-dist[\s\S]*Retire the unsupported sync API[\s\S]*deploy:supabase-migrations/, "the unsupported sync API must be revoked only after the new Pages client is live");
+  assert.match(deployWorkflow, /pages deploy extension\/web-dist[\s\S]*Verify hosted app before irreversible cutover[\s\S]*Retire the unsupported sync API[\s\S]*deploy:supabase-migrations/, "the unsupported sync API must be revoked only after the new Pages client passes its hosted smoke test");
+  assert.match(
+    deployWorkflow,
+    /Retire the unsupported sync API\s*\n\s*if: github\.event_name == 'workflow_dispatch' \|\| inputs\.activate_public_release == true/,
+    "the draft rollout must not revoke the old-client API before the matching release is public"
+  );
   assert.ok(
-    deployWorkflow.indexOf("deploy:supabase-migrations -- --through 0012") < deployWorkflow.indexOf("pages deploy extension/web-dist")
+    deployWorkflow.indexOf("deploy:supabase-migrations -- --through 0013") < deployWorkflow.indexOf("pages deploy extension/web-dist")
       && deployWorkflow.lastIndexOf("npm run deploy:supabase-migrations") > deployWorkflow.indexOf("pages deploy extension/web-dist"),
     "the production rollout must preserve old-client compatibility until the new Pages bundle switches"
   );
-  assert.match(deployWorkflow, /verify:supabase-production[\s\S]*smoke:hosted/, "production database and Auth gates must pass before the hosted acceptance test");
+  assert.match(deployWorkflow, /Verify hosted app before irreversible cutover[\s\S]*Retire the unsupported sync API[\s\S]*Verify production security configuration[\s\S]*Verify hosted app after irreversible cutover/, "release activation must smoke-test both before and after the irreversible database cutover");
   assert.match(deployWorkflow, /cancel-in-progress: false/, "a rollout must not be cancelled after the backend changes but before the Pages bundle switches");
   const migrationDeployment = await readFile(join(repoRoot, "scripts/apply-supabase-migrations.mjs"), "utf8");
   assert.match(migrationDeployment, /--through/, "the migration deployer must support a bounded compatibility phase");
@@ -1341,16 +1455,24 @@ try {
   const managementClient = await readFile(join(repoRoot, "scripts/supabase-management.mjs"), "utf8");
   assert.match(managementClient, /\/database\/query/, "production database changes must use the authenticated Supabase Management API");
   assert.match(managementClient, /READ_ONLY_PROJECT_ENDPOINTS[\s\S]*Management API path is not allow-listed/, "the Management API helper must reject unreviewed endpoints");
+  assert.match(managementClient, /WRITABLE_AUTH_CONFIG_FIELDS[\s\S]*reviewedAuthUpdate === true[\s\S]*unreviewed field/, "Auth configuration writes must be restricted to reviewed fields and an explicit write path");
   assert.match(managementClient, /MAX_MANAGEMENT_BODY_BYTES[\s\S]*Buffer\.byteLength/, "Management API uploads must have an explicit size bound");
   assert.doesNotMatch(managementClient, /console\.log\([^)]*token|console\.error\([^)]*token/, "the Supabase access token must never be logged");
+  const authConfigurator = await readFile(join(repoRoot, "scripts/configure-supabase-auth.mjs"), "utf8");
+  assert.match(authConfigurator, /site_url: officialOrigin[\s\S]*uri_allow_list: officialOrigin/, "the reviewed Auth configuration must remove every retired redirect origin");
+  assert.match(authConfigurator, /rate_limit_verify: 360[\s\S]*rate_limit_token_refresh: 1800/, "the reviewed Auth configuration must match Supabase's current verification and refresh limits");
+  assert.match(authConfigurator, /mailer_templates_confirmation_content: confirmationTemplate[\s\S]*mailer_templates_recovery_content: recoveryTemplate/, "the reviewed Auth configurator must publish the tracked prefetch-safe email templates");
+  assert.match(deployWorkflow, /configure:supabase-auth/, "every production deployment must converge the reviewed Auth origin and rate limits");
   const supabaseProductionGate = await readFile(join(repoRoot, "scripts/verify-supabase-production.mjs"), "utf8");
-  assert.match(supabaseProductionGate, /password_hibp_enabled === true/, "production must reject leaked passwords");
+  assert.match(supabaseProductionGate, /serverLeakedPasswordProtectionEnabled[\s\S]*client-side k-anonymous check remains mandatory/, "the free-plan production gate must explicitly preserve and disclose the mandatory client-side leaked-password mitigation");
   assert.match(supabaseProductionGate, /security_update_password_require_current_password === true/, "production must enforce current-password verification");
   assert.match(supabaseProductionGate, /refresh_token_rotation_enabled === true/, "production must enforce refresh-token rotation");
-  assert.match(supabaseProductionGate, /sessions_timebox[\s\S]*90 \* 24 \* 60 \* 60/, "production sessions must have a bounded absolute lifetime");
-  assert.match(supabaseProductionGate, /sessions_inactivity_timeout[\s\S]*30 \* 24 \* 60 \* 60/, "inactive production sessions must expire");
+  assert.match(supabaseProductionGate, /session_activity_exists[\s\S]*server-enforced sync session policy/, "production must verify the database-enforced session policy");
+  assert.match(supabaseProductionGate, /snapshot_select_policy[\s\S]*has_whytab_sync_session[\s\S]*account ownership and session expiry/, "production must keep transitional direct reads account-scoped and session-bound");
   assert.match(supabaseProductionGate, /rate_limit_email_sent[\s\S]*1000/, "production email sending must have a reviewed throughput boundary");
   assert.match(supabaseProductionGate, /hook_send_email_enabled === true/, "production must require the signed transactional-email hook");
+  assert.match(supabaseProductionGate, /mailer_templates_confirmation_content === confirmationTemplate/, "production must reject signup email-template drift");
+  assert.match(supabaseProductionGate, /mailer_templates_recovery_content === recoveryTemplate/, "production must reject password-recovery email-template drift");
   assert.match(supabaseProductionGate, /Direct production database ingress is not fully closed/, "production verification must reject direct database ingress");
   assert.match(supabaseProductionGate, /Unreviewed Supabase Security Advisor finding/, "production verification must fail for unreviewed security findings");
   const releaseWorkflow = await readFile(join(repoRoot, ".github/workflows/release.yml"), "utf8");
@@ -1365,7 +1487,7 @@ try {
   );
   assert.match(
     releaseWorkflow,
-    /deploy:supabase-migrations -- --through 0012[\s\S]*Deploy backward-compatible Edge Functions[\s\S]*Prepare private draft release/,
+    /deploy:supabase-migrations -- --through 0013[\s\S]*Deploy backward-compatible Edge Functions[\s\S]*Configure reviewed Supabase Auth settings[\s\S]*Verify production predeployment gates[\s\S]*Prepare private draft release/,
     "the draft release artifact must be prepared only after its backward-compatible database and function dependencies are ready"
   );
   assert.match(
@@ -1386,7 +1508,12 @@ try {
   assert.match(
     releaseWorkflow,
     /publish:[\s\S]*needs: deploy[\s\S]*gh release edit[\s\S]*--draft=false/,
-    "the release must become public only after the hosted rollout and final production checks succeed"
+    "the release must become public only after the compatible hosted rollout succeeds"
+  );
+  assert.match(
+    releaseWorkflow,
+    /activate:[\s\S]*needs: publish[\s\S]*activate_public_release: true/,
+    "the irreversible sync cutover must run only after the matching release artifact becomes public"
   );
   const rootPackage = JSON.parse(await readFile(join(repoRoot, "package.json"), "utf8"));
   const extensionPackageVerifier = await readFile(join(repoRoot, "scripts/verify-extension-package.mjs"), "utf8");
@@ -1418,11 +1545,25 @@ try {
   );
   const hostedSmokeTest = await readFile(join(repoRoot, "scripts/hosted-smoke-test.mjs"), "utf8");
   assert.match(hostedSmokeTest, /REQUIRE_PRODUCTION_CONFIG/, "production monitoring must fail instead of skipping account checks when secrets are missing");
+  assert.match(hostedSmokeTest, /ALLOW_PREVIOUS_VERSION_MANIFEST[\s\S]*safe predecessor/, "staged production checks must accept only a validated older update manifest");
   assert.match(hostedSmokeTest, /auth\/v1\/settings[\s\S]*disable_signup[\s\S]*mailer_autoconfirm/, "production monitoring must verify email registration and confirmation settings");
   assert.match(hostedSmokeTest, /functions\/v1\/boc-rates/, "production monitoring must verify the public edge-function path");
   assert.match(hostedSmokeTest, /cspSources[\s\S]*\.has\("https:\/\/challenges\.cloudflare\.com"\)/, "hosted checks must parse CSP source lists instead of accepting a hostile URL substring");
+  assert.match(hostedSmokeTest, /confirm\.html[\s\S]*cache-control[\s\S]*event\.isTrusted/, "hosted checks must validate the non-cacheable email-confirmation click boundary");
   const uptimeWorkflow = await readFile(join(repoRoot, ".github/workflows/uptime.yml"), "utf8");
   assert.match(uptimeWorkflow, /verify:supabase-production[\s\S]*smoke:hosted/, "scheduled monitoring must detect both cloud security drift and public service failures");
+  assert.match(deployWorkflow, /Verify production predeployment gates[\s\S]*--phase predeploy[\s\S]*Deploy to Cloudflare Pages/, "production security preflight must pass before the public Pages deployment");
+  assert.match(deployWorkflow, /stage-live-version-manifest\.mjs[\s\S]*Deploy to Cloudflare Pages/, "the first Pages rollout must retain the already-public update manifest until its Release is public");
+  assert.match(deployWorkflow, /ALLOW_PREVIOUS_VERSION_MANIFEST/, "the staged hosted check must explicitly verify predecessor-manifest mode");
+  assert.match(releaseWorkflow, /Deploy backward-compatible Edge Functions[\s\S]*--phase predeploy[\s\S]*Build production package/, "release packaging must wait for production predeployment gates");
+  assert.match(releaseWorkflow, /publish:[\s\S]*draft=false[\s\S]*activate:[\s\S]*activate_public_release: true/, "the update manifest must be activated only after the verified draft Release becomes public");
+  const stagedVersionManifest = await readFile(join(repoRoot, "scripts/stage-live-version-manifest.mjs"), "utf8");
+  const versionManifestLibrary = await readFile(join(repoRoot, "scripts/version-manifest.mjs"), "utf8");
+  assert.match(stagedVersionManifest, /redirect: "error"[\s\S]*16_384[\s\S]*validatePublishedPredecessorManifest/, "the staged manifest fetch must reject redirects and oversized input before reusable validation");
+  assert.match(versionManifestLibrary, /compareReleaseVersions\(manifest\.latestVersion, nextVersion\) >= 0/, "the staged manifest validator must reject current and newer versions");
+  assert.match(versionManifestLibrary, /releaseNotesUrl[\s\S]*OFFICIAL_RELEASE_URL[\s\S]*updateUrl/, "the staged manifest must retain only the official public release destination");
+  const supabaseProductionVerifier = await readFile(join(repoRoot, "scripts/verify-supabase-production.mjs"), "utf8");
+  assert.match(supabaseProductionVerifier, /phase === "final"[\s\S]*requiredPredeployVersions/, "the production verifier must distinguish backward-compatible predeployment state from final state");
   const supabaseConfig = await readFile(join(repoRoot, "supabase/config.toml"), "utf8");
   assert.match(supabaseConfig, /\[functions\.boc-rates\]\s*verify_jwt = false/, "the public rate function must keep its in-handler publishable-key validation reachable");
   assert.match(supabaseConfig, /\[functions\.delete-account\]\s*verify_jwt = true/, "account deletion must retain gateway JWT verification");
@@ -1446,15 +1587,39 @@ try {
   assert.match(rateLimitedSyncMigration, /sync_write_rate_limits/, "sync writes must have an account-scoped database rate-limit record");
   assert.match(rateLimitedSyncMigration, /rate_count > 20[\s\S]*next_revision := -1/, "excessive snapshot writes must fail without replacing cloud data");
   assert.match(rateLimitedSyncMigration, /revoke all on table public\.sync_write_rate_limits from public, anon, authenticated/, "clients must not read or modify sync rate-limit state directly");
-  const retiredSyncMigration = await readFile(join(repoRoot, "supabase/migrations/0013_retire_unbound_sync_rpc.sql"), "utf8");
+  const sessionPolicyMigration = await readFile(join(repoRoot, "supabase/migrations/0013_enforce_sync_session_policy.sql"), "utf8");
+  assert.match(sessionPolicyMigration, /references auth\.sessions\(id\) on delete cascade/, "sync session state must be removed when the Auth session ends");
+  assert.match(sessionPolicyMigration, /session_created_at < checked_at - interval '90 days'/, "cloud sessions must have a server-enforced 90-day absolute lifetime");
+  assert.match(sessionPolicyMigration, /activity_last_seen_at < checked_at - interval '30 days'/, "cloud sessions must expire after 30 days of inactivity");
+  assert.match(sessionPolicyMigration, /has_whytab_sync_session[\s\S]*auth\.uid\(\) = user_id[\s\S]*has_whytab_sync_session\(user_id\)/, "published 0.5.x clients must retain RLS-protected reads without bypassing the new session policy");
+  assert.match(sessionPolicyMigration, /pull_sync_snapshot_for_user[\s\S]*assert_whytab_sync_session/, "snapshot reads must enforce the account-bound session policy");
+  assert.match(sessionPolicyMigration, /push_sync_snapshot_for_user[\s\S]*assert_whytab_sync_session/, "snapshot writes must enforce the account-bound session policy");
+  assert.match(
+    sessionPolicyMigration,
+    /create or replace function public\.push_sync_snapshot\([\s\S]*public\.push_sync_snapshot_for_user\([\s\S]*current_user_id/,
+    "the staged legacy write API must delegate to the account-bound, session-limited, rate-limited implementation"
+  );
+  assert.match(syncSource, /rpc\("pull_sync_snapshot_for_user"[\s\S]*p_user_id: expectedUserId/, "snapshot reads must use the account-bound server API");
+  assert.match(syncSource, /whytab session revoked[\s\S]*whytab session expired[\s\S]*whytab session inactive/, "server session-policy failures must terminate the local Auth view");
+  const retiredSyncMigration = await readFile(join(repoRoot, "supabase/migrations/0014_retire_legacy_sync_access.sql"), "utf8");
   assert.match(retiredSyncMigration, /revoke all on function public\.push_sync_snapshot\(text, jsonb, bigint\) from public, anon, authenticated/, "the post-client migration must revoke every public role from the old sync API");
+  assert.doesNotMatch(retiredSyncMigration, /revoke select on table public\.sync_snapshots from authenticated/, "the 0.6.0 migration must not break RLS-protected reads used by published 0.5.x clients");
   assert.match(syncSource, /next_revision\) === -1[\s\S]*同步操作过于频繁/, "the client must explain a server-side synchronization rate limit instead of retrying it as a conflict");
+  assert.match(syncSource, /data as \{ deleted\?: unknown \}\)\.deleted !== true[\s\S]*AccountDeletionOutcomeUnknownError/, "account deletion must require an explicit success response");
+  assert.match(appSource, /mergeAndSaveStateForAccount\(current, deletingUserId\)[\s\S]*markLocalAccountDeletionPending\(deletingUserId\)[\s\S]*deleteAccount\(/, "account deletion must persist the target partition before sending the irreversible request");
+  assert.match(appSource, /账号删除状态待核验[\s\S]*\{ persistPrevious: false \}/, "an ambiguous deletion must hide the target account without attempting another fallible account save");
+  assert.match(appSource, /addEventListener\("online", resumeSync\)[\s\S]*addEventListener\("focus", resumeSync\)[\s\S]*resumeSync\(\)/, "pending account cleanup and offline activation must retry immediately when the ready state is installed");
+  assert.doesNotMatch(appSource, /AccountDeletionOutcomeUnknownError[\s\S]{0,500}await signOut/, "an ambiguous deletion must retain its Auth session so the server outcome can be verified later");
   const webManifest = JSON.parse(await readFile(join(repoRoot, "extension/public/app.webmanifest"), "utf8"));
   assert.equal(webManifest.icons.some((icon) => icon.sizes === "192x192"), true, "PWA must provide a 192px install icon");
   assert.equal(webManifest.icons.some((icon) => icon.sizes === "512x512"), true, "PWA must provide a 512px install icon");
   const resetPasswordTemplate = await readFile(join(repoRoot, "docs/supabase-reset-password-email.html"), "utf8");
   assert.match(resetPasswordTemplate, /whytab\.pages\.dev\/icons\/icon128\.png/, "password reset email must use the public whytab logo");
-  assert.match(resetPasswordTemplate, /\{\{ \.ConfirmationURL \}\}/, "password reset email must preserve Supabase's secure confirmation link");
+  assert.match(resetPasswordTemplate, /confirm\.html#token=\{\{ \.TokenHash \}\}[\s\S]*type=recovery/, "password reset email must use the prefetch-safe confirmation page");
+  assert.doesNotMatch(resetPasswordTemplate, /\{\{ \.ConfirmationURL \}\}/, "password reset email must not expose a directly consumable one-time link");
+  const signupEmailTemplate = await readFile(join(repoRoot, "docs/supabase-confirm-signup-email.html"), "utf8");
+  assert.match(signupEmailTemplate, /confirm\.html#token=\{\{ \.TokenHash \}\}[\s\S]*type=signup/, "signup email must use the prefetch-safe confirmation page");
+  assert.doesNotMatch(signupEmailTemplate, /\{\{ \.ConfirmationURL \}\}/, "signup email must not expose a directly consumable one-time link");
   const backupWorkflow = await readFile(join(repoRoot, ".github/workflows/database-backup.yml"), "utf8");
   assert.match(backupWorkflow, /secrets\.SUPABASE_ACCESS_TOKEN/, "database backups must use an encrypted, revocable Supabase access token");
   assert.doesNotMatch(
@@ -1463,9 +1628,19 @@ try {
     "backup credentials must be scoped to the export, encryption, closure, or upload step that needs them"
   );
   assert.doesNotMatch(backupWorkflow, /SUPABASE_DB_PASSWORD|SUPABASE_DB_URL/, "database backups must not retain a long-lived database password or connection string");
+  assert.match(backupWorkflow, /database\/jit-access[\s\S]*state":"enabled"/, "database backups must enable the reviewed temporary database-access feature");
+  assert.match(backupWorkflow, /database\/jit[\s\S]*role: "postgres"[\s\S]*runner_ip\/32/, "database backups must bind temporary database access to the runner IP and postgres role");
+  assert.match(backupWorkflow, /db_url="\$\(printf '%s:\/\/%s:%s@%s:%s\/%s\?%s'[\s\S]*"db\.\$\{SUPABASE_PROJECT_REF\}\.supabase\.co" 5432 postgres sslmode=require\)/, "database dumps must use the direct temporary-access connection");
+  assert.match(backupWorkflow, /Revoke temporary database access[\s\S]*database\/jit\/\$\{JIT_USER_ID\}/, "database backups must revoke temporary database access after every run");
   assert.match(backupWorkflow, /network-restrictions update[\s\S]*runner_ip\/32/, "database backups must restrict temporary database ingress to the current runner");
+  assert.match(backupWorkflow, /trap close_ingress EXIT INT TERM[\s\S]*ingress_open=true[\s\S]*close_ingress[\s\S]*trap - EXIT INT TERM/, "database exports must close temporary ingress inside the export process as well as in the always-run cleanup step");
   assert.match(backupWorkflow, /Close direct database ingress[\s\S]*0\.0\.0\.0\/32/, "database backups must close direct database ingress even after an export failure");
   assert.match(backupWorkflow, /supabase db dump[\s\S]*--role-only/, "off-site backups must include database roles");
+  assert.match(backupWorkflow, /--schema public/, "application backups must explicitly export the public schema");
+  assert.match(backupWorkflow, /auth-data\.sql[\s\S]*--schema auth/, "account recovery backups must explicitly export the Auth schema");
+  assert.match(backupWorkflow, /-x "auth\.sessions"[\s\S]*-x "auth\.sso_providers"/, "account recovery backups must exclude active sessions and other unapproved Auth tables");
+  assert.match(backupWorkflow, /verify-backup-export\.mjs/, "backup exports must pass the Auth-table allowlist before encryption");
+  assert.match(backupWorkflow, /roles\.sql schema\.sql auth-data\.sql data\.sql/, "the encrypted archive must include the verified account and application exports");
   assert.match(backupWorkflow, /backup-envelope\.mjs[\s\S]*encrypt/, "database exports must be encrypted before upload");
   assert.match(backupWorkflow, /aws s3 cp[\s\S]*\.tar\.gz\.enc/, "only the encrypted database envelope may be uploaded");
   assert.doesNotMatch(backupWorkflow, /upload-artifact/, "plaintext or encrypted user backups must not become public workflow artifacts");
@@ -1474,6 +1649,9 @@ try {
   assert.match(backupEnvelope, /RSA_PKCS1_OAEP_PADDING/, "backup data keys must use RSA-OAEP wrapping");
   assert.match(backupEnvelope, /const handle = await open\(inputPath, "r"\);[\s\S]*const input = await handle\.stat\(\)/, "backup inspection must validate the same open file descriptor it reads");
   assert.match(backupEnvelope, /The private recovery key must use an absolute path outside the repository/, "recovery private keys must be rejected inside the source repository");
+  const backupExportVerifier = await readFile(join(repoRoot, "scripts/verify-backup-export.mjs"), "utf8");
+  assert.match(backupExportVerifier, /allowedAuthTables = new Set\(\["identities", "users"\]\)/, "Auth backups must use a closed table allowlist");
+  assert.match(backupExportVerifier, /unapproved table/, "Auth backups must fail closed when a transient or unknown table appears");
 } finally {
   await rm(tempDir, { recursive: true, force: true });
 }

@@ -4,7 +4,8 @@ This runbook covers the official whytab production database. A backup is valid o
 
 ## Security Model
 
-- GitHub Actions exports Supabase roles, schema, Auth records, and application data into an ephemeral runner directory.
+- GitHub Actions exports Supabase roles, application schema and data, plus only the `auth.users` and `auth.identities` records needed to recover email/password accounts, into an ephemeral runner directory.
+- Active sessions, refresh tokens, one-time tokens, audit logs, MFA challenges, and other transient Auth tables are excluded. A structural verifier rejects the export before encryption if any unapproved Auth table appears.
 - The export is compressed and encrypted before upload with a fresh AES-256-GCM data key.
 - The data key is wrapped with a 4096-bit RSA recovery public key using RSA-OAEP-SHA-256.
 - The private recovery key never enters GitHub, Cloudflare, Supabase, the public repository, or the production build.
@@ -37,7 +38,7 @@ This protects backup contents from a compromise of R2 or the upload credential a
 
 6. Add these GitHub Actions secrets:
 
-   - `SUPABASE_ACCESS_TOKEN`: a dedicated, revocable Supabase access token used to initialize a temporary database role. Do not reuse a personal interactive token when a dedicated token is available.
+   - `SUPABASE_ACCESS_TOKEN`: a dedicated, revocable Supabase access token used for the temporary database-access mapping. The workflow limits that mapping to the current GitHub runner IP and revokes it after the export. Do not reuse a personal interactive token when a dedicated token is available.
    - `BACKUP_ENCRYPTION_PUBLIC_KEY_B64`: base64-encoded recovery public key.
    - `R2_ACCESS_KEY_ID`: bucket-scoped R2 S3 access-key ID.
    - `R2_SECRET_ACCESS_KEY`: matching R2 S3 secret.
@@ -46,8 +47,10 @@ This protects backup contents from a compromise of R2 or the upload credential a
 
 7. Run `Encrypted Production Database Backup` manually once. Confirm the workflow succeeds and the R2 object is private.
 
-The backup workflow limits direct database ingress to the current GitHub runner,
-exports through a temporary Supabase login role, and restores a deny-by-default
+The backup workflow enables Supabase Temporary Access only for the export,
+maps the token owner to the `postgres` role for a short expiry and the current
+GitHub runner IP, limits direct database ingress to that same runner, and
+revokes the mapping before the workflow continues. It restores a deny-by-default
 database allowlist even when the export fails. It does not store the database
 password or a PostgreSQL connection string.
 
@@ -69,10 +72,10 @@ Perform this test before public launch and at least once every 90 days:
      /absolute/offline/location/whytab-backup-private.pem
    ```
 
-4. Extract `roles.sql`, `schema.sql`, and `data.sql`.
+4. Extract `roles.sql`, `schema.sql`, `auth-data.sql`, and `data.sql`.
 5. Create a separate disposable Supabase project. Never restore over production as a test.
-6. Follow Supabase's official CLI restore order for roles, schema, and data. Reconfigure Auth URLs, CAPTCHA, SMTP, Edge Functions, and secrets separately.
-7. Verify table counts, a disposable Auth login, one disposable sync snapshot, RLS isolation, and account deletion.
+6. Follow Supabase's official CLI restore process: restore roles and application schema, restore `auth-data.sql` before application data so account foreign keys exist, then restore `data.sql`. Do not restore over production as a test. Reconfigure Auth URLs, CAPTCHA, SMTP, Edge Functions, and secrets separately.
+7. Verify account and identity counts, require users to sign in again, verify a disposable Auth login, one disposable sync snapshot, RLS isolation, and account deletion. No backed-up browser session or refresh token should remain usable.
 8. Delete the disposable project and all plaintext restore files.
 9. Record only the date, source backup ID, restore result, and reviewer. Do not record user emails, snapshot content, credentials, or database URLs.
 

@@ -41,17 +41,7 @@ const TurnstileChallenge = forwardRef<TurnstileChallengeHandle, TurnstileChallen
     };
 
     const reset = () => {
-      onToken("");
-      if (status === "error") {
-        reload();
-        return;
-      }
-      setStatus("loading");
-      setMessage("正在刷新安全验证");
-      frameRef.current?.contentWindow?.postMessage(
-        { type: "whytab-turnstile-reset", instance },
-        "*"
-      );
+      reload();
     };
 
     useImperativeHandle(ref, () => ({ reset }));

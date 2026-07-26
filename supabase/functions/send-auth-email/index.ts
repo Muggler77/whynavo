@@ -209,9 +209,16 @@ function buildVerificationUrl(emailData: AuthEmailPayload["email_data"], tokenHa
   if (!supabaseUrl || !tokenHash) return "";
 
   const url = new URL("/auth/v1/verify", supabaseUrl);
-  url.searchParams.set("token_hash", tokenHash);
+  url.searchParams.set("token", tokenHash);
   url.searchParams.set("type", emailData.email_action_type);
   url.searchParams.set("redirect_to", safeRedirectUrl(emailData.redirect_to));
+  return url.toString();
+}
+
+function buildConfirmationPageUrl(verificationUrl: string) {
+  if (!verificationUrl) return "";
+  const url = new URL("confirm.html", normalizedPublicAppUrl);
+  url.hash = `confirmation_url=${encodeURIComponent(verificationUrl)}`;
   return url.toString();
 }
 
@@ -236,18 +243,19 @@ function renderEmail(action: AuthEmailAction, verificationUrl: string, token?: s
       ? "Confirm the address to sign in on other devices and synchronize your own whytab data."
       : "Continue only if you initiated this request.";
 
-  const escapedVerificationUrl = escapeHtml(verificationUrl);
+  const confirmationPageUrl = buildConfirmationPageUrl(verificationUrl);
+  const escapedConfirmationPageUrl = escapeHtml(confirmationPageUrl);
   const escapedToken = escapeHtml(token || "");
-  const fallback = verificationUrl
+  const fallback = confirmationPageUrl
     ? `<p style="margin:0 0 14px;color:#64748b;font-size:13px;">如果按钮无法打开，请复制以下链接到浏览器地址栏：</p>
-       <p style="margin:0 0 18px;word-break:break-all;color:#475569;font-size:12px;">${escapedVerificationUrl}</p>`
+       <p style="margin:0 0 18px;word-break:break-all;color:#475569;font-size:12px;">${escapedConfirmationPageUrl}</p>`
     : escapedToken
       ? `<p style="margin:0 0 18px;color:#475569;font-size:14px;">验证码：<strong>${escapedToken}</strong></p>`
       : "";
 
-  const actionBlock = verificationUrl
+  const actionBlock = confirmationPageUrl
     ? `<p style="margin:0 0 24px;text-align:center;">
-         <a href="${escapedVerificationUrl}" style="display:inline-block;background:#0f172a;color:#ffffff;text-decoration:none;border-radius:10px;padding:12px 22px;font-size:15px;font-weight:700;">${buttonText}</a>
+         <a href="${escapedConfirmationPageUrl}" style="display:inline-block;background:#0f172a;color:#ffffff;text-decoration:none;border-radius:10px;padding:12px 22px;font-size:15px;font-weight:700;">${buttonText}</a>
        </p>`
     : escapedToken
       ? `<p style="margin:0 0 24px;color:#475569;font-size:14px;">请在 whytab 页面中输入上面的验证码。</p>`
@@ -299,7 +307,7 @@ ${intro}
 
 ${nextStep}
 
-${verificationUrl || (token ? `验证码：${token}` : "")}
+${confirmationPageUrl || (token ? `验证码：${token}` : "")}
 
 如果你没有发起这项操作，可以忽略这封邮件。
 

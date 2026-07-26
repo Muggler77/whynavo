@@ -2,6 +2,16 @@ import { readFile } from "node:fs/promises";
 
 const origin = (process.env.WHYTAB_ORIGIN || "https://whytab.pages.dev").replace(/\/$/, "");
 const packageJson = JSON.parse(await readFile(new URL("../package.json", import.meta.url), "utf8"));
+const allowPreviousVersionManifest = process.env.ALLOW_PREVIOUS_VERSION_MANIFEST === "1";
+const releasePattern = /^\d+\.\d+\.\d+$/;
+const compareVersions = (left, right) => {
+  const a = left.split(".").map(Number);
+  const b = right.split(".").map(Number);
+  for (let index = 0; index < 3; index += 1) {
+    if (a[index] !== b[index]) return a[index] - b[index];
+  }
+  return 0;
+};
 
 const wait = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds));
 const cspSources = (policy, directive) => {
@@ -32,9 +42,13 @@ const fetchWithRetry = async (path, attempts = 6) => {
 
 const home = await fetchWithRetry("/");
 const homeHtml = await home.text();
+const homeCsp = home.headers.get("content-security-policy") || "";
 if (!/<title>whytab<\/title>/.test(homeHtml)) throw new Error("Hosted home page is not the whytab app");
-if (!home.headers.get("content-security-policy")?.includes("default-src 'self'")) {
+if (!homeCsp.includes("default-src 'self'")) {
   throw new Error("Hosted home page is missing the expected Content-Security-Policy");
+}
+if (!cspSources(homeCsp, "connect-src").has("https://api.pwnedpasswords.com")) {
+  throw new Error("Hosted app cannot reach the privacy-preserving password safety service");
 }
 if (!home.headers.get("strict-transport-security")) throw new Error("Hosted home page is missing HSTS");
 if (home.headers.get("x-content-type-options") !== "nosniff") throw new Error("Hosted home page is missing MIME sniffing protection");
@@ -51,6 +65,27 @@ if (home.headers.get("cross-origin-resource-policy") !== "same-origin") {
 for (const path of ["/privacy.html", "/terms.html"]) {
   const response = await fetchWithRetry(path);
   if (!response.headers.get("content-security-policy")) throw new Error(`${path} is missing security headers`);
+}
+
+const confirmation = await fetchWithRetry("/confirm.html");
+const confirmationHtml = await confirmation.text();
+if (
+  !confirmationHtml.includes("./confirm.js")
+  || !confirmationHtml.includes("./confirm.css")
+  || confirmationHtml.includes("/auth/v1/verify")
+) {
+  throw new Error("Hosted email-confirmation interstitial is incomplete or embeds a verification token target");
+}
+if (confirmation.headers.get("cache-control") !== "no-store") {
+  throw new Error("Email-confirmation interstitial must not be cached");
+}
+const confirmationClient = await (await fetchWithRetry("/confirm.js")).text();
+if (
+  !confirmationClient.includes('candidate.pathname !== "/auth/v1/verify"')
+  || !confirmationClient.includes("event.isTrusted")
+  || !confirmationClient.includes("window.location.replace(verificationUrl)")
+) {
+  throw new Error("Hosted email-confirmation interstitial does not enforce an explicit verified click");
 }
 
 const captcha = await fetchWithRetry("/captcha.html");
@@ -72,7 +107,20 @@ if (captcha.headers.get("cross-origin-resource-policy") !== "cross-origin") {
 }
 
 const version = await (await fetchWithRetry("/latest-version.json")).json();
-if (version.latestVersion !== packageJson.version || version.minimumSupportedVersion !== packageJson.version) {
+if (allowPreviousVersionManifest) {
+  if (
+    !releasePattern.test(String(version.latestVersion || ""))
+    || !releasePattern.test(String(version.minimumSupportedVersion || ""))
+    || compareVersions(version.minimumSupportedVersion, version.latestVersion) > 0
+    || compareVersions(version.latestVersion, packageJson.version) >= 0
+    || Number(version.dataSchemaVersion) !== 1
+  ) {
+    throw new Error(`Hosted staging manifest is not a safe predecessor of ${packageJson.version}`);
+  }
+} else if (
+  version.latestVersion !== packageJson.version
+  || version.minimumSupportedVersion !== packageJson.version
+) {
   throw new Error(`Hosted version manifest does not match ${packageJson.version}`);
 }
 
@@ -97,6 +145,7 @@ if (!serviceWorker.includes(`whytab-shell-v${packageJson.version}`)) {
   throw new Error("Hosted Service Worker cache is not versioned with the release");
 }
 if (!serviceWorker.includes("captcha.html")) throw new Error("Hosted Service Worker does not isolate CAPTCHA navigation");
+if (!serviceWorker.includes("confirm.html")) throw new Error("Hosted Service Worker does not isolate email-confirmation navigation");
 
 const assetPaths = [...homeHtml.matchAll(/(?:src|href)=["']([^"']+\.(?:css|js))["']/g)]
   .map((match) => new URL(match[1], `${origin}/`).pathname);
@@ -180,6 +229,17 @@ if (supabaseUrl && supabaseAnonKey) {
         p_name: "primary",
         p_payload: {},
         p_expected_revision: 0
+      })
+    }
+  );
+  await requireDenied(
+    "account-bound snapshot read RPC",
+    "/rest/v1/rpc/pull_sync_snapshot_for_user",
+    {
+      method: "POST",
+      body: JSON.stringify({
+        p_user_id: "00000000-0000-0000-0000-000000000000",
+        p_name: "primary"
       })
     }
   );

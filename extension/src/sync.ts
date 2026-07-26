@@ -17,6 +17,48 @@ export type SyncStatus = {
 
 let supabaseModulePromise: Promise<typeof import("@supabase/supabase-js")> | undefined;
 const clientPromises = new Map<string, Promise<SupabaseClient>>();
+const PWNED_PASSWORDS_RANGE_URL = "https://api.pwnedpasswords.com/range/";
+const PASSWORD_SAFETY_TIMEOUT_MS = 8_000;
+const MAX_PWNED_PASSWORD_RESPONSE_CHARS = 256_000;
+
+const sha1Hex = async (value: string) => {
+  const digest = await crypto.subtle.digest("SHA-1", new TextEncoder().encode(value));
+  return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("").toUpperCase();
+};
+
+export async function assertPasswordNotKnownLeaked(password: string) {
+  const hash = await sha1Hex(password);
+  const prefix = hash.slice(0, 5);
+  const suffix = hash.slice(5);
+  let response: Response;
+  try {
+    response = await fetch(`${PWNED_PASSWORDS_RANGE_URL}${prefix}`, {
+      headers: { "Add-Padding": "true" },
+      cache: "no-store",
+      credentials: "omit",
+      referrerPolicy: "no-referrer",
+      signal: AbortSignal.timeout(PASSWORD_SAFETY_TIMEOUT_MS)
+    });
+  } catch {
+    throw new Error("暂时无法完成密码泄露检查，请检查网络后重试");
+  }
+  if (!response.ok) throw new Error("暂时无法完成密码泄露检查，请稍后重试");
+  const contentLength = Number(response.headers.get("content-length") || 0);
+  if (contentLength > MAX_PWNED_PASSWORD_RESPONSE_CHARS) {
+    throw new Error("密码安全服务返回异常，请稍后重试");
+  }
+  const body = await response.text();
+  if (body.length > MAX_PWNED_PASSWORD_RESPONSE_CHARS) {
+    throw new Error("密码安全服务返回异常，请稍后重试");
+  }
+  const leaked = body.split(/\r?\n/).some((line) => {
+    const [candidateSuffix, count] = line.split(":");
+    return candidateSuffix === suffix && Number(count) > 0;
+  });
+  if (leaked) {
+    throw new Error("此密码已出现在已知数据泄露中，请使用密码管理器生成新的唯一密码");
+  }
+}
 
 export async function getSupabase(url?: string, anonKey?: string) {
   if (!url || !anonKey) return undefined;
@@ -94,7 +136,10 @@ export function isTerminalAuthError(error: unknown) {
     "refresh token not found",
     "session not found",
     "user not found",
-    "jwt expired"
+    "jwt expired",
+    "whytab session revoked",
+    "whytab session expired",
+    "whytab session inactive"
   ].some((fragment) => message.includes(fragment));
 }
 
@@ -107,7 +152,19 @@ export async function signIn(url: string, anonKey: string, email: string, passwo
     options: captchaToken ? { captchaToken } : undefined
   });
   if (result.error) throw result.error;
-  return result.data.user;
+  let passwordSafetyWarning: string | undefined;
+  try {
+    await assertPasswordNotKnownLeaked(password);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "";
+    passwordSafetyWarning = message.includes("已出现在已知数据泄露")
+      ? "登录成功，但当前密码已出现在已知数据泄露中，请立即在本页更换为唯一密码。"
+      : "登录成功，但暂时无法完成泄露密码检查；请勿在其他网站复用此密码。";
+  }
+  return {
+    user: result.data.user,
+    passwordSafetyWarning
+  };
 }
 
 export async function signUp(
@@ -120,6 +177,7 @@ export async function signUp(
 ) {
   const supabase = await getSupabase(url, anonKey);
   if (!supabase) throw new Error("Supabase 配置不完整");
+  await assertPasswordNotKnownLeaked(password);
   const result = await supabase.auth.signUp({
     email,
     password,
@@ -135,6 +193,26 @@ export async function signUp(
   });
   if (result.error) throw result.error;
   return result.data as { user: User | null; session: Session | null };
+}
+
+export async function resendSignupConfirmation(
+  url: string,
+  anonKey: string,
+  email: string,
+  emailRedirectTo?: string,
+  captchaToken?: string
+) {
+  const supabase = await getSupabase(url, anonKey);
+  if (!supabase) throw new Error("Supabase 配置不完整");
+  const { error } = await supabase.auth.resend({
+    type: "signup",
+    email,
+    options: {
+      ...(emailRedirectTo ? { emailRedirectTo } : {}),
+      ...(captchaToken ? { captchaToken } : {})
+    }
+  });
+  if (error) throw error;
 }
 
 export async function signOut(url?: string, anonKey?: string) {
@@ -211,37 +289,43 @@ export async function updatePassword(
 ) {
   const supabase = await getSupabase(url, anonKey);
   if (!supabase) throw new Error("同步服务暂未配置，请稍后再试");
+  await assertPasswordNotKnownLeaked(password);
   let updateClient = supabase;
   let expectedUserId: string | undefined;
-  if (currentPassword) {
-    if (!captchaToken) throw new Error("请先完成安全验证");
-    const { data: currentUserData, error: currentUserError } = await supabase.auth.getUser();
-    if (currentUserError) throw currentUserError;
-    if (!currentUserData.user?.email) throw new Error("当前账号没有可验证的邮箱");
-    expectedUserId = currentUserData.user.id;
-    const verificationClient = await getEphemeralSupabase(url, anonKey);
-    const { data: verificationData, error: verificationError } = await verificationClient.auth.signInWithPassword({
-      email: currentUserData.user.email,
-      password: currentPassword,
-      options: { captchaToken }
+  let verificationClient: SupabaseClient | undefined;
+  try {
+    if (currentPassword) {
+      if (!captchaToken) throw new Error("请先完成安全验证");
+      const { data: currentUserData, error: currentUserError } = await supabase.auth.getUser();
+      if (currentUserError) throw currentUserError;
+      if (!currentUserData.user?.email) throw new Error("当前账号没有可验证的邮箱");
+      expectedUserId = currentUserData.user.id;
+      verificationClient = await getEphemeralSupabase(url, anonKey);
+      const { data: verificationData, error: verificationError } = await verificationClient.auth.signInWithPassword({
+        email: currentUserData.user.email,
+        password: currentPassword,
+        options: { captchaToken }
+      });
+      if (verificationError) throw verificationError;
+      if (verificationData.user?.id !== currentUserData.user.id) throw new AuthAccountChangedError();
+      const { data: confirmedUserData, error: confirmedUserError } = await supabase.auth.getUser();
+      if (confirmedUserError) throw confirmedUserError;
+      if (confirmedUserData.user?.id !== currentUserData.user.id) throw new AuthAccountChangedError();
+      updateClient = verificationClient;
+    }
+    const { data, error } = await updateClient.auth.updateUser({
+      password,
+      ...(currentPassword ? { current_password: currentPassword } : {})
     });
-    if (verificationError) throw verificationError;
-    if (verificationData.user?.id !== currentUserData.user.id) throw new AuthAccountChangedError();
-    const { data: confirmedUserData, error: confirmedUserError } = await supabase.auth.getUser();
-    if (confirmedUserError) throw confirmedUserError;
-    if (confirmedUserData.user?.id !== currentUserData.user.id) throw new AuthAccountChangedError();
-    updateClient = verificationClient;
-  }
-  const { data, error } = await updateClient.auth.updateUser({
-    password,
-    ...(currentPassword ? { current_password: currentPassword } : {})
-  });
-  if (error) throw error;
-  if (expectedUserId && data.user?.id !== expectedUserId) throw new AuthAccountChangedError();
-  if (expectedUserId) {
-    const { data: confirmedUserData, error: confirmedUserError } = await supabase.auth.getUser();
-    if (confirmedUserError) throw confirmedUserError;
-    if (confirmedUserData.user?.id !== expectedUserId) throw new AuthAccountChangedError();
+    if (error) throw error;
+    if (expectedUserId && data.user?.id !== expectedUserId) throw new AuthAccountChangedError();
+    if (expectedUserId) {
+      const { data: confirmedUserData, error: confirmedUserError } = await supabase.auth.getUser();
+      if (confirmedUserError) throw confirmedUserError;
+      if (confirmedUserData.user?.id !== expectedUserId) throw new AuthAccountChangedError();
+    }
+  } finally {
+    await verificationClient?.auth.signOut({ scope: "local" }).catch(() => undefined);
   }
 }
 
@@ -255,11 +339,22 @@ export async function deleteAccount(
   const supabase = await getSupabase(url, anonKey);
   if (!supabase) throw new Error("同步服务暂未配置，请稍后再试");
   if (!expectedUserId) throw new AuthAccountChangedError();
-  const { error } = await supabase.functions.invoke("delete-account", {
+  const { data, error } = await supabase.functions.invoke("delete-account", {
     method: "POST",
     body: { expectedUserId, password, captchaToken }
   });
-  if (error) throw error;
+  if (error) {
+    const status = typeof (error as { context?: { status?: unknown } }).context?.status === "number"
+      ? (error as { context: { status: number } }).context.status
+      : undefined;
+    if (status !== undefined && status >= 400 && status < 500) {
+      throw new AccountDeletionRejectedError(error.message);
+    }
+    throw new AccountDeletionOutcomeUnknownError();
+  }
+  if (!data || typeof data !== "object" || (data as { deleted?: unknown }).deleted !== true) {
+    throw new AccountDeletionOutcomeUnknownError();
+  }
 }
 
 export class SyncConflictError extends Error {
@@ -273,6 +368,20 @@ export class AuthAccountChangedError extends Error {
   constructor() {
     super("登录账号已变化，本次数据操作已取消");
     this.name = "AuthAccountChangedError";
+  }
+}
+
+export class AccountDeletionRejectedError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "AccountDeletionRejectedError";
+  }
+}
+
+export class AccountDeletionOutcomeUnknownError extends Error {
+  constructor() {
+    super("删除请求结果暂时无法确认，联网后会自动核验；在确认前请勿继续编辑此账号数据。");
+    this.name = "AccountDeletionOutcomeUnknownError";
   }
 }
 
@@ -875,18 +984,22 @@ export async function pullSnapshot(state: AppState, expectedUserId: string): Pro
   if (!supabase) throw new Error("Supabase 配置不完整");
   if (!expectedUserId) throw new AuthAccountChangedError();
 
-  const { data, error } = await supabase
-    .from("sync_snapshots")
-    .select("user_id, payload, updated_at, revision")
-    .eq("user_id", expectedUserId)
-    .eq("name", "primary")
-    .maybeSingle();
+  const { data, error } = await supabase.rpc("pull_sync_snapshot_for_user", {
+    p_user_id: expectedUserId,
+    p_name: "primary"
+  });
   if (error) throw error;
+  const snapshot = (Array.isArray(data) ? data[0] : data) as {
+    user_id?: string;
+    payload?: AppState;
+    updated_at?: string;
+    revision?: number;
+  } | null;
   const { data: authData, error: authError } = await supabase.auth.getUser();
   if (authError) throw authError;
   if (authData.user?.id !== expectedUserId) throw new AuthAccountChangedError();
-  if (data && data.user_id !== expectedUserId) throw new AuthAccountChangedError();
-  const payload = data?.payload as AppState | undefined;
+  if (snapshot && snapshot.user_id !== expectedUserId) throw new AuthAccountChangedError();
+  const payload = snapshot?.payload;
   if (!payload) return undefined;
   validateAppStatePayload(payload, "云端数据");
   ensureRemoteCompatible(payload);
@@ -894,8 +1007,8 @@ export async function pullSnapshot(state: AppState, expectedUserId: string): Pro
     ...payload,
     sync: {
       ...payload.sync,
-      remoteRevision: Number(data?.revision || 0),
-      lastRemoteUpdatedAt: data?.updated_at || payload.sync?.lastRemoteUpdatedAt
+      remoteRevision: Number(snapshot?.revision || 0),
+      lastRemoteUpdatedAt: snapshot?.updated_at || payload.sync?.lastRemoteUpdatedAt
     }
   };
 }

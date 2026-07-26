@@ -112,7 +112,7 @@ self.addEventListener("fetch", (event) => {
   }
 
   if (request.mode === "navigate") {
-    if (url.pathname.endsWith("/captcha.html")) {
+    if (url.pathname.endsWith("/captcha.html") || url.pathname.endsWith("/confirm.html")) {
       event.respondWith(fetch(request));
       return;
     }
