@@ -1164,8 +1164,11 @@ try {
   assert.match(dbSource, /CORRUPT_STATE_BACKUP_KEY/, "malformed local state must be preserved in an account-scoped recovery record");
   assert.match(dbSource, /validateAppStatePayload\(normalizeState\(stored\), "本机数据"\)/, "local state must receive full structural validation before migration and rendering");
   assert.match(dbSource, /existed: Boolean\(stored\) && !recovered/, "quarantined account state must not be merged back into cloud data as a valid local snapshot");
-  assert.match(dbSource, /legacyStored = !userId && !scopedStored \? await readKey<AppState>\(STATE_KEY\) : undefined/, "unowned legacy app data must only migrate through the anonymous partition");
-  assert.match(dbSource, /await saveStateForAccount\(state, userId\);\s+await deleteKey\(STATE_KEY\);/, "legacy app data must only be removed after its account-scoped copy succeeds");
+  assert.match(dbSource, /export async function hasLegacyUnscopedState/, "legacy local state must be detectable without loading it into an account");
+  assert.match(dbSource, /export async function adoptLegacyStateForAccount/, "legacy local state must have an explicit account-adoption path");
+  assert.doesNotMatch(dbSource, /const legacyStored = !userId && !scopedStored/, "anonymous startup must not auto-adopt the pre-isolation global state");
+  assert.match(dbSource, /adoptLegacyStateForAccount[\s\S]*store\.delete\(STATE_KEY\)/, "legacy state must be deleted only by the explicit adoption transaction");
+  assert.match(dbSource, /adoptLegacyStateForAccount[\s\S]*deletedAccountMarkerKey\(userId\)[\s\S]*blockedByDeletion/, "legacy adoption must honor account deletion markers");
   assert.match(dbSource, /commitAnonymousStateAdoption[\s\S]*store\.put\(state, accountStateKey\(userId\)\);[\s\S]*store\.put\(emptyAnonymousState, ANONYMOUS_STATE_KEY\)/, "anonymous data adoption must save the account copy and clear the consumed anonymous partition atomically");
   assert.match(
     appSource,

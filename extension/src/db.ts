@@ -120,13 +120,103 @@ async function migrateStoredState(stored: AppState | undefined, save: (state: Ap
   return initial;
 }
 
-export async function loadState(): Promise<AppState> {
-  const stored = await readKey<AppState>(STATE_KEY);
-  return migrateStoredState(stored, saveState);
+/**
+ * The pre-account-isolation client stored all data under STATE_KEY. It is
+ * intentionally left untouched until the user explicitly assigns it to an
+ * authenticated account; otherwise a new account on the same browser could
+ * silently inherit another account's old local data.
+ */
+export async function hasLegacyUnscopedState(): Promise<boolean> {
+  return Boolean(await readKey<unknown>(STATE_KEY));
 }
 
-export async function saveState(state: AppState): Promise<void> {
-  await writeKey(STATE_KEY, state);
+export async function adoptLegacyStateForAccount(userId: string): Promise<AppState> {
+  if (!userId) throw new Error("无法为未登录账号导入旧版本数据");
+  const db = await openDb();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE, "readwrite");
+    const store = tx.objectStore(STORE);
+    let markerRequest: IDBRequest;
+    let legacyRequest: IDBRequest | undefined;
+    let accountRequest: IDBRequest | undefined;
+    let adoptedState: AppState | undefined;
+    let failure: Error | undefined;
+    let blockedByDeletion = false;
+
+    const abortWith = (error: Error) => {
+      failure = error;
+      tx.abort();
+    };
+
+    const readExistingAccount = (legacy: AppState) => {
+      accountRequest = store.get(accountStateKey(userId));
+      accountRequest.onsuccess = () => {
+        const existing = accountRequest?.result as AppState | undefined;
+        const migration = migrateState(legacy, userId);
+        if (migration.backup) {
+          store.put(migration.backup, accountScopedKey(MIGRATION_BACKUP_KEY, userId));
+        }
+        let normalizedLegacy: AppState;
+        try {
+          normalizedLegacy = normalizeState(migration.state);
+          validateAppStatePayload(normalizedLegacy, "旧版本本机数据");
+        } catch {
+          abortWith(new Error("旧版本本机数据已损坏，未导入当前账号"));
+          return;
+        }
+
+        adoptedState = normalizedLegacy;
+        if (existing) {
+          try {
+            const normalizedExisting = normalizeState(existing);
+            validateAppStatePayload(normalizedExisting, "当前账号本机数据");
+            adoptedState = mergeLocalPeerState(normalizedExisting, normalizedLegacy);
+          } catch {
+            store.put({
+              savedAt: new Date().toISOString(),
+              value: existing
+            }, accountScopedKey(CORRUPT_STATE_BACKUP_KEY, userId));
+          }
+        }
+        store.put(adoptedState, accountStateKey(userId));
+        store.delete(STATE_KEY);
+      };
+      accountRequest.onerror = () => abortWith(accountRequest?.error || new Error("读取当前账号数据失败"));
+    };
+
+    markerRequest = store.get(deletedAccountMarkerKey(userId));
+    markerRequest.onsuccess = () => {
+      if (markerRequest.result) {
+        blockedByDeletion = true;
+        tx.abort();
+        return;
+      }
+      legacyRequest = store.get(STATE_KEY);
+      legacyRequest.onsuccess = () => {
+        const legacy = legacyRequest?.result as AppState | undefined;
+        if (!legacy) {
+          abortWith(new Error("没有找到可导入的旧版本本机数据"));
+          return;
+        }
+        if (!isAppState(legacy)) {
+          abortWith(new Error("旧版本本机数据格式无效，未导入当前账号"));
+          return;
+        }
+        readExistingAccount(legacy);
+      };
+      legacyRequest.onerror = () => abortWith(legacyRequest?.error || new Error("读取旧版本本机数据失败"));
+    };
+    markerRequest.onerror = () => abortWith(markerRequest.error || new Error("读取账号删除状态失败"));
+    tx.oncomplete = () => {
+      if (adoptedState) resolve(adoptedState);
+      else reject(new Error("旧版本本机数据导入未完成"));
+    };
+    tx.onerror = () => reject(failure || tx.error || new Error("旧版本本机数据导入失败"));
+    tx.onabort = () => reject(
+      failure
+      || (blockedByDeletion ? new Error("已删除账号不能重新写入本机数据") : tx.error || new Error("旧版本本机数据导入已取消"))
+    );
+  });
 }
 
 export async function loadStateForAccount(userId?: string): Promise<{ state: AppState; existed: boolean; recovered: boolean }> {
@@ -135,8 +225,7 @@ export async function loadStateForAccount(userId?: string): Promise<{ state: App
   }
   const key = accountStateKey(userId);
   const scopedStored = await readKey<AppState>(key);
-  const legacyStored = !userId && !scopedStored ? await readKey<AppState>(STATE_KEY) : undefined;
-  const stored = scopedStored || legacyStored;
+  const stored = scopedStored;
   let recovered = false;
   if (stored) {
     try {
@@ -147,10 +236,6 @@ export async function loadStateForAccount(userId?: string): Promise<{ state: App
     }
   }
   const state = await migrateStoredState(stored, (next) => saveStateForAccount(next, userId), userId);
-  if (legacyStored) {
-    await saveStateForAccount(state, userId);
-    await deleteKey(STATE_KEY);
-  }
   return { state, existed: Boolean(stored) && !recovered, recovered };
 }
 

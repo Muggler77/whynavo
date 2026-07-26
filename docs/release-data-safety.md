@@ -46,6 +46,7 @@ npm run build
 ## Data Safety Rules
 
 - Never delete or rewrite local user data during an update without first creating a backup.
+- Never auto-assign an unowned pre-account-isolation `app-state` key to an anonymous session or a newly authenticated account. Keep it quarantined until the user explicitly confirms the destination account, then adopt it in one transaction and remove the old key only after the account-scoped write succeeds.
 - Keep `manifest.version`, `APP_VERSION`, and `latest-version.json` aligned for every public release.
 - Keep `DATA_SCHEMA_VERSION` separate from app version.
 - If a future cloud snapshot has a higher data schema than the current client supports, stop sync and ask the user to upgrade.

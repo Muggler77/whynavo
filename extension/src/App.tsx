@@ -57,7 +57,7 @@ import {
 } from "lucide-react";
 import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type FocusEvent, type KeyboardEvent, type MouseEvent } from "react";
 import { createPortal } from "react-dom";
-import { accountScopedKey, clearLocalAccountDeletionPending, clearLocalDeletedAccountMarkerForVerifiedUser, commitAnonymousStateAdoption, deleteKey, deleteLocalAccountData, downloadJson, loadStateForAccount, markLocalAccountDeletionPending, mergeAndSaveStateForAccount, readKey, readPendingLocalAccountDeletionIds, saveStateForAccount, writeKey } from "./db";
+import { accountScopedKey, adoptLegacyStateForAccount, clearLocalAccountDeletionPending, clearLocalDeletedAccountMarkerForVerifiedUser, commitAnonymousStateAdoption, deleteKey, deleteLocalAccountData, downloadJson, hasLegacyUnscopedState, loadStateForAccount, markLocalAccountDeletionPending, mergeAndSaveStateForAccount, readKey, readPendingLocalAccountDeletionIds, saveStateForAccount, writeKey } from "./db";
 import { defaultState, defaultWidgetOrder, defaultWidgetSizes, nowIso, uid } from "./defaultState";
 import { MAX_IMPORTED_SHORTCUTS, MAX_IMPORT_TEXT_CHARS, colorFor, curatedIconCount, curatedIconFor, fallbackFaviconFor, faviconFor, importedToShortcuts, normalizeIconReference, parseImportText, siteIconCandidatesFor } from "./importers";
 import { MIGRATION_BACKUP_KEY, type StateBackup } from "./migrations";
@@ -855,6 +855,7 @@ export default function App() {
   const [undoLabel, setUndoLabel] = useState("");
   const [restoreAvailable, setRestoreAvailable] = useState(false);
   const [migrationBackupAvailable, setMigrationBackupAvailable] = useState(false);
+  const [legacyStateAvailable, setLegacyStateAvailable] = useState(false);
   const [passwordRecovery, setPasswordRecovery] = useState(false);
   const [useCompactAssets, setUseCompactAssets] = useState(() => window.matchMedia("(max-width: 700px)").matches);
   const stateRef = useRef(state);
@@ -1405,6 +1406,7 @@ export default function App() {
     void (async () => {
       const pendingAccountDeletionIds = await readPendingLocalAccountDeletionIds();
       pendingAccountDeletionIdsRef.current = pendingAccountDeletionIds;
+      setLegacyStateAvailable(await hasLegacyUnscopedState().catch(() => false));
       const bootState = defaultState();
       let authVerifiedOnline = false;
       let user = await getCachedUser(bootState.settings.supabaseUrl, bootState.settings.supabaseAnonKey).catch(() => null);
@@ -2956,6 +2958,37 @@ export default function App() {
     }
   };
 
+  const adoptLegacyData = async () => {
+    const expectedUserId = activeUserIdRef.current;
+    if (!expectedUserId) throw new Error("请先登录当前账号，再导入旧版本数据");
+    if (!legacyStateAvailable) {
+      setLegacyStateAvailable(false);
+      throw new Error("没有找到可导入的旧版本本机数据");
+    }
+    if (!window.confirm("旧版本数据可能属于更新前登录过的账号。只有确认它属于当前账号时才继续导入；导入后将从旧版本隔离区移除。")) return;
+    const operationEpoch = accountEpochRef.current;
+    if (syncLockRef.current) throw new Error("已有同步任务正在进行，请稍候");
+    const adopted = await adoptLegacyStateForAccount(expectedUserId);
+    if (!isCurrentAccountOperation(operationEpoch, expectedUserId)) {
+      throw new Error("账号已变化，旧版本数据未应用");
+    }
+    const current = normalizeState(withCurrentServiceConfig(adopted));
+    const persisted = await mergeAndSaveStateForAccount(current, expectedUserId);
+    if (!isCurrentAccountOperation(operationEpoch, expectedUserId)) {
+      throw new Error("账号已变化，旧版本数据未应用");
+    }
+    const finalState = mergeLocalPeerState(current, persisted);
+    applyState(finalState);
+    broadcastLocalStateSaved(expectedUserId);
+    setLegacyStateAvailable(false);
+    setSync((old) => ({
+      ...old,
+      syncing: false,
+      message: "旧版本本机数据已导入当前账号"
+    }));
+    showToast("旧版本本机数据已导入当前账号，接下来可以执行合并同步");
+  };
+
   const customWallpapers = state.settings.customWallpapers || [];
   const wallpaperUrlForId = (id?: string, compact = false) => {
     if (!id) return undefined;
@@ -3613,6 +3646,8 @@ export default function App() {
           state={state}
           sync={sync}
           updateState={updateState}
+          legacyStateAvailable={legacyStateAvailable}
+          onAdoptLegacyData={adoptLegacyData}
           onClose={() => setDialog(null)}
           onLogin={async (mode, email, password, captchaToken) => {
             const { supabaseUrl, supabaseAnonKey } = state.settings;
@@ -5806,10 +5841,12 @@ function TimeZoneDialog({ current, onClose, onChoose }: { current: string; onClo
   );
 }
 
-function SyncDialog({ state, sync, updateState, onClose, onLogin, onSignOut, onSignOutAll, onDeleteAccount, onResetPassword, onResendVerification, onUpdatePassword, passwordRecovery, onPasswordRecoveryComplete, onSync, restoreAvailable, onRestore }: {
+function SyncDialog({ state, sync, updateState, legacyStateAvailable, onAdoptLegacyData, onClose, onLogin, onSignOut, onSignOutAll, onDeleteAccount, onResetPassword, onResendVerification, onUpdatePassword, passwordRecovery, onPasswordRecoveryComplete, onSync, restoreAvailable, onRestore }: {
   state: AppState;
   sync: SyncStatus;
   updateState: (updater: (state: AppState) => AppState) => void;
+  legacyStateAvailable: boolean;
+  onAdoptLegacyData: () => Promise<void>;
   onClose: () => void;
   onLogin: (mode: "login" | "signup", email: string, password: string, captchaToken: string) => Promise<AuthResult>;
   onSignOut: () => Promise<void>;
@@ -5840,6 +5877,7 @@ function SyncDialog({ state, sync, updateState, onClose, onLogin, onSignOut, onS
   const [deleteCaptchaToken, setDeleteCaptchaToken] = useState("");
   const [legalConsent, setLegalConsent] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [legacyBusy, setLegacyBusy] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const authChallengeRef = useRef<TurnstileChallengeHandle>(null);
@@ -6016,6 +6054,19 @@ function SyncDialog({ state, sync, updateState, onClose, onLogin, onSignOut, onS
       void submit(authMode);
     }
   };
+  const importLegacyData = async () => {
+    setLegacyBusy(true);
+    setError("");
+    setNotice("");
+    try {
+      await onAdoptLegacyData();
+      setNotice("旧版本本机数据已导入当前账号，请执行一次合并同步。");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "旧版本本机数据导入失败，请重试");
+    } finally {
+      setLegacyBusy(false);
+    }
+  };
 
   return (
     <DialogShell title="账号与云同步" onClose={onClose} className="sync-dialog-overlay" scrollResetKey={authMode}>
@@ -6081,6 +6132,20 @@ function SyncDialog({ state, sync, updateState, onClose, onLogin, onSignOut, onS
           />
         </label>
       </div>
+
+      {legacyStateAvailable && (
+        <div className="sync-legacy-import">
+          <strong>检测到更新前本机数据</strong>
+          <p>旧版本把数据保存在未绑定账号的本机区域。为防止不同账号串数据，whytab 不会自动导入。</p>
+          {sync.user ? (
+            <button type="button" disabled={busy || legacyBusy || sync.syncing} onClick={() => void importLegacyData()}>
+              <Download size={16} /> 确认属于当前账号并导入
+            </button>
+          ) : (
+            <small>请先登录你在更新前使用的账号，再确认导入。</small>
+          )}
+        </div>
+      )}
 
       {!sync.user && (
         <div className="sync-auth-panel">

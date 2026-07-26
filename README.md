@@ -430,6 +430,8 @@ For Chrome Web Store submission, upload a zip whose root contains `manifest.json
 
 Security release 0.6.0 retires the account-unbound sync-write API. Version 0.5.7 can still read its own pre-0.6 snapshot through session-bound RLS, but it stops syncing safely after a 0.6.0 client writes the new minimum-version marker. Older clients that used the retired write API are rejected immediately. Local data remains intact; replace an unpacked extension with the latest release directory and reload it from the extension-management page before continuing cloud synchronization.
 
+If a very early version stored local data under the pre-account-isolation global key, 0.6.0 keeps that data quarantined instead of guessing which account owns it. Sign in to the account that owned the data, open the account and sync panel, and explicitly confirm the import. The old key is removed only after the account-scoped write succeeds; a different account cannot silently inherit it.
+
 ## Edge Installation
 
 1. Open `edge://extensions/`.
