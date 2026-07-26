@@ -17,7 +17,13 @@ const WRITABLE_AUTH_CONFIG_FIELDS = new Set([
   "mailer_subjects_confirmation",
   "mailer_subjects_recovery",
   "mailer_templates_confirmation_content",
-  "mailer_templates_recovery_content"
+  "mailer_templates_recovery_content",
+  "smtp_admin_email",
+  "smtp_host",
+  "smtp_port",
+  "smtp_user",
+  "smtp_pass",
+  "smtp_sender_name"
 ]);
 
 const requiredEnvironmentValue = (name) => {
