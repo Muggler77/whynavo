@@ -307,6 +307,9 @@ const allowedAdvisorFindings = new Set([
   "authenticated_security_definer_function_executable:public.pull_sync_snapshot_for_user",
   "authenticated_security_definer_function_executable:public.push_sync_snapshot_for_user"
 ]);
+if (!isFinal) {
+  allowedAdvisorFindings.add("authenticated_security_definer_function_executable:public.push_sync_snapshot");
+}
 const advisorFindings = Array.isArray(advisors?.lints) ? advisors.lints : [];
 for (const finding of advisorFindings) {
   if (finding?.name === "auth_leaked_password_protection") {

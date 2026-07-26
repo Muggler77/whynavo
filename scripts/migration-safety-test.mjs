@@ -1480,6 +1480,11 @@ try {
   assert.match(supabaseProductionGate, /mailer_templates_recovery_content === recoveryTemplate/, "production must reject password-recovery email-template drift");
   assert.match(supabaseProductionGate, /Direct production database ingress is not fully closed/, "production verification must reject direct database ingress");
   assert.match(supabaseProductionGate, /Unreviewed Supabase Security Advisor finding/, "production verification must fail for unreviewed security findings");
+  assert.match(
+    supabaseProductionGate,
+    /if \(!isFinal\)[\s\S]*push_sync_snapshot/,
+    "the transitional security-definer warning must be allowed only before the final legacy-sync cutover"
+  );
   const releaseWorkflow = await readFile(join(repoRoot, ".github/workflows/release.yml"), "utf8");
   assert.match(releaseWorkflow, /sha256sum/, "release archives must include a user-verifiable SHA-256 checksum");
   assert.match(releaseWorkflow, /actions\/attest@[0-9a-f]{40}/, "release archives must receive provenance from a commit-pinned GitHub attestation action");
