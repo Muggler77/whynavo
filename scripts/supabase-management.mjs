@@ -75,7 +75,15 @@ export async function managementRequest(path, options = {}) {
   });
   if (!response.ok) {
     const requestId = response.headers.get("x-request-id") || "unavailable";
-    throw new Error(`Supabase Management API request failed (${response.status}, request ${requestId})`);
+    const responseBody = (await response.text())
+      .replaceAll(/(?:sbp|eyJ)[A-Za-z0-9._-]+/g, "[redacted]")
+      .replaceAll(/\s+/g, " ")
+      .trim()
+      .slice(0, 512);
+    throw new Error(
+      `Supabase Management API request failed (${response.status}, request ${requestId})`
+      + (responseBody ? `: ${responseBody}` : "")
+    );
   }
   const text = await response.text();
   return text ? JSON.parse(text) : undefined;
