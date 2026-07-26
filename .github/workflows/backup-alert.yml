@@ -1,0 +1,49 @@
+name: Report whytab Backup Incidents
+
+on:
+  workflow_run:
+    workflows: ["Encrypted Production Database Backup"]
+    types: [completed]
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  report:
+    if: vars.WHYTAB_PRODUCTION_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      RUN_URL: ${{ github.event.workflow_run.html_url }}
+      RUN_CONCLUSION: ${{ github.event.workflow_run.conclusion }}
+    steps:
+      - name: Ensure backup incident label exists
+        run: >-
+          gh label create backup-alert
+          --color B60205
+          --description "Automated encrypted database backup incident"
+          --force
+
+      - name: Open or resolve backup incident
+        shell: bash
+        run: |
+          set -euo pipefail
+          open_issue="$(gh issue list --label backup-alert --state open --json number --jq '.[0].number // empty')"
+          if [ "$RUN_CONCLUSION" = "success" ]; then
+            if [ -n "$open_issue" ]; then
+              gh issue close "$open_issue" --comment "Encrypted database backups recovered. Successful run: $RUN_URL"
+            fi
+            exit 0
+          fi
+
+          if [ -n "$open_issue" ]; then
+            gh issue comment "$open_issue" --body "Encrypted database backups are still failing. Latest run: $RUN_URL"
+          else
+            gh issue create \
+              --title "Encrypted production database backup failed" \
+              --label backup-alert \
+              --body "The scheduled encrypted backup failed. Review the workflow logs without posting database URLs, credentials, plaintext dumps, or user data: $RUN_URL"
+          fi

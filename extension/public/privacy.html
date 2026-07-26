@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#0c111d" />
+    <title>whytab 隐私与数据说明</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        color: #e8eef7;
+        background: #0c111d;
+      }
+      body {
+        margin: 0;
+        background: #0c111d;
+      }
+      main {
+        width: min(760px, calc(100% - 32px));
+        margin: 0 auto;
+        padding: 48px 0 72px;
+      }
+      h1 {
+        margin: 0 0 10px;
+        font-size: 30px;
+        letter-spacing: 0;
+      }
+      h2 {
+        margin: 30px 0 10px;
+        font-size: 18px;
+        letter-spacing: 0;
+      }
+      p, li {
+        color: #b9c6d8;
+        font-size: 15px;
+        line-height: 1.75;
+      }
+      a {
+        color: #67e8f9;
+      }
+      .meta {
+        color: #7f8da3;
+        font-size: 13px;
+      }
+      .notice {
+        padding: 14px 16px;
+        background: #131c2b;
+        border: 1px solid #26354a;
+        border-radius: 8px;
+      }
+      .divider {
+        margin: 48px 0;
+        border: 0;
+        border-top: 1px solid #26354a;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>whytab 隐私与数据说明</h1>
+      <p class="meta">更新日期：2026 年 7 月 25 日</p>
+      <p class="notice">whytab 采用本地优先设计。你无需登录即可使用，登录仅用于可选的跨设备同步。</p>
+
+      <h2>本机数据</h2>
+      <p>快捷方式、小组件、便签、待办、倒计时、日历、布局和设置默认保存在当前浏览器的 IndexedDB 中。清理浏览器网站数据、卸载扩展、删除浏览器配置文件或系统回收存储空间，都可能影响仅存在本机的数据。请定期使用完整 JSON 备份。</p>
+      <p>whytab 不会对 IndexedDB 中的应用内容额外实施端到端或字段级加密。本机数据的静态保护依赖浏览器配置文件、操作系统账号、设备锁和磁盘加密；请勿在共享或未受保护的设备上保存敏感内容。</p>
+
+      <h2>账号与云同步</h2>
+      <p>当你注册或登录时，密码会从当前表单通过 HTTPS 直接提交给 Supabase Auth。whytab 不会把密码写入应用状态、IndexedDB、导出备份或同步快照；Supabase Auth 负责验证凭据，并在当前浏览器中保存维持登录所需的访问与刷新会话令牌。这些令牌不进入 whytab 数据备份或同步快照，退出登录会撤销或移除相应会话。可同步的 whytab 数据会写入与账号 ID 绑定的云端快照，并通过 Row Level Security 和带修订号的原子写入限制账号边界。</p>
+
+      <h2>处理目的与范围</h2>
+      <p>这些数据只用于提供本机仪表盘、账号验证、跨设备同步、故障恢复和反滥用保护。whytab 不出售个人数据，不投放基于用户内容的广告，也不在应用中接入行为分析 SDK。托管、认证和安全服务可能保留必要的访问、投递和安全日志。</p>
+
+      <h2>不会同步的内容</h2>
+      <p>本机上传的照片、照片文件名、自定义壁纸、快捷图标和文件夹图标不会进入云端快照。同步数据不是端到端加密；云服务运营方在必要的系统管理场景下可能具备技术访问能力，因此不要在便签或标题中保存密码、恢复码或其他高度敏感秘密。</p>
+
+      <h2>外部服务</h2>
+      <ul>
+        <li>Supabase：账号、认证邮件、会话和可选云同步。</li>
+        <li>邮件投递服务：发送注册验证、密码重置和账号安全邮件。</li>
+        <li>Open-Meteo：根据你填写的城市，或在你主动开启当前位置后根据设备坐标，提供天气和地理编码。</li>
+        <li>Simple Icons、DuckDuckGo 和 Google：开启自动图标查找时通过 HTTPS 获取网站图标；这会向相应提供方暴露被请求的网站主机名。</li>
+        <li>Cloudflare Pages：托管 whytab 网页版本并提供 HTTPS 与安全响应头。</li>
+        <li>Cloudflare Turnstile：在注册、登录、密码重置、修改密码和删除账号前进行反滥用验证。</li>
+      </ul>
+      <p>天气城市、“使用当前位置”偏好、天气结果以及启用定位后取得的坐标只按当前账号分区缓存在本机，用于减少重复请求；它们不进入云端同步快照或完整备份。天气卡片只链接到 Open-Meteo 官方来源页，不会把坐标转交给额外的搜索服务。</p>
+      <p>Turnstile 会处理完成反滥用验证所需的浏览器、网络和交互信号，并返回一个短期一次性令牌。whytab 只在当前页面内存中使用该令牌完成认证请求，不会把它写入本机数据、导出备份或云端同步快照。</p>
+
+      <h2>保留与删除</h2>
+      <p>本机数据会保留到你在应用中覆盖、清理浏览器网站数据、卸载扩展或删除浏览器配置文件。账号和云端快照会保留到你永久删除账号；删除后会从在线账号和业务表中移除。当前不会把 whytab 数据库导出保存在独立的异地灾备存储中；启用此类灾备前会先更新本说明，明确存储服务、加密方式和保留周期。安全日志和邮件投递日志可能按相应服务商的有限保留周期延迟清除。</p>
+
+      <h2>跨设备与跨境处理</h2>
+      <p>登录同步时，数据会由所使用的云服务区域和网络节点处理，位置可能不同于你所在的国家或地区。不同网页域名的浏览器本机存储彼此隔离；未同步的本机数据不会仅因更换访问域名而自动迁移。</p>
+
+      <h2>你的选择</h2>
+      <p>你可以不登录、关闭自动同步、关闭第三方图标查找、导出完整备份并在其他浏览器恢复。新安装默认不读取定位；只有你主动开启“使用当前位置”后，应用才会调用浏览器定位，浏览器或操作系统可能显示权限提示。普通“退出登录”只退出当前设备，并切换到未登录空白数据；“退出所有设备”会撤销该账号的其他刷新会话，其他设备会在会话刷新后退出。</p>
+      <p>登录后可在“账号与云同步”中永久删除账号。删除前需要再次输入当前邮箱和密码并完成安全验证；完成后会删除 Supabase Auth 账号、该账号的云端同步数据，以及此设备上的账号数据、账号备份、图标解析缓存和位置天气缓存。此操作无法恢复，建议先导出完整 JSON 备份。</p>
+      <p>你可以通过完整备份查看并携带自己的 whytab 内容，也可以直接修改或删除记录。敏感的数据请求或安全问题不要写入公开 Issue，请使用 GitHub 的私密漏洞报告渠道。</p>
+
+      <h2>未成年人</h2>
+      <p>账号同步服务不面向未满 16 周岁，或未达到所在地可独立同意网络服务年龄的用户。达到当地要求前，请勿创建同步账号。</p>
+
+      <h2>源代码与支持</h2>
+      <p>源代码、数据模型和安全说明位于 <a href="https://github.com/Muggler77/whytab" rel="noreferrer">GitHub 仓库</a>。不包含个人数据的一般问题可通过仓库的 <a href="https://github.com/Muggler77/whytab/issues" rel="noreferrer">Issues</a> 提交；敏感问题使用 <a href="https://github.com/Muggler77/whytab/security/advisories/new" rel="noreferrer">私密漏洞报告</a>。</p>
+
+      <p><a href="./terms.html">查看服务条款</a> · <a href="./">返回 whytab</a></p>
+
+      <hr class="divider" />
+      <h1 id="english">whytab Privacy and Data Notice</h1>
+      <p class="meta">Effective date: July 25, 2026</p>
+      <p class="notice">whytab is local-first. You can use it without an account; signing in is only required for optional cross-device synchronization.</p>
+
+      <h2>Data on your device</h2>
+      <p>Shortcuts, widgets, notes, todos, countdowns, calendar entries, layout, and settings are stored in the current browser's IndexedDB by default. Clearing site data, removing the extension, deleting the browser profile, or operating-system storage cleanup can remove device-only data. Use the complete JSON backup regularly.</p>
+      <p>whytab does not add end-to-end or field-level encryption to application content in IndexedDB. Protection of data at rest depends on the browser profile, operating-system account, device lock, and disk encryption. Do not keep sensitive content on a shared or unprotected device.</p>
+
+      <h2>Account and cloud synchronization</h2>
+      <p>When you register or sign in, your password is sent directly over HTTPS from the current form to Supabase Auth. whytab does not place passwords in application state, IndexedDB, exported backups, or synchronization snapshots. Supabase Auth stores the access and refresh session tokens needed to remain signed in in the current browser; those tokens are excluded from whytab backups and cloud snapshots and are removed or revoked by the applicable sign-out action. Synchronizable data is stored in an account-scoped cloud snapshot protected by Supabase authentication, Row Level Security, and revision-checked atomic writes.</p>
+
+      <h2>Purposes and data scope</h2>
+      <p>Data is processed only to provide the local dashboard, account verification, optional synchronization, recovery, and abuse prevention. whytab does not sell personal data, use user content for targeted advertising, or include behavioral analytics SDKs. Hosting, authentication, email, and security providers may retain necessary delivery, access, and security logs.</p>
+
+      <h2>Data that is not synchronized</h2>
+      <p>Device-uploaded photos, photo filenames, custom wallpapers, shortcut icons, and folder icons are excluded from cloud snapshots. Synchronized data is not end-to-end encrypted. Cloud operators may have technical access when necessary to operate the service, so do not store passwords, recovery codes, or other highly sensitive secrets in titles or notes.</p>
+
+      <h2>Service providers</h2>
+      <ul>
+        <li>Supabase for accounts, sessions, authentication, and cloud snapshots.</li>
+        <li>The configured email provider for verification, password reset, and security messages.</li>
+        <li>Cloudflare Pages for HTTPS hosting and Cloudflare Turnstile for abuse prevention during account operations.</li>
+        <li>Open-Meteo for weather and geocoding based on the city you enter or, only after you enable current-location weather, the device coordinates.</li>
+        <li>Simple Icons, DuckDuckGo, and Google for HTTPS site-icon requests when remote lookup is enabled; those requests disclose the requested hostname to the applicable provider.</li>
+      </ul>
+      <p>The selected city, current-location preference, weather response, and any device coordinates are cached only in the current account's local browser partition to reduce repeat requests. They are excluded from cloud snapshots and complete backups. Weather source links do not forward coordinates to an additional search provider.</p>
+      <p>Turnstile processes browser, network, and interaction signals needed to issue a short-lived, single-use challenge token. whytab uses that token only in page memory for the current authentication request.</p>
+
+      <h2>Retention, deletion, and your choices</h2>
+      <p>Device data remains until you overwrite it or remove the relevant browser storage. Online account data remains until the account is permanently deleted. whytab does not currently retain independent off-site exports of the production database; this notice will be updated with the storage provider, encryption method, and retention period before such disaster-recovery storage is enabled. Security and email-delivery logs may follow their providers' limited retention periods. You can use whytab without signing in, disable automatic sync and remote icon lookup, export a complete backup, and delete the account from the account panel after confirming the current email and password and completing the security challenge.</p>
+      <p>Ordinary sign-out affects only the current device and switches it to an empty signed-out data area. “Sign out all devices” revokes the account's other refresh sessions; other devices sign out when their sessions refresh. Different web origins have separate browser storage, so device-only data does not automatically move when a domain changes.</p>
+
+      <h2>International processing and age</h2>
+      <p>Cloud services and network nodes may process data outside your country or region. The synchronization account service is not directed to anyone under 16 or below the age at which they can independently consent to an online service in their location.</p>
+
+      <h2>Support and source</h2>
+      <p>Source code and security documentation are available in the <a href="https://github.com/Muggler77/whytab" rel="noreferrer">GitHub repository</a>. Use public <a href="https://github.com/Muggler77/whytab/issues" rel="noreferrer">Issues</a> only for requests that contain no personal data. Report sensitive security matters through <a href="https://github.com/Muggler77/whytab/security/advisories/new" rel="noreferrer">private vulnerability reporting</a>.</p>
+      <p><a href="./terms.html">Terms of Service</a> · <a href="./">Return to whytab</a></p>
+    </main>
+  </body>
+</html>

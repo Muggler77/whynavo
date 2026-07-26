@@ -1,0 +1,42 @@
+name: Verify whytab
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Setup Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Verify data migrations and security boundaries
+        run: node scripts/migration-safety-test.mjs
+      - name: Verify Edge Function syntax
+        run: npm run verify:edge-functions
+      - name: Verify encrypted backup tooling
+        run: npm run verify:backup-tools
+      - name: Verify repository privacy and secret boundaries
+        run: |
+          npm run verify:repository-safety
+          npm run verify:public-images
+      - name: Verify public repository history
+        run: npm run verify:repository-history
+      - name: Build extension and web app
+        run: npm run build:web
+      - name: Audit production dependencies
+        run: npm audit --omit=dev --audit-level=high
