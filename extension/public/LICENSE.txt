@@ -19,8 +19,3 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
-
-Unless a file states otherwise, this license also covers repository-authored
-icons and wallpaper assets. The license does not grant trademark rights in the
-whytab name or logo. Modified distributions must not imply endorsement by the
-official whytab service.
