@@ -10,9 +10,7 @@ const desired = {
   site_url: officialOrigin,
   uri_allow_list: officialOrigin,
   rate_limit_verify: 360,
-  rate_limit_token_refresh: 1800,
-  mailer_subjects_confirmation: "Verify your whytab email / 验证 whytab 邮箱",
-  mailer_subjects_recovery: "Reset your whytab password / 重置 whytab 密码"
+  rate_limit_token_refresh: 1800
 };
 
 await updateReviewedAuthConfig(desired);
@@ -24,4 +22,4 @@ for (const [key, expected] of Object.entries(desired)) {
   }
 }
 
-console.log("Supabase Auth origin, rate limits, and reviewed email subjects are configured; templates remain gated until production email delivery is enabled.");
+console.log("Supabase Auth origin and rate limits are configured; all email branding remains gated until production delivery is enabled.");
