@@ -81,14 +81,17 @@ export async function managementRequest(path, options = {}) {
   return text ? JSON.parse(text) : undefined;
 }
 
-export async function databaseQuery(query) {
+export async function databaseQuery(query, { readOnly = true } = {}) {
   if (typeof query !== "string" || !query.trim() || query.includes("\0")) {
     throw new Error("Supabase database query must be non-empty text");
+  }
+  if (typeof readOnly !== "boolean") {
+    throw new Error("Supabase database query readOnly must be boolean");
   }
   const projectRef = supabaseProjectRef();
   return managementRequest(`/v1/projects/${projectRef}/database/query`, {
     method: "POST",
-    body: { query }
+    body: { query, read_only: readOnly }
   });
 }
 

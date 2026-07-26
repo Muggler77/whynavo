@@ -1457,6 +1457,8 @@ try {
   assert.match(migrationDeployment, /supabase_migrations\.schema_migrations/, "the Management API migration path must preserve the official migration ledger");
   const managementClient = await readFile(join(repoRoot, "scripts/supabase-management.mjs"), "utf8");
   assert.match(managementClient, /\/database\/query/, "production database changes must use the authenticated Supabase Management API");
+  assert.match(managementClient, /read_only: readOnly/, "Supabase database queries must declare their read/write mode explicitly");
+  assert.match(migrationDeployment, /databaseQuery\(transaction, \{ readOnly: false \}\)/, "migration transactions must explicitly request write access");
   assert.match(managementClient, /READ_ONLY_PROJECT_ENDPOINTS[\s\S]*Management API path is not allow-listed/, "the Management API helper must reject unreviewed endpoints");
   assert.match(managementClient, /WRITABLE_AUTH_CONFIG_FIELDS[\s\S]*reviewedAuthUpdate === true[\s\S]*unreviewed field/, "Auth configuration writes must be restricted to reviewed fields and an explicit write path");
   assert.match(managementClient, /MAX_MANAGEMENT_BODY_BYTES[\s\S]*Buffer\.byteLength/, "Management API uploads must have an explicit size bound");

@@ -69,7 +69,7 @@ for (const migration of selectedMigrations) {
     "commit;"
   ].join("\n");
 
-  await databaseQuery(transaction);
+  await databaseQuery(transaction, { readOnly: false });
   appliedCount += 1;
 }
 
