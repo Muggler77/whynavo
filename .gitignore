@@ -1,0 +1,15 @@
+node_modules
+dist
+release/
+.env
+.env.*
+!.env.example
+.DS_Store
+*.log
+网页数据/
+supabase/.temp/
+extension/web-dist/
+.backup-work/
+*.tar.gz.enc
+*.tar.gz.enc.sha256
+*backup-private*.pem

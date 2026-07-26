@@ -1,0 +1,29 @@
+{
+  "name": "whytab",
+  "private": true,
+  "version": "0.6.0",
+  "description": "whytab browser new tab extension workspace",
+  "scripts": {
+    "dev": "npm --workspace extension run dev",
+    "build": "npm --workspace extension run build",
+    "build:web": "npm run build && node scripts/build-web.mjs",
+    "preview": "npm --workspace extension run preview",
+    "smoke:hosted": "node scripts/hosted-smoke-test.mjs",
+    "typecheck": "npm --workspace extension run typecheck",
+    "verify:repository-safety": "node scripts/repository-safety-test.mjs",
+    "verify:repository-history": "node scripts/repository-history-safety-test.mjs",
+    "verify:public-images": "node scripts/verify-public-images.mjs",
+    "verify:edge-functions": "node scripts/verify-edge-functions.mjs",
+    "verify:backup-tools": "node scripts/backup-envelope-test.mjs",
+    "verify:production-config": "node scripts/verify-production-config.mjs",
+    "verify:supabase-production": "node scripts/verify-supabase-production.mjs",
+    "deploy:supabase-migrations": "node scripts/apply-supabase-migrations.mjs",
+    "verify:release": "node scripts/verify-release-version.mjs"
+  },
+  "workspaces": [
+    "extension"
+  ],
+  "devDependencies": {
+    "esbuild": "0.28.1"
+  }
+}
