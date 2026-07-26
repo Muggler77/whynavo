@@ -1,9 +1,11 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 
+import { resolveReleaseVersion } from "./release-version.mjs";
+
 const readJson = async (path) => JSON.parse(await readFile(new URL(path, import.meta.url), "utf8"));
 const rootPackage = await readJson("../package.json");
-const releaseVersion = (process.env.RELEASE_VERSION || process.env.GITHUB_REF_NAME || rootPackage.version || "").trim();
+const releaseVersion = resolveReleaseVersion(process.env, rootPackage.version);
 assert.match(releaseVersion, /^\d+\.\d+\.\d+$/, "release tag or package version must use semantic version format");
 
 const extensionPackage = await readJson("../extension/package.json");
