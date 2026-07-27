@@ -1,0 +1,138 @@
+:root {
+  color: #17212b;
+  background: #eef3f5;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "PingFang SC", "Microsoft YaHei", sans-serif;
+  font-synthesis: none;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  min-width: 320px;
+  min-height: 100%;
+  margin: 0;
+}
+
+body {
+  min-height: 100vh;
+  background: #eef3f5;
+}
+
+.confirmation-shell {
+  display: grid;
+  min-height: 100vh;
+  padding: 24px;
+  place-items: center;
+}
+
+.confirmation-panel {
+  width: min(100%, 440px);
+  padding: 34px 32px 30px;
+  border: 1px solid rgba(255, 255, 255, 0.82);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.88);
+  box-shadow: 0 20px 60px rgba(24, 42, 54, 0.14);
+  text-align: center;
+  -webkit-backdrop-filter: blur(18px) saturate(125%);
+  backdrop-filter: blur(18px) saturate(125%);
+}
+
+.confirmation-logo {
+  display: block;
+  margin: 0 auto 12px;
+  border-radius: 16px;
+}
+
+.confirmation-brand {
+  margin: 0 0 24px;
+  color: #52616d;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+h1 {
+  margin: 0 0 14px;
+  font-size: 25px;
+  line-height: 1.25;
+}
+
+.confirmation-copy {
+  margin: 0 0 10px;
+  color: #53626e;
+  font-size: 14px;
+  line-height: 1.7;
+}
+
+.confirmation-status {
+  min-height: 22px;
+  margin: 22px 0 16px;
+  color: #0f766e;
+  font-size: 14px;
+  font-weight: 650;
+  line-height: 1.55;
+}
+
+.confirmation-status[data-state="error"] {
+  color: #b42318;
+}
+
+.confirmation-button {
+  width: 100%;
+  min-height: 46px;
+  border: 0;
+  border-radius: 8px;
+  background: #17212b;
+  color: #fff;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 700;
+}
+
+.confirmation-button:hover:not(:disabled) {
+  background: #263743;
+}
+
+.confirmation-button:focus-visible,
+.confirmation-cancel:focus-visible {
+  outline: 3px solid rgba(13, 148, 136, 0.34);
+  outline-offset: 3px;
+}
+
+.confirmation-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.confirmation-cancel {
+  display: inline-block;
+  margin-top: 18px;
+  color: #52616d;
+  font-size: 14px;
+  text-decoration: none;
+}
+
+.confirmation-cancel:hover {
+  color: #17212b;
+  text-decoration: underline;
+}
+
+@media (max-width: 520px) {
+  .confirmation-shell {
+    padding: 16px;
+  }
+
+  .confirmation-panel {
+    padding: 28px 22px 24px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+  }
+}

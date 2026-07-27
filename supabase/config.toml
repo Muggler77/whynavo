@@ -1,0 +1,10 @@
+project_id = "keafulupzvfljvbzwgrq"
+
+[functions.boc-rates]
+verify_jwt = false
+
+[functions.delete-account]
+verify_jwt = true
+
+[functions.send-auth-email]
+verify_jwt = false
