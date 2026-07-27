@@ -1466,7 +1466,7 @@ try {
   assert.doesNotMatch(managementClient, /console\.log\([^)]*token|console\.error\([^)]*token/, "the Supabase access token must never be logged");
   const authConfigurator = await readFile(join(repoRoot, "scripts/configure-supabase-auth.mjs"), "utf8");
   assert.match(authConfigurator, /site_url: officialOrigin[\s\S]*uri_allow_list: officialOrigin/, "the reviewed Auth configuration must remove every retired redirect origin");
-  assert.match(authConfigurator, /rate_limit_verify: 360[\s\S]*rate_limit_token_refresh: 1800/, "the reviewed Auth configuration must match Supabase's current verification and refresh limits");
+  assert.match(authConfigurator, /rate_limit_email_sent: 60[\s\S]*rate_limit_verify: 360[\s\S]*rate_limit_token_refresh: 1800/, "the reviewed Auth configuration must match Supabase's current email, verification, and refresh limits");
   assert.doesNotMatch(authConfigurator, /mailer_subjects_confirmation|mailer_subjects_recovery|mailer_templates_confirmation_content|mailer_templates_recovery_content/, "the free-tier Auth configurator must not attempt email branding writes that Supabase rejects without custom SMTP");
   assert.match(deployWorkflow, /configure:supabase-auth/, "every production deployment must converge the reviewed Auth origin and rate limits");
   const supabaseProductionGate = await readFile(join(repoRoot, "scripts/verify-supabase-production.mjs"), "utf8");
