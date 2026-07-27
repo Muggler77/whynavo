@@ -10,6 +10,8 @@ Current release: **0.8.0**. See the [bilingual release notes](docs/releases/0.8.
 >
 > The public source and local 0.8.0 build are available for review and testing. Hosted account registration and cloud sync remain pre-release until the matching public Release, production email sender, encrypted off-site backup, database migration, and live smoke tests all pass. Do not use the hosted service as the only copy of important data yet.
 
+![WhyNavo 0.8.0 Lucid Canvas home workspace](docs/images/whynavo-0.8.0-lucid-canvas.png)
+
 ## Product and Framework
 
 WhyNavo is both a ready-to-use product and a publicly auditable, configurable codebase.
