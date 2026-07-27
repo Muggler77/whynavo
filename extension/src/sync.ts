@@ -409,6 +409,7 @@ const WIDGET_KEYS = new Set<WidgetKey>([
 ]);
 const SETTINGS_KEYS = new Set([
   "theme",
+  "language",
   "wallpaper",
   "wallpaperPreset",
   "wallpaperRotation",
@@ -696,6 +697,7 @@ export function validateAppStatePayload(value: unknown, label = "数据"): asser
   const settings = state.settings;
   if (!hasOnlyKeys(settings, SETTINGS_KEYS)) throw new Error(`${label}格式无效：包含未知的设置字段`);
   const stringSettings = [
+    "language",
     "wallpaperPreset",
     "photoFrameTitle",
     "iconPresentation",
@@ -732,6 +734,7 @@ export function validateAppStatePayload(value: unknown, label = "数据"): asser
     || !validOptionalBoolean(settings.weatherUseLocation)
     || !validOptionalBoolean(settings.remoteIconLookup)
     || (settings.iconPresentation !== undefined && !["original", "soft", "minimal"].includes(String(settings.iconPresentation)))
+    || (settings.language !== undefined && !["zh-CN", "en-US"].includes(String(settings.language)))
     || !["comfortable", "compact"].includes(String(settings.gridDensity))
     || !["top", "bottom"].includes(String(settings.dockPosition))
     || typeof settings.city !== "string"
@@ -1447,6 +1450,7 @@ export function normalizeState(state: AppState): AppState {
   }
   const settings: Settings = {
     ...state.settings,
+    language: state.settings.language === "en-US" ? "en-US" : "zh-CN",
     wallpaper: visualVersion < 5 ? undefined : normalizeStoredImageReference(state.settings.wallpaper),
     wallpaperPreset: visualVersion < 12 && state.settings.wallpaperPreset === "coastal-glass"
       ? "lucid-room"

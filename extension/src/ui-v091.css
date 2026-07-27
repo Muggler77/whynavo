@@ -1,0 +1,578 @@
+/*
+ * WhyNavo 0.9.1: borderless Spaces canvas, stable collected icons, and i18n controls.
+ */
+
+.language-toggle {
+  width: auto !important;
+  min-width: 48px !important;
+  padding: 0 8px !important;
+  gap: 4px;
+}
+
+.language-toggle span {
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.spaces-page-hero {
+  display: grid;
+  min-height: 176px;
+  padding: 70px 0 34px;
+  place-items: center;
+}
+
+.space-search {
+  display: grid;
+  width: min(620px, calc(100vw - 280px));
+  min-height: 52px;
+  padding: 0 8px 0 18px;
+  grid-template-columns: 22px minmax(0, 1fr) 36px;
+  align-items: center;
+  gap: 10px;
+  color: var(--lucid-soft);
+  background: color-mix(in srgb, var(--lucid-surface-solid) 86%, transparent);
+  border: 1px solid var(--lucid-line);
+  border-radius: 8px;
+  box-shadow: 0 14px 38px rgba(31, 39, 45, 0.07);
+  backdrop-filter: blur(18px);
+}
+
+.space-search input {
+  width: 100%;
+  min-width: 0;
+  height: 50px;
+  padding: 0;
+  color: var(--lucid-ink);
+  background: transparent;
+  border: 0;
+  outline: 0;
+  font-size: 14px;
+}
+
+.space-search input::placeholder {
+  color: var(--lucid-faint);
+}
+
+.space-search button {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  color: var(--lucid-faint);
+  background: transparent;
+  border: 0;
+  border-radius: 6px;
+  place-items: center;
+}
+
+.space-search:focus-within {
+  border-color: color-mix(in srgb, var(--lucid-brand) 58%, var(--lucid-line));
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--lucid-brand) 13%, transparent), 0 14px 38px rgba(31, 39, 45, 0.08);
+}
+
+.workspace.page-shortcuts,
+.workspace.page-custom {
+  width: min(1600px, 100%);
+}
+
+.page-shortcuts .shortcut-stage,
+.page-custom .shortcut-stage {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: 132px minmax(0, 1fr);
+  grid-template-rows: 48px minmax(236px, auto);
+  grid-template-areas:
+    "rail head"
+    "rail panel";
+  align-items: start;
+  gap: 10px 28px;
+}
+
+.page-shortcuts .shortcut-stage-head,
+.page-custom .shortcut-stage-head {
+  min-height: 48px;
+  padding: 0 2px;
+}
+
+.page-shortcuts .shortcut-stage-title > span,
+.page-custom .shortcut-stage-title > span {
+  display: none;
+}
+
+.page-shortcuts .shortcut-stage-title h2,
+.page-custom .shortcut-stage-title h2 {
+  font-size: 15px;
+  font-weight: 620;
+}
+
+.page-shortcuts .shortcut-stage-title p,
+.page-custom .shortcut-stage-title p {
+  margin-top: 2px;
+  font-size: 10px;
+}
+
+.page-shortcuts .shortcut-stage-actions button,
+.page-custom .shortcut-stage-actions button {
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+}
+
+.page-shortcuts .shortcut-stage-actions button:hover,
+.page-custom .shortcut-stage-actions button:hover {
+  background: var(--wt-surface-hover);
+  border-color: var(--wt-line);
+}
+
+.page-shortcuts .layer-rail,
+.page-custom .layer-rail {
+  position: sticky;
+  top: 18px;
+  display: flex;
+  width: 132px;
+  min-width: 0;
+  max-height: calc(100dvh - 190px);
+  margin: 0;
+  padding: 0 12px 0 0;
+  align-items: stretch;
+  flex-direction: column;
+  gap: 4px;
+  overflow: hidden auto;
+  color: var(--lucid-soft);
+  background: transparent;
+  border: 0;
+  border-right: 1px solid var(--lucid-line);
+  border-radius: 0;
+  box-shadow: none;
+  backdrop-filter: none;
+  scrollbar-width: thin;
+}
+
+.page-shortcuts .layer-head,
+.page-custom .layer-head {
+  min-height: 40px;
+  padding: 0 2px 7px 9px;
+  justify-content: space-between;
+  color: var(--lucid-faint);
+  border: 0;
+  font-size: 10px;
+}
+
+.page-shortcuts .layer-head button,
+.page-custom .layer-head button {
+  width: 32px;
+  height: 32px;
+}
+
+.page-shortcuts .layer-rail > button,
+.page-shortcuts .layer-main,
+.page-custom .layer-rail > button,
+.page-custom .layer-main {
+  position: relative;
+  width: 100%;
+  min-width: 0;
+  min-height: 40px;
+  padding: 0 8px;
+  justify-content: flex-start;
+  gap: 8px;
+  color: var(--lucid-soft);
+  background: transparent;
+  border: 0;
+  border-radius: 6px;
+}
+
+.page-shortcuts .layer-rail > button span:not(.group-dot),
+.page-shortcuts .layer-main span:not(.group-dot),
+.page-custom .layer-rail > button span:not(.group-dot),
+.page-custom .layer-main span:not(.group-dot) {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.page-shortcuts .layer-rail > button small,
+.page-shortcuts .layer-main small,
+.page-custom .layer-rail > button small,
+.page-custom .layer-main small {
+  margin-left: auto;
+  font-size: 9px;
+}
+
+.page-shortcuts .layer-rail > button:hover,
+.page-shortcuts .layer-rail > button.active,
+.page-shortcuts .layer-row.active .layer-main,
+.page-custom .layer-rail > button:hover,
+.page-custom .layer-rail > button.active,
+.page-custom .layer-row.active .layer-main {
+  color: var(--lucid-ink);
+  background: color-mix(in srgb, var(--lucid-surface) 58%, transparent);
+  border: 0;
+}
+
+.page-shortcuts .layer-rail > button.active::before,
+.page-shortcuts .layer-row.active .layer-main::before,
+.page-custom .layer-rail > button.active::before,
+.page-custom .layer-row.active .layer-main::before {
+  position: absolute;
+  top: 11px;
+  bottom: 11px;
+  left: -1px;
+  width: 2px;
+  content: "";
+  background: var(--lucid-brand);
+  border-radius: 99px;
+}
+
+.page-shortcuts .layer-row,
+.page-custom .layer-row {
+  width: 100%;
+}
+
+.page-shortcuts .layer-actions,
+.page-custom .layer-actions {
+  position: absolute;
+  right: 4px;
+  padding-left: 2px;
+  background: color-mix(in srgb, var(--lucid-surface-solid) 80%, transparent);
+  border-radius: 5px;
+}
+
+.page-shortcuts .shortcuts-panel,
+.page-custom .shortcuts-panel {
+  min-width: 0;
+  min-height: 236px;
+  padding: 0;
+  overflow: visible;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  backdrop-filter: none;
+}
+
+.page-shortcuts .shortcut-grid,
+.page-custom .shortcut-grid {
+  display: grid;
+  min-width: 0;
+  padding: 4px 0 28px;
+  grid-template-columns: repeat(auto-fill, minmax(84px, 1fr));
+  align-content: start;
+  align-items: start;
+  gap: 18px 10px;
+}
+
+.page-shortcuts .shortcut-grid.compact,
+.page-custom .shortcut-grid.compact {
+  grid-template-columns: repeat(auto-fill, minmax(76px, 1fr));
+  gap: 14px 8px;
+}
+
+.page-shortcuts .shortcut,
+.page-custom .shortcut {
+  position: relative;
+  min-width: 0;
+  min-height: 104px;
+  overflow: visible;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.page-shortcuts .shortcut:hover,
+.page-custom .shortcut:hover {
+  background: transparent;
+}
+
+.page-shortcuts .shortcut > a,
+.page-shortcuts .folder-open,
+.page-custom .shortcut > a,
+.page-custom .folder-open {
+  width: 100%;
+  min-width: 0;
+  min-height: 104px;
+  padding: 5px 4px 7px;
+  gap: 8px;
+  color: var(--lucid-soft);
+  background: transparent;
+  border: 0;
+  border-radius: 7px;
+}
+
+.page-shortcuts .shortcut > a:hover,
+.page-shortcuts .folder-open:hover,
+.page-custom .shortcut > a:hover,
+.page-custom .folder-open:hover {
+  color: var(--lucid-ink);
+  background: color-mix(in srgb, var(--lucid-surface) 38%, transparent);
+}
+
+.page-shortcuts .shortcut-icon,
+.page-custom .shortcut-icon {
+  flex: 0 0 var(--icon);
+  width: var(--icon);
+  height: var(--icon);
+  overflow: hidden;
+  background: transparent;
+  border: 0;
+  border-radius: 22%;
+  box-shadow: none;
+}
+
+.page-shortcuts .shortcut-icon-image.is-site-art,
+.page-shortcuts .shortcut-icon img,
+.page-custom .shortcut-icon-image.is-site-art,
+.page-custom .shortcut-icon img {
+  width: 100%;
+  height: 100%;
+  max-width: 100%;
+  object-fit: contain;
+}
+
+.page-shortcuts .shortcut-icon-image.is-brand-mark,
+.page-custom .shortcut-icon-image.is-brand-mark {
+  width: 84%;
+  height: 84%;
+  object-fit: contain;
+}
+
+.page-shortcuts .folder-icon:not(.has-image),
+.page-custom .folder-icon:not(.has-image) {
+  color: var(--folder-color);
+  background: color-mix(in srgb, var(--folder-color) 13%, transparent);
+}
+
+.page-shortcuts .shortcut a > span:last-child,
+.page-shortcuts .folder-open > span:last-child,
+.page-custom .shortcut a > span:last-child,
+.page-custom .folder-open > span:last-child {
+  display: block;
+  width: 100%;
+  min-height: 16px;
+  overflow: hidden;
+  color: inherit;
+  font-size: 10px;
+  font-weight: 540;
+  line-height: 16px;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.page-shortcuts .drag-corner,
+.page-custom .drag-corner {
+  top: 0;
+  right: 6px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 160ms ease;
+}
+
+.page-shortcuts .shortcut:hover .drag-corner,
+.page-shortcuts .shortcut:focus-within .drag-corner,
+.page-custom .shortcut:hover .drag-corner,
+.page-custom .shortcut:focus-within .drag-corner {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.page-shortcuts .empty-shortcut,
+.page-custom .empty-shortcut {
+  min-height: 104px;
+  color: var(--lucid-faint);
+  background: transparent;
+  border: 1px dashed var(--lucid-line);
+  border-radius: 7px;
+}
+
+.page-shortcuts .search-empty,
+.page-custom .search-empty {
+  grid-column: 1 / -1;
+  min-height: 180px;
+  border: 0;
+}
+
+/* Collected icons must never overflow their fixed preview cell. */
+
+.collected-icon-grid {
+  grid-template-columns: repeat(auto-fit, minmax(76px, 1fr));
+  gap: 8px;
+}
+
+.collected-icon-grid button {
+  min-height: 88px;
+  max-width: 100%;
+  overflow: hidden;
+}
+
+.collected-icon-grid button > span:first-child {
+  display: grid;
+  width: 44px;
+  height: 44px;
+  flex: 0 0 44px;
+  overflow: hidden;
+  background: color-mix(in srgb, var(--wt-surface) 70%, transparent);
+  border-radius: 10px;
+  place-items: center;
+}
+
+.collected-icon-grid img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  max-width: 100%;
+  object-fit: contain;
+}
+
+.collected-icon-grid em {
+  display: block;
+  width: 100%;
+  overflow: hidden;
+  font-size: 9px;
+  font-style: normal;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.icon-choice-fallback {
+  display: grid;
+  width: 100%;
+  height: 100%;
+  color: var(--wt-text-soft);
+  font-size: 18px;
+  font-weight: 650;
+  place-items: center;
+}
+
+@media (max-width: 900px) {
+  .spaces-page-hero {
+    min-height: 142px;
+    padding: 48px 0 24px;
+  }
+
+  .space-search {
+    width: min(620px, calc(100vw - 96px));
+  }
+
+  .page-shortcuts .shortcut-stage,
+  .page-custom .shortcut-stage {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto auto minmax(220px, auto);
+    grid-template-areas:
+      "head"
+      "rail"
+      "panel";
+    gap: 6px;
+  }
+
+  .page-shortcuts .layer-rail,
+  .page-custom .layer-rail {
+    position: static;
+    display: flex;
+    width: 100%;
+    max-height: none;
+    padding: 4px 0 9px;
+    align-items: center;
+    flex-direction: row;
+    overflow: auto hidden;
+    border: 0;
+    border-bottom: 1px solid var(--lucid-line);
+  }
+
+  .page-shortcuts .layer-head,
+  .page-custom .layer-head {
+    min-width: max-content;
+    padding: 0 6px;
+    gap: 4px;
+  }
+
+  .page-shortcuts .layer-rail > button,
+  .page-shortcuts .layer-main,
+  .page-custom .layer-rail > button,
+  .page-custom .layer-main {
+    width: auto;
+    min-width: max-content;
+  }
+
+  .page-shortcuts .layer-rail > button.active::before,
+  .page-shortcuts .layer-row.active .layer-main::before,
+  .page-custom .layer-rail > button.active::before,
+  .page-custom .layer-row.active .layer-main::before {
+    top: auto;
+    right: 10px;
+    bottom: -4px;
+    left: 10px;
+    width: auto;
+    height: 2px;
+  }
+
+  .page-shortcuts .shortcut-grid,
+  .page-custom .shortcut-grid {
+    grid-template-columns: repeat(auto-fill, minmax(78px, 1fr));
+    gap: 14px 8px;
+  }
+}
+
+@media (max-width: 700px) {
+  .language-toggle {
+    min-width: 44px !important;
+  }
+
+  .language-toggle span {
+    display: none;
+  }
+
+  .spaces-page-hero {
+    min-height: 118px;
+    padding: 18px 0 16px;
+  }
+
+  .space-search {
+    width: 100%;
+    min-height: 48px;
+  }
+
+  .space-search input {
+    height: 46px;
+    font-size: 13px;
+  }
+
+  .page-shortcuts .shortcut-stage-title h2,
+  .page-custom .shortcut-stage-title h2 {
+    font-size: 14px;
+  }
+
+  .page-shortcuts .shortcut-grid,
+  .page-custom .shortcut-grid,
+  .page-shortcuts .shortcut-grid.compact,
+  .page-custom .shortcut-grid.compact {
+    grid-template-columns: repeat(auto-fill, minmax(70px, 1fr));
+    gap: 10px 4px;
+  }
+
+  .page-shortcuts .shortcut,
+  .page-shortcuts .shortcut > a,
+  .page-shortcuts .folder-open,
+  .page-custom .shortcut,
+  .page-custom .shortcut > a,
+  .page-custom .folder-open {
+    min-height: 96px;
+  }
+
+  .page-shortcuts .shortcut a > span:last-child,
+  .page-shortcuts .folder-open > span:last-child,
+  .page-custom .shortcut a > span:last-child,
+  .page-custom .folder-open > span:last-child {
+    font-size: 9px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .page-shortcuts .drag-corner,
+  .page-custom .drag-corner {
+    transition: none;
+  }
+}

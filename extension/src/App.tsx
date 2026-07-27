@@ -40,6 +40,7 @@ import {
   Navigation,
   Plane,
   Layers,
+  Languages,
   LayoutGrid,
   LogOut,
   Palette,
@@ -75,7 +76,7 @@ import {
   Wind,
   X
 } from "lucide-react";
-import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type FocusEvent, type KeyboardEvent, type MouseEvent } from "react";
+import { createContext, lazy, Suspense, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, type FocusEvent, type KeyboardEvent, type MouseEvent } from "react";
 import { createPortal } from "react-dom";
 import { accountScopedKey, adoptLegacyStateForAccount, clearLocalAccountDeletionPending, clearLocalDeletedAccountMarkerForVerifiedUser, commitAnonymousStateAdoption, deleteKey, deleteLocalAccountData, downloadJson, hasLegacyUnscopedState, loadStateForAccount, markLocalAccountDeletionPending, mergeAndSaveStateForAccount, readKey, readPendingLocalAccountDeletionIds, saveStateForAccount, writeKey } from "./db";
 import { defaultNavigationOrder, defaultState, defaultWidgetOrder, defaultWidgetSizes, nowIso, uid } from "./defaultState";
@@ -123,7 +124,7 @@ import {
   validateAppStatePayload,
   type SyncStatus
 } from "./sync";
-import type { AppState, Countdown, CustomNavPage, CustomNavPageIcon, Note, RatesState, SearchEngine, Shortcut, ShortcutFolder, SystemNavPage, Todo, WeatherState, WidgetKey, WidgetSize } from "./types";
+import type { AppState, Countdown, CustomNavPage, CustomNavPageIcon, Note, RatesState, SearchEngine, Shortcut, ShortcutFolder, SystemNavPage, Todo, UiLanguage, WeatherState, WidgetKey, WidgetSize } from "./types";
 import { normalizeHttpUrl, safeHttpHref } from "./urls";
 
 type Dialog = "shortcut" | "folder" | "import" | "library" | "pages" | "settings" | "sync" | "timezone" | null;
@@ -164,10 +165,15 @@ const RATES_CACHE_MAX_AGE_MS = 6 * 60 * 60 * 1000;
 const ICON_LOAD_TIMEOUT_MS = 5000;
 const ICON_FAILURE_RETRY_MS = 6 * 60 * 60 * 1000;
 const MIN_SHARP_ICON_SIZE = 96;
+const MIN_ICON_PREVIEW_SIZE = 16;
 const SHORTCUT_RENDER_BATCH = 48;
 const ICON_MANAGER_RENDER_BATCH = 80;
 const MAX_CUSTOM_WALLPAPERS = 12;
 const MAX_IMAGE_UPLOAD_BYTES = 12 * 1024 * 1024;
+
+const UiLanguageContext = createContext<UiLanguage>("zh-CN");
+const localized = (language: UiLanguage, zh: string, en: string) => language === "en-US" ? en : zh;
+const useUiLanguage = () => useContext(UiLanguageContext);
 
 const sampleAStarterSites = [
   { title: "Google", url: "https://www.google.com/", icon: "/starter-icons/google.svg" },
@@ -382,6 +388,15 @@ const systemNavDefaults: Record<SystemNavPage, {
   tools: { label: "Tools", title: "工具", description: "快速处理日常小任务", icon: "book" }
 };
 
+const systemNavEnglishDescriptions: Record<SystemNavPage, string> = {
+  widgets: "Your priorities, widgets, and quick access",
+  shortcuts: "Organize sites and folders by category",
+  search: "Find sites, notes, and tasks",
+  notes: "Capture, organize, and continue writing",
+  tasks: "Focus on the next important thing",
+  tools: "Handle everyday utilities quickly"
+};
+
 const comparableUrl = (url: string) => {
   try {
     const parsed = new URL(normalizeHttpUrl(url) || url);
@@ -556,10 +571,10 @@ const iconCandidatesFor = (url: string, iconUrl?: string, title = "") => {
     customIconUrl && !isGeneratedFavicon(customIconUrl)
       ? { url: customIconUrl, kind: isSimpleIconsUrl(customIconUrl) ? "brand-mark" : "site-art", vector: isVectorIconUrl(customIconUrl) }
       : undefined,
-    curated ? { url: curated, kind: "brand-mark", vector: true } : undefined,
     serviceIcon ? { url: serviceIcon, kind: "site-art", vector: false } : undefined,
-    fallbackIcon ? { url: fallbackIcon, kind: "site-art", vector: false } : undefined,
+    curated ? { url: curated, kind: "brand-mark", vector: true } : undefined,
     ...directCandidates.map((candidate) => ({ url: candidate, kind: "site-art" as const, vector: false })),
+    fallbackIcon ? { url: fallbackIcon, kind: "site-art", vector: false } : undefined,
     customIconUrl && isGeneratedFavicon(customIconUrl) ? { url: customIconUrl, kind: "site-art", vector: false } : undefined
   ];
   const seen = new Set<string>();
@@ -694,9 +709,12 @@ function IconChoicePreview({ src, fallback }: { src: string; fallback: string })
     <img
       src={src}
       alt=""
+      loading="eager"
+      decoding="async"
+      referrerPolicy="no-referrer"
       onLoad={(event) => {
         const shortestEdge = Math.min(event.currentTarget.naturalWidth, event.currentTarget.naturalHeight);
-        if (!isVectorIconUrl(src) && shortestEdge < MIN_SHARP_ICON_SIZE) setFailed(true);
+        if (!isVectorIconUrl(src) && shortestEdge < MIN_ICON_PREVIEW_SIZE) setFailed(true);
       }}
       onError={() => setFailed(true)}
     />
@@ -879,6 +897,8 @@ const calendarDateLabel = (key: string) => {
 
 export default function App() {
   const [state, setState] = useState<AppState>(() => defaultState());
+  const uiLanguage: UiLanguage = state.settings.language === "en-US" ? "en-US" : "zh-CN";
+  const text = useCallback((zh: string, en: string) => localized(uiLanguage, zh, en), [uiLanguage]);
   const [ready, setReady] = useState(false);
   const [dialog, setDialog] = useState<Dialog>(null);
   const [activePage, setActivePage] = useState<HomePage>("widgets");
@@ -893,6 +913,7 @@ export default function App() {
   const [pageMenu, setPageMenu] = useState<PageMenuState>(null);
   const [widgetMenu, setWidgetMenu] = useState<WidgetMenuState>(null);
   const [searchText, setSearchText] = useState("");
+  const [spaceSearchText, setSpaceSearchText] = useState("");
   const [clock, setClock] = useState(() => new Date());
   const [activeLayer, setActiveLayer] = useState("all");
   const [layoutEditing, setLayoutEditing] = useState(false);
@@ -947,6 +968,10 @@ export default function App() {
       delete document.documentElement.dataset.whynavoTheme;
     };
   }, [state.settings.theme]);
+
+  useEffect(() => {
+    document.documentElement.lang = uiLanguage;
+  }, [uiLanguage]);
 
   useEffect(() => {
     setShortcutMenu(null);
@@ -1899,8 +1924,15 @@ export default function App() {
     [hiddenNavPages, navigationOrder]
   );
   const systemNavLabel = useCallback((page: SystemNavPage) => (
-    state.settings.navigationLabels?.[page]?.trim() || systemNavDefaults[page].label
-  ), [state.settings.navigationLabels]);
+    state.settings.navigationLabels?.[page]?.trim()
+    || localized(uiLanguage, systemNavDefaults[page].title, systemNavDefaults[page].label)
+  ), [state.settings.navigationLabels, uiLanguage]);
+  const systemNavTitle = useCallback((page: SystemNavPage) => (
+    localized(uiLanguage, systemNavDefaults[page].title, systemNavDefaults[page].label)
+  ), [uiLanguage]);
+  const systemNavDescription = useCallback((page: SystemNavPage) => (
+    localized(uiLanguage, systemNavDefaults[page].description, systemNavEnglishDescriptions[page])
+  ), [uiLanguage]);
   const systemNavIcon = useCallback((page: SystemNavPage) => (
     state.settings.navigationIcons?.[page] || systemNavDefaults[page].icon
   ), [state.settings.navigationIcons]);
@@ -1971,13 +2003,27 @@ export default function App() {
     const linkTiles = shortcuts.map((shortcut) => ({ kind: "shortcut" as const, shortcut, order: shortcut.order }));
     return [...folderTiles, ...linkTiles].sort((a, b) => a.order - b.order);
   }, [allShortcuts, shortcuts, visibleFolders]);
+  const filteredShortcutTiles = useMemo(() => {
+    const query = spaceSearchText.trim().toLocaleLowerCase(uiLanguage);
+    if (!query) return shortcutTiles;
+    return shortcutTiles.filter((item) => {
+      if (item.kind === "shortcut") {
+        return `${item.shortcut.title} ${item.shortcut.url}`.toLocaleLowerCase(uiLanguage).includes(query);
+      }
+      if (item.folder.name.toLocaleLowerCase(uiLanguage).includes(query)) return true;
+      return allShortcuts.some((shortcut) => (
+        shortcut.folderId === item.folder.id
+        && `${shortcut.title} ${shortcut.url}`.toLocaleLowerCase(uiLanguage).includes(query)
+      ));
+    });
+  }, [allShortcuts, shortcutTiles, spaceSearchText, uiLanguage]);
   const renderedShortcutTiles = useMemo(
-    () => shortcutTiles.slice(0, shortcutRenderLimit),
-    [shortcutRenderLimit, shortcutTiles]
+    () => filteredShortcutTiles.slice(0, shortcutRenderLimit),
+    [filteredShortcutTiles, shortcutRenderLimit]
   );
   useEffect(() => {
     setShortcutRenderLimit(SHORTCUT_RENDER_BATCH);
-  }, [activeCustomPageId, activeLayer]);
+  }, [activeCustomPageId, activeLayer, spaceSearchText]);
   const homeShortcutTiles = useMemo(() => {
     const folderTiles = allFolders.map((folder) => {
       const firstChildOrder = allShortcuts
@@ -2002,23 +2048,25 @@ export default function App() {
 
   const pinned = useMemo(() => allShortcuts.filter((shortcut) => shortcut.pinned), [allShortcuts]);
   const activeLayerName = activeLayer === "all"
-    ? "全部网站"
+    ? text("全部网站", "All sites")
     : activeLayer === "pinned"
-      ? "Dock 固定"
-      : groups.find((group) => group.id === activeLayer)?.name || "快捷导航";
+      ? text("Dock 固定", "Pinned")
+      : groups.find((group) => group.id === activeLayer)?.name || text("快捷导航", "Shortcuts");
   const activeCustomNavPage = customNavPages.find((page) => page.id === activeCustomPageId);
   const today = clock;
   const selectedTimeZone = state.settings.timeZone || "Asia/Shanghai";
   const selectedHour = Number(formatterFor(selectedTimeZone, { hour: "2-digit", hour12: false }).format(clock).replace(/\D/g, "")) % 24;
   const greetingLead = selectedHour < 6
-    ? "Good evening"
+    ? text("夜深了", "Good evening")
     : selectedHour < 12
-      ? "Good morning"
+      ? text("早上好", "Good morning")
       : selectedHour < 18
-        ? "Good afternoon"
-        : "Good evening";
+        ? text("下午好", "Good afternoon")
+        : text("晚上好", "Good evening");
   const accountName = sync.user?.email?.split("@")[0]?.replace(/[._-]+/g, " ").trim();
-  const homeGreeting = `${greetingLead}${accountName ? `, ${accountName}` : ""}.`;
+  const homeGreeting = uiLanguage === "en-US"
+    ? `${greetingLead}${accountName ? `, ${accountName}` : ""}.`
+    : `${greetingLead}${accountName ? `，${accountName}` : ""}。`;
 
   const saveSyncRestorePoint = async (
     label: string,
@@ -3355,13 +3403,14 @@ export default function App() {
   };
 
   return (
-    <main
-      className={`app ${state.settings.theme} nav-${navigationDisplay} nav-${navigationSide} ${navigationOpen ? "nav-open" : ""}`}
-      style={backgroundStyle}
-      onWheel={handlePageWheel}
-      onContextMenuCapture={handleAppContextMenu}
-    >
-      <a className="skip-link" href="#whynavo-workspace">跳到主要内容</a>
+    <UiLanguageContext.Provider value={uiLanguage}>
+      <main
+        className={`app ${state.settings.theme} nav-${navigationDisplay} nav-${navigationSide} ${navigationOpen ? "nav-open" : ""}`}
+        style={backgroundStyle}
+        onWheel={handlePageWheel}
+        onContextMenuCapture={handleAppContextMenu}
+      >
+      <a className="skip-link" href="#whynavo-workspace">{text("跳到主要内容", "Skip to main content")}</a>
       <div className="shell" ref={shellRef}>
         <header className="topbar">
           <div className="brand">
@@ -3373,9 +3422,26 @@ export default function App() {
           <div className="actions">
             <button
               type="button"
+              className="top-action language-toggle"
+              aria-label={text("切换到英文", "Switch to Chinese")}
+              title={text("切换到英文", "Switch to Chinese")}
+              onClick={() => updateState((current) => ({
+                ...current,
+                settings: {
+                  ...current.settings,
+                  language: current.settings.language === "en-US" ? "zh-CN" : "en-US",
+                  updatedAt: nowIso()
+                }
+              }))}
+            >
+              <Languages size={16} />
+              <span>{uiLanguage === "en-US" ? "中" : "EN"}</span>
+            </button>
+            <button
+              type="button"
               className="top-action"
-              aria-label={state.settings.theme === "dark" ? "切换到浅色主题" : "切换到深色主题"}
-              title={state.settings.theme === "dark" ? "切换到浅色主题" : "切换到深色主题"}
+              aria-label={state.settings.theme === "dark" ? text("切换到浅色主题", "Switch to light theme") : text("切换到深色主题", "Switch to dark theme")}
+              title={state.settings.theme === "dark" ? text("切换到浅色主题", "Switch to light theme") : text("切换到深色主题", "Switch to dark theme")}
               onClick={() => updateState((current) => ({
                 ...current,
                 settings: {
@@ -3387,41 +3453,54 @@ export default function App() {
             >
               {state.settings.theme === "dark" ? <Moon size={17} /> : <Sun size={17} />}
             </button>
-            <button type="button" className="top-action mobile-settings" aria-label="设置" title="设置" onClick={() => setDialog("settings")}><Settings size={17} /></button>
-            <button className="account-button" aria-label="账号与云同步" title="账号与云同步" onClick={() => setDialog("sync")}>
+            <button type="button" className="top-action mobile-settings" aria-label={text("设置", "Settings")} title={text("设置", "Settings")} onClick={() => setDialog("settings")}><Settings size={17} /></button>
+            <button className="account-button" aria-label={text("账号与云同步", "Account and cloud sync")} title={text("账号与云同步", "Account and cloud sync")} onClick={() => setDialog("sync")}>
               <UserCircle size={17} />
-              <span>{sync.user ? "Logged in" : "Unlogged"}</span>
+              <span>{sync.user ? text("已登录", "Signed in") : text("未登录", "Signed out")}</span>
             </button>
           </div>
         </header>
 
-        <section className={`hero ${activePage === "widgets" ? "sample-a-hero" : "compact-page-hero"}`}>
+        <section className={`hero ${activePage === "widgets" ? "sample-a-hero" : "compact-page-hero"} ${activePage === "shortcuts" ? "spaces-page-hero" : ""}`}>
           {activePage === "widgets" ? (
             <>
               <div className="home-greeting">
                 <h2>{homeGreeting}</h2>
-                <p>Focus on what matters. You’re in control.</p>
+                <p>{text("把注意力留给真正重要的事。", "Focus on what matters. You’re in control.")}</p>
               </div>
               <div className="search hero-search">
                 {USE_BROWSER_DEFAULT_SEARCH
-                  ? <span className="engine-toggle engine-default">默认</span>
-                  : <button type="button" className="engine-toggle" title="点击切换搜索引擎" onClick={toggleSearchEngine}>{searchEngines[currentSearchEngine].label}</button>}
+                  ? <span className="engine-toggle engine-default">{text("默认", "Default")}</span>
+                  : <button type="button" className="engine-toggle" title={text("切换搜索引擎", "Switch search engine")} onClick={toggleSearchEngine}>{searchEngines[currentSearchEngine].label}</button>}
                 <Search size={20} />
                 <input
                   ref={searchInputRef}
                   value={searchText}
                   onChange={(event) => setSearchText(event.target.value)}
                   onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); runSearch(); } }}
-                  placeholder="Search apps, sites, notes, tasks..."
+                  placeholder={text("搜索应用、网站、笔记和任务…", "Search apps, sites, notes, and tasks...")}
                 />
-                <button type="button" className="search-submit" aria-label="搜索" title="搜索" onClick={runSearch}><Search size={18} /></button>
+                <button type="button" className="search-submit" aria-label={text("搜索", "Search")} title={text("搜索", "Search")} onClick={runSearch}><Search size={18} /></button>
               </div>
             </>
+          ) : activePage === "shortcuts" ? (
+            <label className="space-search">
+              <Search size={19} aria-hidden="true" />
+              <input
+                value={spaceSearchText}
+                onChange={(event) => setSpaceSearchText(event.target.value)}
+                placeholder={text("搜索网站和文件夹", "Search sites and folders")}
+                aria-label={text("搜索网站和文件夹", "Search sites and folders")}
+              />
+              {spaceSearchText && (
+                <button type="button" onClick={() => setSpaceSearchText("")} aria-label={text("清除搜索", "Clear search")} title={text("清除搜索", "Clear search")}><X size={16} /></button>
+              )}
+            </label>
           ) : (
             <div className="compact-page-heading">
-              <span>{activeCustomNavPage ? "Custom space" : systemNavLabel(activePage)}</span>
-              <h2>{activeCustomNavPage?.name || systemNavDefaults[activePage].title}</h2>
-              <p>{activeCustomNavPage ? `${shortcutTiles.length} 个入口` : systemNavDefaults[activePage].description}</p>
+              <span>{activeCustomNavPage ? text("自定义空间", "Custom space") : systemNavLabel(activePage)}</span>
+              <h2>{activeCustomNavPage?.name || systemNavTitle(activePage)}</h2>
+              <p>{activeCustomNavPage ? text(`${shortcutTiles.length} 个入口`, `${shortcutTiles.length} items`) : systemNavDescription(activePage)}</p>
             </div>
           )}
         </section>
@@ -3430,8 +3509,8 @@ export default function App() {
           <button
             type="button"
             className="page-nav-trigger"
-            aria-label="显示页面导航"
-            title="显示页面导航"
+            aria-label={text("显示页面导航", "Show page navigation")}
+            title={text("显示页面导航", "Show page navigation")}
             onClick={() => setNavigationOpen(true)}
           >
             {navigationSide === "right" ? <PanelRight size={17} /> : <PanelLeft size={17} />}
@@ -3442,8 +3521,8 @@ export default function App() {
           <button
             type="button"
             className="page-nav-auto-trigger"
-            aria-label="展开页面导航"
-            title="展开页面导航"
+            aria-label={text("展开页面导航", "Open page navigation")}
+            title={text("展开页面导航", "Open page navigation")}
             onPointerEnter={openNavigation}
             onPointerLeave={scheduleNavigationClose}
             onFocus={openNavigation}
@@ -3454,7 +3533,7 @@ export default function App() {
 
         <nav
           className="page-nav"
-          aria-label="WhyNavo 页面切换"
+          aria-label={text("WhyNavo 页面切换", "WhyNavo pages")}
           onPointerEnter={openNavigation}
           onPointerLeave={scheduleNavigationClose}
           onFocusCapture={openNavigation}
@@ -3470,7 +3549,7 @@ export default function App() {
                 <button
                   className={activePage === page && !activeCustomPageId ? "active" : ""}
                   onClick={() => goToPage(page)}
-                  title={systemNavDefaults[page].title}
+                  title={systemNavTitle(page)}
                   key={page}
                 >
                   <PageIcon size={19} />
@@ -3489,9 +3568,9 @@ export default function App() {
             })}
           </div>
           <div className="page-nav-secondary">
-            <button onClick={() => setDialog("settings")} title="设置"><Settings size={18} /><span>Settings</span></button>
+            <button onClick={() => setDialog("settings")} title={text("设置", "Settings")}><Settings size={18} /><span>{text("设置", "Settings")}</span></button>
             {navigationDisplay === "hidden" && (
-              <button className="nav-hide-control" onClick={() => setNavigationOpen(false)} title="隐藏导航" aria-label="隐藏导航"><EyeOff size={18} /></button>
+              <button className="nav-hide-control" onClick={() => setNavigationOpen(false)} title={text("隐藏导航", "Hide navigation")} aria-label={text("隐藏导航", "Hide navigation")}><EyeOff size={18} /></button>
             )}
           </div>
         </nav>
@@ -3502,11 +3581,11 @@ export default function App() {
             if (activePage !== "widgets") goToPage("widgets");
             const next = !layoutEditing;
             setLayoutEditing(next);
-            showToast(next ? "布局编辑已开启" : "主页布局已保存");
+            showToast(next ? text("布局编辑已开启", "Layout editing enabled") : text("主页布局已保存", "Home layout saved"));
           }}
         >
           {layoutEditing ? <Check size={17} /> : <GripVertical size={17} />}
-          <span>{layoutEditing ? "Done" : "Edit layout"}</span>
+          <span>{layoutEditing ? text("完成", "Done") : text("编辑布局", "Edit layout")}</span>
         </button>
 
         {activePage === "shortcuts" && state.settings.dockPosition === "top" && <Dock shortcuts={pinned} />}
@@ -3521,10 +3600,10 @@ export default function App() {
                 <section className="sample-a-sites-panel">
                   <header>
                     <div>
-                      <span>Quick access</span>
-                      <h2>My Sites</h2>
+                      <span>{text("快捷入口", "Quick access")}</span>
+                      <h2>{text("我的网站", "My Sites")}</h2>
                     </div>
-                    <button type="button" aria-label="添加网站" title="添加网站" onClick={() => openNewShortcut()}><Plus size={17} /></button>
+                    <button type="button" aria-label={text("添加网站", "Add site")} title={text("添加网站", "Add site")} onClick={() => openNewShortcut()}><Plus size={17} /></button>
                   </header>
                   <HomeShortcuts
                     tiles={homeShortcutTiles.slice(0, 12)}
@@ -3543,7 +3622,7 @@ export default function App() {
                     {widgetsPanel}
                   </section>
                 ) : (
-                  <section className="sample-a-primary-widgets" aria-label="主要小组件">
+                  <section className="sample-a-primary-widgets" aria-label={text("主要小组件", "Primary widgets")}>
                     {primaryWidgetItems.map((item) => (
                       <div className="widget-sortable-shell widget-size-wide" data-widget-key={item.id} key={item.id}>
                         {item.content}
@@ -3554,15 +3633,15 @@ export default function App() {
               </div>
 
               {!layoutEditing && secondaryWidgetItems.length > 0 && (
-                <section className="sample-a-widget-shelf" aria-label="更多小组件">
+                <section className="sample-a-widget-shelf" aria-label={text("更多小组件", "More widgets")}>
                   <header>
                     <div>
-                      <span>More widgets</span>
-                      <h2>按需展开，不挤占主页空间</h2>
+                      <span>{text("更多小组件", "More widgets")}</span>
+                      <h2>{text("按需展开，不挤占主页空间", "Open only what you need")}</h2>
                     </div>
                     <div className="sample-a-section-actions">
-                      <button type="button" aria-label="资源中心" title="资源中心" onClick={() => setDialog("library")}><Palette size={17} /></button>
-                      <button type="button" aria-label="刷新数据" title="刷新数据" onClick={() => void refreshExternalData(state, true)}><RefreshCcw size={17} /></button>
+                      <button type="button" aria-label={text("资源中心", "Resource center")} title={text("资源中心", "Resource center")} onClick={() => setDialog("library")}><Palette size={17} /></button>
+                      <button type="button" aria-label={text("刷新数据", "Refresh data")} title={text("刷新数据", "Refresh data")} onClick={() => void refreshExternalData(state, true)}><RefreshCcw size={17} /></button>
                     </div>
                   </header>
                   <div className="sample-a-widget-tabs" role="tablist" aria-label="选择小组件">
@@ -3592,11 +3671,11 @@ export default function App() {
 
               <footer className="sample-a-local-note">
                 <ShieldCheck size={15} />
-                <span>Local-first. Your data stays on your device.</span>
+                <span>{text("本地优先。未登录时，数据只保存在你的设备上。", "Local-first. Signed-out data stays on your device.")}</span>
               </footer>
-              <div className="sample-a-corner-actions" aria-label="主页快捷操作">
-                <button type="button" aria-label="壁纸与组件" title="壁纸与组件" onClick={() => setDialog("library")}><ImageIcon size={17} /></button>
-                <button type="button" aria-label="添加网站" title="添加网站" onClick={() => openNewShortcut()}><Plus size={19} /></button>
+              <div className="sample-a-corner-actions" aria-label={text("主页快捷操作", "Home quick actions")}>
+                <button type="button" aria-label={text("壁纸与组件", "Wallpapers and widgets")} title={text("壁纸与组件", "Wallpapers and widgets")} onClick={() => setDialog("library")}><ImageIcon size={17} /></button>
+                <button type="button" aria-label={text("添加网站", "Add site")} title={text("添加网站", "Add site")} onClick={() => openNewShortcut()}><Plus size={19} /></button>
               </div>
             </section>
           ) : activePage === "search" ? (
@@ -3642,13 +3721,13 @@ export default function App() {
                   })() : <Layers size={19} />}</span>
                   <div>
                     <h2>{activeCustomNavPage?.name || activeLayerName}</h2>
-                    <p>{shortcutTiles.length} 个入口</p>
+                    <p>{text(`${filteredShortcutTiles.length} 个入口`, `${filteredShortcutTiles.length} items`)}</p>
                   </div>
                 </div>
                 <div className="shortcut-stage-actions">
-                  <button type="button" title="添加网站" aria-label="添加网站" onClick={() => openNewShortcut(activeCustomNavPage?.groupId)}><Plus size={17} /></button>
-                  <button type="button" title="新建文件夹" aria-label="新建文件夹" onClick={() => openNewFolder(activeCustomNavPage?.groupId)}><FolderPlus size={17} /></button>
-                  <button type="button" title="管理页面" aria-label="管理页面" onClick={() => setDialog("pages")}><Settings size={17} /></button>
+                  <button type="button" title={text("添加网站", "Add site")} aria-label={text("添加网站", "Add site")} onClick={() => openNewShortcut(activeCustomNavPage?.groupId)}><Plus size={17} /></button>
+                  <button type="button" title={text("新建文件夹", "New folder")} aria-label={text("新建文件夹", "New folder")} onClick={() => openNewFolder(activeCustomNavPage?.groupId)}><FolderPlus size={17} /></button>
+                  <button type="button" title={text("管理页面", "Manage pages")} aria-label={text("管理页面", "Manage pages")} onClick={() => setDialog("pages")}><Settings size={17} /></button>
                 </div>
               </header>
               {!activeCustomNavPage && (
@@ -3674,7 +3753,7 @@ export default function App() {
                           data-folder-id={folder.id}
                           onClick={() => setOpenFolderId(folder.id)}
                         >
-                          <button className="folder-open" title={"打开 " + folder.name}>
+                          <button className="folder-open" title={text(`打开 ${folder.name}`, `Open ${folder.name}`)}>
                             <span className={"shortcut-icon folder-icon " + (folder.iconUrl ? "has-image" : "")} style={{ "--folder-color": folder.iconColor } as React.CSSProperties}>
                               <FolderIconContent iconUrl={folder.iconUrl} size={Math.round(state.settings.iconSize * 0.46)} />
                             </span>
@@ -3700,17 +3779,19 @@ export default function App() {
                           </span>
                           <span>{shortcut.title}</span>
                         </a>
-                        <span className="drag-corner" title="拖拽排序"><GripVertical size={14} /></span>
+                        <span className="drag-corner" title={text("拖拽排序", "Drag to reorder")}><GripVertical size={14} /></span>
                       </article>
                     );
                   })}
-                  {renderedShortcutTiles.length < shortcutTiles.length && (
+                  {renderedShortcutTiles.length < filteredShortcutTiles.length && (
                     <ShortcutRenderSentinel
-                      onVisible={() => setShortcutRenderLimit((current) => Math.min(shortcutTiles.length, current + SHORTCUT_RENDER_BATCH))}
+                      onVisible={() => setShortcutRenderLimit((current) => Math.min(filteredShortcutTiles.length, current + SHORTCUT_RENDER_BATCH))}
                     />
                   )}
-                  {!shortcuts.length && !visibleFolders.length && (
-                    <button className="empty-shortcut" onClick={() => openNewShortcut(activeCustomNavPage?.groupId)}><Plus size={22} /> 添加网站</button>
+                  {!filteredShortcutTiles.length && (
+                    spaceSearchText
+                      ? <div className="empty-shortcut search-empty"><Search size={22} />{text("没有匹配的网站或文件夹", "No matching sites or folders")}</div>
+                      : <button className="empty-shortcut" onClick={() => openNewShortcut(activeCustomNavPage?.groupId)}><Plus size={22} />{text("添加网站", "Add site")}</button>
                   )}
                 </div>
               </section>
@@ -4113,7 +4194,8 @@ export default function App() {
           {undoSnapshotRef.current && undoLabel && <button type="button" onClick={undoLastChange}>撤销</button>}
         </div>
       )}
-    </main>
+      </main>
+    </UiLanguageContext.Provider>
   );
 }
 
@@ -4327,6 +4409,8 @@ function SearchWorkspace({ query, onQueryChange, onWebSearch, onToggleEngine, en
   onOpenNotes: () => void;
   onOpenTasks: () => void;
 }) {
+  const language = useUiLanguage();
+  const text = (zh: string, en: string) => localized(language, zh, en);
   const normalizedQuery = query.trim().toLowerCase();
   const matchedShortcuts = shortcuts
     .filter((shortcut) => !normalizedQuery || `${shortcut.title} ${shortcut.url}`.toLowerCase().includes(normalizedQuery))
@@ -4351,16 +4435,16 @@ function SearchWorkspace({ query, onQueryChange, onWebSearch, onToggleEngine, en
           autoFocus
           value={query}
           onChange={(event) => onQueryChange(event.target.value)}
-          placeholder="查找网站、笔记、任务，或直接搜索网络"
-          aria-label="搜索 WhyNavo 内容"
+          placeholder={text("查找网站、笔记、任务，或直接搜索网络", "Find sites, notes, tasks, or search the web")}
+          aria-label={text("搜索 WhyNavo 内容", "Search WhyNavo content")}
         />
-        <button type="button" className="lucid-search-engine" onClick={onToggleEngine} title="切换网络搜索引擎">{engineLabel}</button>
-        <button type="submit" className="lucid-search-web" title="搜索网络" aria-label="搜索网络"><Navigation size={17} /></button>
+        <button type="button" className="lucid-search-engine" onClick={onToggleEngine} title={text("切换网络搜索引擎", "Switch web search engine")}>{engineLabel}</button>
+        <button type="submit" className="lucid-search-web" title={text("搜索网络", "Search the web")} aria-label={text("搜索网络", "Search the web")}><Navigation size={17} /></button>
       </form>
 
       <div className="lucid-search-summary">
-        <span>{normalizedQuery ? `${resultCount} 个本地结果` : "Recently used"}</span>
-        <p>{normalizedQuery ? "本地结果即时显示；按回车可继续搜索网络。" : "先从设备本地内容开始，不上传搜索词。"}</p>
+        <span>{normalizedQuery ? text(`${resultCount} 个本地结果`, `${resultCount} local results`) : text("最近使用", "Recently used")}</span>
+        <p>{normalizedQuery ? text("本地结果即时显示；按回车可继续搜索网络。", "Local results appear instantly; press Enter to search the web.") : text("先从设备本地内容开始，不上传搜索词。", "Start with local device content without uploading your query.")}</p>
       </div>
 
       <div className="lucid-search-results">
@@ -4375,33 +4459,33 @@ function SearchWorkspace({ query, onQueryChange, onWebSearch, onToggleEngine, en
                 <span><strong>{shortcut.title}</strong><small>{shortcut.url}</small></span>
               </a>
             ))}
-            {!matchedShortcuts.length && <p className="lucid-result-empty">没有匹配的网站</p>}
+            {!matchedShortcuts.length && <p className="lucid-result-empty">{text("没有匹配的网站", "No matching sites")}</p>}
           </div>
         </section>
 
         <section className="lucid-result-group">
-          <header><span><StickyNote size={16} />Notes</span><button type="button" onClick={onOpenNotes}>打开</button></header>
+          <header><span><StickyNote size={16} />{text("笔记", "Notes")}</span><button type="button" onClick={onOpenNotes}>{text("打开", "Open")}</button></header>
           <div className="lucid-text-results">
             {matchedNotes.map((note) => (
               <button type="button" onClick={onOpenNotes} key={note.id}>
-                <span><strong>{note.title || "未命名笔记"}</strong><small>{note.body || "空白笔记"}</small></span>
+                <span><strong>{note.title || text("未命名笔记", "Untitled note")}</strong><small>{note.body || text("空白笔记", "Empty note")}</small></span>
                 <FileText size={15} />
               </button>
             ))}
-            {!matchedNotes.length && <p className="lucid-result-empty">没有匹配的笔记</p>}
+            {!matchedNotes.length && <p className="lucid-result-empty">{text("没有匹配的笔记", "No matching notes")}</p>}
           </div>
         </section>
 
         <section className="lucid-result-group">
-          <header><span><ListTodo size={16} />Tasks</span><button type="button" onClick={onOpenTasks}>打开</button></header>
+          <header><span><ListTodo size={16} />{text("任务", "Tasks")}</span><button type="button" onClick={onOpenTasks}>{text("打开", "Open")}</button></header>
           <div className="lucid-text-results">
             {matchedTodos.map((todo) => (
               <button type="button" className={todo.done ? "is-done" : ""} onClick={onOpenTasks} key={todo.id}>
-                <span><strong>{todo.text}</strong><small>{todo.done ? "已完成" : "待处理"}</small></span>
+                <span><strong>{todo.text}</strong><small>{todo.done ? text("已完成", "Completed") : text("待处理", "Open")}</small></span>
                 <Check size={15} />
               </button>
             ))}
-            {!matchedTodos.length && <p className="lucid-result-empty">没有匹配的任务</p>}
+            {!matchedTodos.length && <p className="lucid-result-empty">{text("没有匹配的任务", "No matching tasks")}</p>}
           </div>
         </section>
       </div>
@@ -4413,6 +4497,8 @@ function NotesWorkspace({ state, updateState }: {
   state: AppState;
   updateState: (updater: (state: AppState) => AppState) => void;
 }) {
+  const language = useUiLanguage();
+  const text = (zh: string, en: string) => localized(language, zh, en);
   const notes = state.notes
     .filter((note) => !note.deletedAt)
     .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt));
@@ -4426,11 +4512,11 @@ function NotesWorkspace({ state, updateState }: {
 
   const addNote = () => {
     if (state.notes.length >= MAX_ENTITY_RECORDS) {
-      window.alert("笔记已达到 5000 条安全上限，请先导出备份并整理旧内容");
+      window.alert(text("笔记已达到 5000 条安全上限，请先导出备份并整理旧内容", "Notes reached the 5,000 item safety limit. Export a backup and remove old content first."));
       return;
     }
     const updatedAt = nowIso();
-    const note: Note = { id: uid(), title: "未命名笔记", body: "", updatedAt };
+    const note: Note = { id: uid(), title: text("未命名笔记", "Untitled note"), body: "", updatedAt };
     updateState((current) => ({ ...current, notes: [...current.notes, note] }));
     setSelectedId(note.id);
   };
@@ -4444,7 +4530,7 @@ function NotesWorkspace({ state, updateState }: {
     }));
   };
   const deleteNote = () => {
-    if (!selected || !window.confirm(`删除“${selected.title || "未命名笔记"}”？`)) return;
+    if (!selected || !window.confirm(text(`删除“${selected.title || "未命名笔记"}”？`, `Delete "${selected.title || "Untitled note"}"?`))) return;
     const deletedAt = nowIso();
     updateState((current) => ({
       ...current,
@@ -4459,18 +4545,18 @@ function NotesWorkspace({ state, updateState }: {
     <section className="lucid-notes-workspace">
       <aside className="lucid-notes-index">
         <header>
-          <div><span>Library</span><strong>{notes.length} notes</strong></div>
-          <button type="button" onClick={addNote} title="新建笔记" aria-label="新建笔记"><Plus size={17} /></button>
+          <div><span>{text("笔记库", "Library")}</span><strong>{text(`${notes.length} 条笔记`, `${notes.length} notes`)}</strong></div>
+          <button type="button" onClick={addNote} title={text("新建笔记", "New note")} aria-label={text("新建笔记", "New note")}><Plus size={17} /></button>
         </header>
         <div className="lucid-note-list">
           {notes.map((note) => (
             <button type="button" className={note.id === selected?.id ? "active" : ""} onClick={() => setSelectedId(note.id)} key={note.id}>
-              <strong>{note.title || "未命名笔记"}</strong>
-              <span>{note.body || "空白笔记"}</span>
-              <small>{new Date(note.updatedAt).toLocaleDateString("zh-CN", { month: "short", day: "numeric" })}</small>
+              <strong>{note.title || text("未命名笔记", "Untitled note")}</strong>
+              <span>{note.body || text("空白笔记", "Empty note")}</span>
+              <small>{new Date(note.updatedAt).toLocaleDateString(language, { month: "short", day: "numeric" })}</small>
             </button>
           ))}
-          {!notes.length && <p>从一张空白纸开始。</p>}
+          {!notes.length && <p>{text("从一张空白纸开始。", "Start with a blank page.")}</p>}
         </div>
       </aside>
 
@@ -4478,29 +4564,29 @@ function NotesWorkspace({ state, updateState }: {
         {selected ? (
           <>
             <header>
-              <span>{new Date(selected.updatedAt).toLocaleString("zh-CN", { month: "long", day: "numeric", hour: "2-digit", minute: "2-digit" })}</span>
-              <button type="button" onClick={deleteNote} title="删除笔记" aria-label="删除笔记"><Trash2 size={16} /></button>
+              <span>{new Date(selected.updatedAt).toLocaleString(language, { month: "long", day: "numeric", hour: "2-digit", minute: "2-digit" })}</span>
+              <button type="button" onClick={deleteNote} title={text("删除笔记", "Delete note")} aria-label={text("删除笔记", "Delete note")}><Trash2 size={16} /></button>
             </header>
             <input
               className="lucid-note-title"
               maxLength={MAX_ENTITY_NAME_CHARS}
               value={selected.title}
               onChange={(event) => updateNote({ title: event.target.value })}
-              placeholder="标题"
-              aria-label="笔记标题"
+              placeholder={text("标题", "Title")}
+              aria-label={text("笔记标题", "Note title")}
             />
             <textarea
               className="lucid-note-body"
               maxLength={MAX_QUICK_NOTE_CHARS}
               value={selected.body}
               onChange={(event) => updateNote({ body: event.target.value })}
-              placeholder="写下想法、链接或下一步..."
-              aria-label="笔记内容"
+              placeholder={text("写下想法、链接或下一步…", "Write down an idea, link, or next step...")}
+              aria-label={text("笔记内容", "Note content")}
             />
-            <footer><ShieldCheck size={14} /><span>自动保存在本机，登录后可安全同步。</span></footer>
+            <footer><ShieldCheck size={14} /><span>{text("自动保存在本机，登录后可安全同步。", "Saved locally automatically and synced securely after sign-in.")}</span></footer>
           </>
         ) : (
-          <button type="button" className="lucid-note-empty" onClick={addNote}><StickyNote size={24} /><span>新建第一条笔记</span></button>
+          <button type="button" className="lucid-note-empty" onClick={addNote}><StickyNote size={24} /><span>{text("新建第一条笔记", "Create your first note")}</span></button>
         )}
       </article>
     </section>
@@ -4511,6 +4597,8 @@ function TasksWorkspace({ state, updateState }: {
   state: AppState;
   updateState: (updater: (state: AppState) => AppState) => void;
 }) {
+  const language = useUiLanguage();
+  const textFor = (zh: string, en: string) => localized(language, zh, en);
   const [text, setText] = useState("");
   const [filter, setFilter] = useState<"open" | "all" | "done">("open");
   const todos = state.todos.filter((todo) => !todo.deletedAt).sort((left, right) => left.order - right.order);
@@ -4522,7 +4610,7 @@ function TasksWorkspace({ state, updateState }: {
     const value = text.trim();
     if (!value) return;
     if (value.length > MAX_TODO_TEXT_CHARS || state.todos.length >= MAX_ENTITY_RECORDS) {
-      window.alert("任务内容过长或已达到安全上限");
+      window.alert(textFor("任务内容过长或已达到安全上限", "The task is too long or the safety limit has been reached."));
       return;
     }
     const todo: Todo = { id: uid(), text: value, done: false, order: todos.length, updatedAt: nowIso() };
@@ -4549,27 +4637,27 @@ function TasksWorkspace({ state, updateState }: {
           <span><strong>{progress}</strong><small>%</small></span>
         </div>
         <div>
-          <span>Today</span>
-          <h2>{todos.length - doneCount ? `${todos.length - doneCount} 件事等待完成` : "今天的任务已完成"}</h2>
-          <p>{doneCount} of {todos.length} completed</p>
+          <span>{textFor("今天", "Today")}</span>
+          <h2>{todos.length - doneCount ? textFor(`${todos.length - doneCount} 件事等待完成`, `${todos.length - doneCount} tasks remaining`) : textFor("今天的任务已完成", "Everything is complete for today")}</h2>
+          <p>{textFor(`已完成 ${doneCount} / ${todos.length}`, `${doneCount} of ${todos.length} completed`)}</p>
         </div>
       </header>
 
       <form className="lucid-task-composer" onSubmit={(event) => { event.preventDefault(); addTodo(); }}>
         <Plus size={18} aria-hidden="true" />
-        <input value={text} maxLength={MAX_TODO_TEXT_CHARS} onChange={(event) => setText(event.target.value)} placeholder="添加下一件要做的事" aria-label="新任务" />
-        <button type="submit" disabled={!text.trim()}>添加</button>
+        <input value={text} maxLength={MAX_TODO_TEXT_CHARS} onChange={(event) => setText(event.target.value)} placeholder={textFor("添加下一件要做的事", "Add the next thing to do")} aria-label={textFor("新任务", "New task")} />
+        <button type="submit" disabled={!text.trim()}>{textFor("添加", "Add")}</button>
       </form>
 
       <div className="lucid-task-toolbar">
-        <div role="tablist" aria-label="任务筛选">
+        <div role="tablist" aria-label={textFor("任务筛选", "Task filter")}>
           {(["open", "all", "done"] as const).map((value) => (
             <button type="button" role="tab" aria-selected={filter === value} className={filter === value ? "active" : ""} onClick={() => setFilter(value)} key={value}>
-              {value === "open" ? "待处理" : value === "all" ? "全部" : "已完成"}
+              {value === "open" ? textFor("待处理", "Open") : value === "all" ? textFor("全部", "All") : textFor("已完成", "Completed")}
             </button>
           ))}
         </div>
-        <span>{visibleTodos.length} items</span>
+        <span>{textFor(`${visibleTodos.length} 项`, `${visibleTodos.length} items`)}</span>
       </div>
 
       <div className="lucid-task-list">
@@ -4579,12 +4667,12 @@ function TasksWorkspace({ state, updateState }: {
               <input type="checkbox" checked={todo.done} onChange={() => toggleTodo(todo.id)} />
               <span>{todo.text}</span>
             </label>
-            <small>{todo.done ? "Completed" : "Open"}</small>
-            <button type="button" title="删除任务" aria-label="删除任务" onClick={() => deleteTodo(todo.id)}><X size={15} /></button>
+            <small>{todo.done ? textFor("已完成", "Completed") : textFor("待处理", "Open")}</small>
+            <button type="button" title={textFor("删除任务", "Delete task")} aria-label={textFor("删除任务", "Delete task")} onClick={() => deleteTodo(todo.id)}><X size={15} /></button>
           </div>
         ))}
         {!visibleTodos.length && (
-          <p className="lucid-task-empty">{filter === "done" ? "还没有已完成任务。" : "这里很安静，可以专注下一件事。"}</p>
+          <p className="lucid-task-empty">{filter === "done" ? textFor("还没有已完成任务。", "No completed tasks yet.") : textFor("这里很安静，可以专注下一件事。", "Nothing here yet. Focus on the next thing.")}</p>
         )}
       </div>
     </section>
@@ -4668,15 +4756,17 @@ function ShortcutContextMenu({ menu, shortcut, onClose, onEdit, onPin, onDelete 
   onPin: (id: string) => void;
   onDelete: (id: string) => void;
 }) {
+  const language = useUiLanguage();
+  const text = (zh: string, en: string) => localized(language, zh, en);
   const surfaceRef = useContextMenuSurface<HTMLDivElement>(onClose);
   if (!shortcut) return null;
   const position = contextMenuPosition(menu.x, menu.y, 188, 188);
   return createPortal(
-    <div ref={surfaceRef} className="shortcut-menu" role="menu" aria-label={`${shortcut.title}快捷操作`} tabIndex={-1} style={position} onContextMenu={(event) => event.preventDefault()}>
-      <a role="menuitem" href={safeHttpHref(shortcut.url)} target="_blank" rel="noreferrer">打开新标签页</a>
-      <button type="button" role="menuitem" onClick={() => onPin(shortcut.id)}><Pin size={15} /> {shortcut.pinned ? "从主页移除" : "放到主页"}</button>
-      <button type="button" role="menuitem" onClick={() => onEdit(shortcut)}><Edit3 size={15} /> 编辑图标</button>
-      <button type="button" role="menuitem" className="danger" onClick={() => onDelete(shortcut.id)}><Trash2 size={15} /> 删除</button>
+    <div ref={surfaceRef} className="shortcut-menu" role="menu" aria-label={text(`${shortcut.title}快捷操作`, `${shortcut.title} actions`)} tabIndex={-1} style={position} onContextMenu={(event) => event.preventDefault()}>
+      <a role="menuitem" href={safeHttpHref(shortcut.url)} target="_blank" rel="noreferrer">{text("打开新标签页", "Open in new tab")}</a>
+      <button type="button" role="menuitem" onClick={() => onPin(shortcut.id)}><Pin size={15} /> {shortcut.pinned ? text("从主页移除", "Remove from Home") : text("放到主页", "Add to Home")}</button>
+      <button type="button" role="menuitem" onClick={() => onEdit(shortcut)}><Edit3 size={15} /> {text("编辑图标", "Edit shortcut")}</button>
+      <button type="button" role="menuitem" className="danger" onClick={() => onDelete(shortcut.id)}><Trash2 size={15} /> {text("删除", "Delete")}</button>
     </div>,
     document.body
   );
@@ -4690,14 +4780,16 @@ function FolderContextMenu({ menu, folder, onClose, onOpen, onEdit, onDelete }: 
   onEdit: (folder: ShortcutFolder) => void;
   onDelete: (folder: ShortcutFolder) => void;
 }) {
+  const language = useUiLanguage();
+  const text = (zh: string, en: string) => localized(language, zh, en);
   const surfaceRef = useContextMenuSurface<HTMLDivElement>(onClose);
   if (!folder) return null;
   const position = contextMenuPosition(menu.x, menu.y, 196, 148);
   return createPortal(
-    <div ref={surfaceRef} className="shortcut-menu" role="menu" aria-label={`${folder.name}文件夹操作`} tabIndex={-1} style={position} onContextMenu={(event) => event.preventDefault()}>
-      <button type="button" role="menuitem" onClick={() => onOpen(folder)}><Folder size={15} /> 打开文件夹</button>
-      <button type="button" role="menuitem" onClick={() => onEdit(folder)}><Edit3 size={15} /> 编辑文件夹</button>
-      <button type="button" role="menuitem" className="danger" onClick={() => onDelete(folder)}><Trash2 size={15} /> 删除文件夹</button>
+    <div ref={surfaceRef} className="shortcut-menu" role="menu" aria-label={text(`${folder.name}文件夹操作`, `${folder.name} folder actions`)} tabIndex={-1} style={position} onContextMenu={(event) => event.preventDefault()}>
+      <button type="button" role="menuitem" onClick={() => onOpen(folder)}><Folder size={15} /> {text("打开文件夹", "Open folder")}</button>
+      <button type="button" role="menuitem" onClick={() => onEdit(folder)}><Edit3 size={15} /> {text("编辑文件夹", "Edit folder")}</button>
+      <button type="button" role="menuitem" className="danger" onClick={() => onDelete(folder)}><Trash2 size={15} /> {text("删除文件夹", "Delete folder")}</button>
     </div>,
     document.body
   );
@@ -4711,14 +4803,16 @@ function PageContextMenu({ menu, onClose, onAddFolder, onAddShortcut, onAddGroup
   onAddGroup: () => void;
   onSettings: () => void;
 }) {
+  const language = useUiLanguage();
+  const text = (zh: string, en: string) => localized(language, zh, en);
   const position = contextMenuPosition(menu.x, menu.y, 220, 260);
   const surfaceRef = useContextMenuSurface<HTMLDivElement>(onClose);
   return createPortal(
-    <div ref={surfaceRef} className="shortcut-menu page-menu" role="menu" aria-label="页面操作" tabIndex={-1} style={position} onContextMenu={(event) => event.preventDefault()}>
-      <button type="button" role="menuitem" onClick={onAddShortcut}><Plus size={15} /> 添加网站</button>
-      <button type="button" role="menuitem" onClick={onAddFolder}><FolderPlus size={15} /> 新建文件夹</button>
-      <button type="button" role="menuitem" onClick={onAddGroup}><Layers size={15} /> 新建分类</button>
-      <button type="button" role="menuitem" onClick={onSettings}><Palette size={15} /> 资源中心</button>
+    <div ref={surfaceRef} className="shortcut-menu page-menu" role="menu" aria-label={text("页面操作", "Page actions")} tabIndex={-1} style={position} onContextMenu={(event) => event.preventDefault()}>
+      <button type="button" role="menuitem" onClick={onAddShortcut}><Plus size={15} /> {text("添加网站", "Add site")}</button>
+      <button type="button" role="menuitem" onClick={onAddFolder}><FolderPlus size={15} /> {text("新建文件夹", "New folder")}</button>
+      <button type="button" role="menuitem" onClick={onAddGroup}><Layers size={15} /> {text("新建分类", "New category")}</button>
+      <button type="button" role="menuitem" onClick={onSettings}><Palette size={15} /> {text("资源中心", "Resource center")}</button>
     </div>,
     document.body
   );
@@ -4771,25 +4865,27 @@ function WidgetContextMenu({ menu, size, onClose, onResize, onOpenLibrary, onRef
   onRotateWallpaper: () => void;
   onHide: (key: WidgetKey) => void;
 }) {
+  const language = useUiLanguage();
+  const text = (zh: string, en: string) => localized(language, zh, en);
   const surfaceRef = useContextMenuSurface<HTMLDivElement>(onClose);
   const position = contextMenuPosition(menu.x, menu.y, 344, menu.widgetKey ? 560 : 250);
-  const widgetName = menu.widgetKey ? widgetNames[menu.widgetKey] : "主页";
+  const widgetName = menu.widgetKey ? widgetNames[menu.widgetKey] : text("主页", "Home");
   const WidgetIcon = menu.widgetKey ? widgetLibraryMeta[menu.widgetKey].Icon : Palette;
   return createPortal(
-    <div ref={surfaceRef} className="shortcut-menu page-menu widget-menu" role="dialog" aria-label={`${widgetName}设置`} tabIndex={-1} style={position} onContextMenu={(event) => event.preventDefault()}>
+    <div ref={surfaceRef} className="shortcut-menu page-menu widget-menu" role="dialog" aria-label={text(`${widgetName}设置`, `${widgetName} settings`)} tabIndex={-1} style={position} onContextMenu={(event) => event.preventDefault()}>
       <div className="widget-menu-heading">
         <span className="widget-menu-icon"><WidgetIcon size={18} /></span>
-        <span><strong>{widgetName}</strong><small>{menu.widgetKey ? "尺寸会立即显示在主页" : "主页外观与数据"}</small></span>
-        <button type="button" className="widget-menu-close" onClick={onClose} aria-label="关闭"><X size={15} /></button>
+        <span><strong>{widgetName}</strong><small>{menu.widgetKey ? text("尺寸会立即显示在主页", "Size updates immediately on Home") : text("主页外观与数据", "Home appearance and data")}</small></span>
+        <button type="button" className="widget-menu-close" onClick={onClose} aria-label={text("关闭", "Close")}><X size={15} /></button>
       </div>
       {menu.widgetKey && size && (
         <WidgetSizePicker widgetKey={menu.widgetKey} value={size} onChange={(nextSize) => onResize(menu.widgetKey!, nextSize)} />
       )}
       <div className="widget-menu-actions">
-        <button onClick={onOpenLibrary}><Palette size={14} /> 小组件库</button>
-        <button onClick={onRefresh}><RefreshCcw size={14} /> 刷新数据</button>
-        <button onClick={onRotateWallpaper}><Shuffle size={14} /> 更换壁纸</button>
-        {menu.widgetKey && <button className="danger" onClick={() => onHide(menu.widgetKey!)}><EyeOff size={14} /> 隐藏组件</button>}
+        <button onClick={onOpenLibrary}><Palette size={14} /> {text("小组件库", "Widget library")}</button>
+        <button onClick={onRefresh}><RefreshCcw size={14} /> {text("刷新数据", "Refresh data")}</button>
+        <button onClick={onRotateWallpaper}><Shuffle size={14} /> {text("更换壁纸", "Change wallpaper")}</button>
+        {menu.widgetKey && <button className="danger" onClick={() => onHide(menu.widgetKey!)}><EyeOff size={14} /> {text("隐藏组件", "Hide widget")}</button>}
       </div>
     </div>,
     document.body
@@ -4805,21 +4901,23 @@ function LayerRail({ activeLayer, groups, shortcuts, onSelect, onAddGroup, onRen
   onRenameGroup: (id: string) => void;
   onDeleteGroup: (id: string) => void;
 }) {
+  const language = useUiLanguage();
+  const text = (zh: string, en: string) => localized(language, zh, en);
   const countFor = (groupId: string) => shortcuts.filter((shortcut) => shortcut.groupId === groupId).length;
   return (
-    <nav className="layer-rail panel" aria-label="快捷导航分层">
+    <nav className="layer-rail panel" aria-label={text("网站分类", "Site categories")}>
       <div className="layer-head">
-        <span>分类</span>
-        <button title="新增分类" onClick={onAddGroup}><Plus size={14} /></button>
+        <span>{text("分类", "Categories")}</span>
+        <button type="button" title={text("新增分类", "Add category")} aria-label={text("新增分类", "Add category")} onClick={onAddGroup}><Plus size={14} /></button>
       </div>
       <button className={activeLayer === "all" ? "active" : ""} onClick={() => onSelect("all")}>
         <Layers size={17} />
-        <span>全部</span>
+        <span>{text("全部", "All")}</span>
         <small>{shortcuts.length}</small>
       </button>
       <button className={activeLayer === "pinned" ? "active" : ""} onClick={() => onSelect("pinned")}>
         <Star size={17} />
-        <span>固定</span>
+        <span>{text("固定", "Pinned")}</span>
         <small>{shortcuts.filter((shortcut) => shortcut.pinned).length}</small>
       </button>
       {groups.map((group) => (
@@ -4830,8 +4928,8 @@ function LayerRail({ activeLayer, groups, shortcuts, onSelect, onAddGroup, onRen
             <small>{countFor(group.id)}</small>
           </button>
           <div className="layer-actions">
-            <button title="重命名分类" onClick={() => onRenameGroup(group.id)}><Edit3 size={13} /></button>
-            <button title="删除分类" onClick={() => onDeleteGroup(group.id)}><Trash2 size={13} /></button>
+            <button type="button" title={text("重命名分类", "Rename category")} aria-label={text("重命名分类", "Rename category")} onClick={() => onRenameGroup(group.id)}><Edit3 size={13} /></button>
+            <button type="button" title={text("删除分类", "Delete category")} aria-label={text("删除分类", "Delete category")} onClick={() => onDeleteGroup(group.id)}><Trash2 size={13} /></button>
           </div>
         </div>
       ))}
@@ -5864,37 +5962,42 @@ function ShortcutDialog({ shortcut, groups, folders, onClose, onSave }: {
   onClose: () => void;
   onSave: (shortcut: Partial<Shortcut>) => void;
 }) {
+  const language = useUiLanguage();
+  const text = (zh: string, en: string) => localized(language, zh, en);
   const [draft, setDraft] = useState<Partial<Shortcut>>(shortcut || { iconColor: "#14B8A6", groupId: groups[0]?.id });
   const iconTitle = draft.title || shortcut?.title || "";
   const iconUrl = draft.url || shortcut?.url || "";
   const collectedIconChoices = useMemo(() => {
-    const rows = [
-      { label: "当前", url: draft.iconUrl && !draft.iconUrl.startsWith(builtInIconPrefix) ? draft.iconUrl : undefined },
-      { label: "品牌", url: curatedIconFor(iconUrl, iconTitle) },
-      { label: "备用", url: fallbackFaviconFor(iconUrl) },
-      { label: "自动", url: faviconFor(iconUrl) }
-    ].filter((item): item is { label: string; url: string } => Boolean(item.url));
+    const siteCandidates = siteIconCandidatesFor(iconUrl).slice(0, 2);
+    const rows: Array<{ label: string; url?: string }> = [
+      { label: text("当前", "Current"), url: draft.iconUrl && !draft.iconUrl.startsWith(builtInIconPrefix) ? draft.iconUrl : undefined },
+      { label: text("自动", "Auto"), url: faviconFor(iconUrl) },
+      { label: text("品牌", "Brand"), url: curatedIconFor(iconUrl, iconTitle) },
+      ...siteCandidates.map((url, index) => ({ label: text(`站点 ${index + 1}`, `Site ${index + 1}`), url })),
+      { label: text("备用", "Backup"), url: fallbackFaviconFor(iconUrl) }
+    ];
+    const availableRows = rows.filter((item): item is { label: string; url: string } => Boolean(item.url));
     const seen = new Set<string>();
-    return rows.filter((item) => {
+    return availableRows.filter((item) => {
       if (seen.has(item.url)) return false;
       seen.add(item.url);
       return true;
     });
-  }, [draft.iconUrl, iconTitle, iconUrl]);
+  }, [draft.iconUrl, iconTitle, iconUrl, language]);
   return (
-    <DialogShell title={shortcut ? "编辑快捷导航" : "新增快捷导航"} onClose={onClose}>
-      <label>名称<input maxLength={MAX_ENTITY_NAME_CHARS} value={draft.title || ""} onChange={(event) => setDraft({ ...draft, title: event.target.value })} /></label>
-      <label>网址<input maxLength={MAX_URL_CHARS} value={draft.url || ""} onChange={(event) => setDraft({ ...draft, url: event.target.value })} placeholder="https://example.com" /></label>
-      <label>图标 URL（可选，默认自动获取）<input maxLength={4 * 1024 * 1024} value={draft.iconUrl || ""} onChange={(event) => setDraft({ ...draft, iconUrl: event.target.value })} placeholder="留空会自动使用网站图标" /></label>
+    <DialogShell title={shortcut?.id ? text("编辑快捷导航", "Edit shortcut") : text("新增快捷导航", "Add shortcut")} onClose={onClose}>
+      <label>{text("名称", "Name")}<input maxLength={MAX_ENTITY_NAME_CHARS} value={draft.title || ""} onChange={(event) => setDraft({ ...draft, title: event.target.value })} /></label>
+      <label>{text("网址", "URL")}<input maxLength={MAX_URL_CHARS} value={draft.url || ""} onChange={(event) => setDraft({ ...draft, url: event.target.value })} placeholder="https://example.com" /></label>
+      <label>{text("图标 URL（可选，默认自动获取）", "Icon URL (optional, detected automatically)")}<input maxLength={4 * 1024 * 1024} value={draft.iconUrl || ""} onChange={(event) => setDraft({ ...draft, iconUrl: event.target.value })} placeholder={text("留空会自动使用网站图标", "Leave blank to detect the site icon")} /></label>
       <div className="shortcut-icon-toolbar">
-        <button type="button" onClick={() => setDraft({ ...draft, iconUrl: draft.url ? faviconFor(draft.url) : "" })}>自动获取图标</button>
-        <button type="button" onClick={() => setDraft({ ...draft, iconUrl: "" })}>清空图标</button>
+        <button type="button" onClick={() => setDraft({ ...draft, iconUrl: draft.url ? faviconFor(draft.url) : "" })}>{text("自动获取图标", "Detect icon")}</button>
+        <button type="button" onClick={() => setDraft({ ...draft, iconUrl: "" })}>{text("清空图标", "Clear icon")}</button>
       </div>
       {collectedIconChoices.length > 0 && (
-        <section className="collected-icon-picker" aria-label="采集图标">
+        <section className="collected-icon-picker" aria-label={text("采集图标", "Collected icons")}>
           <div className="default-icon-picker-head">
-            <span>采集图标</span>
-            <small>从网站识别到的候选</small>
+            <span>{text("采集图标", "Collected icons")}</span>
+            <small>{text("从网站识别到的候选", "Candidates detected from the site")}</small>
           </div>
           <div className="collected-icon-grid">
             {collectedIconChoices.map((choice) => (
@@ -5912,10 +6015,10 @@ function ShortcutDialog({ shortcut, groups, folders, onClose, onSave }: {
           </div>
         </section>
       )}
-      <section className="default-icon-picker" aria-label="默认图标">
+      <section className="default-icon-picker" aria-label={text("默认图标", "Default icons")}>
         <div className="default-icon-picker-head">
-          <span>默认图标</span>
-          <small>适合采集不到图标的网站</small>
+          <span>{text("默认图标", "Default icons")}</span>
+          <small>{text("适合采集不到图标的网站", "Use when a site icon is unavailable")}</small>
         </div>
         <div className="default-icon-grid">
           {builtInShortcutIcons.map((icon) => {
@@ -5941,12 +6044,12 @@ function ShortcutDialog({ shortcut, groups, folders, onClose, onSave }: {
         <span className="shortcut-icon" style={{ "--icon": "58px", "--fallback-color": draft.iconColor || "#737373" } as React.CSSProperties}>
           <ShortcutIconContent url={draft.url || ""} iconUrl={draft.iconUrl} title={draft.title || ""} fallback={(draft.title || "网").slice(0, 1)} />
         </span>
-        <span>{draft.title || "预览"}</span>
+        <span>{draft.title || text("预览", "Preview")}</span>
       </div>
-      <label>分组<select value={draft.groupId || groups[0]?.id} onChange={(event) => setDraft({ ...draft, groupId: event.target.value })}>{groups.map((group) => <option value={group.id} key={group.id}>{group.name}</option>)}</select></label>
-      <label>文件夹<select value={draft.folderId || ""} onChange={(event) => setDraft({ ...draft, folderId: event.target.value || undefined })}><option value="">不放入文件夹</option>{folders.map((folder) => <option value={folder.id} key={folder.id}>{folder.name}</option>)}</select></label>
-      <label className="check-row"><input type="checkbox" checked={Boolean(draft.pinned)} onChange={(event) => setDraft({ ...draft, pinned: event.target.checked })} /> 固定到 Dock</label>
-      <button className="primary" onClick={() => onSave(draft)}><Save size={16} /> 保存</button>
+      <label>{text("分组", "Category")}<select value={draft.groupId || groups[0]?.id} onChange={(event) => setDraft({ ...draft, groupId: event.target.value })}>{groups.map((group) => <option value={group.id} key={group.id}>{group.name}</option>)}</select></label>
+      <label>{text("文件夹", "Folder")}<select value={draft.folderId || ""} onChange={(event) => setDraft({ ...draft, folderId: event.target.value || undefined })}><option value="">{text("不放入文件夹", "No folder")}</option>{folders.map((folder) => <option value={folder.id} key={folder.id}>{folder.name}</option>)}</select></label>
+      <label className="check-row"><input type="checkbox" checked={Boolean(draft.pinned)} onChange={(event) => setDraft({ ...draft, pinned: event.target.checked })} /> {text("固定到 Dock", "Pin to Dock")}</label>
+      <button className="primary" onClick={() => onSave(draft)}><Save size={16} /> {text("保存", "Save")}</button>
     </DialogShell>
   );
 }
@@ -6475,34 +6578,36 @@ function SettingsDialog({ state, updateCheck, migrationBackupAvailable, updateSt
 }) {
   const [section, setSection] = useState<"appearance" | "navigation" | "data" | "about">("appearance");
   const settings = state.settings;
+  const language: UiLanguage = settings.language === "en-US" ? "en-US" : "zh-CN";
+  const text = (zh: string, en: string) => localized(language, zh, en);
   const noteConflicts = state.notes.filter((note) => !note.deletedAt && note.conflictBody);
   const setSetting = <K extends keyof AppState["settings"]>(key: K, value: AppState["settings"][K]) => {
     updateState((current) => ({ ...current, settings: { ...current.settings, [key]: value, updatedAt: nowIso() } }));
   };
   const updateMessage = updateCheck.status === "checking"
-    ? "正在检查更新..."
+    ? text("正在检查更新…", "Checking for updates...")
     : updateCheck.status === "available"
-      ? `发现新版本 ${updateCheck.manifest.latestVersion}`
+      ? text(`发现新版本 ${updateCheck.manifest.latestVersion}`, `Version ${updateCheck.manifest.latestVersion} is available`)
       : updateCheck.status === "unsupported"
-        ? `当前版本低于最低支持版本 ${updateCheck.manifest.minimumSupportedVersion}`
+        ? text(`当前版本低于最低支持版本 ${updateCheck.manifest.minimumSupportedVersion}`, `This version is below the minimum supported version ${updateCheck.manifest.minimumSupportedVersion}`)
         : updateCheck.status === "current"
-          ? "当前已是最新版本"
+          ? text("当前已是最新版本", "You are up to date")
           : updateCheck.status === "error"
             ? updateCheck.message
-            : "可手动检查是否有新版";
+            : text("可手动检查是否有新版", "Check manually for a new version");
   const updateTarget = updateCheck.status === "available" || updateCheck.status === "unsupported"
     ? updateCheck.manifest.updateUrl || updateCheck.manifest.releaseNotesUrl || UPDATE_TARGET_URL
     : UPDATE_TARGET_URL;
   const sections = [
-    { id: "appearance" as const, label: "外观", Icon: Palette },
-    { id: "navigation" as const, label: "导航", Icon: SlidersHorizontal },
-    { id: "data" as const, label: "数据", Icon: Database },
-    { id: "about" as const, label: "版本", Icon: RefreshCcw }
+    { id: "appearance" as const, label: text("外观", "Appearance"), Icon: Palette },
+    { id: "navigation" as const, label: text("导航", "Navigation"), Icon: SlidersHorizontal },
+    { id: "data" as const, label: text("数据", "Data"), Icon: Database },
+    { id: "about" as const, label: text("版本", "About"), Icon: RefreshCcw }
   ];
   return (
-    <DialogShell title="设置" onClose={onClose} className="settings-dialog-overlay lucid-settings-overlay">
+    <DialogShell title={text("设置", "Settings")} onClose={onClose} className="settings-dialog-overlay lucid-settings-overlay">
       <div className="lucid-settings-layout">
-        <nav className="lucid-settings-nav" aria-label="设置分类">
+        <nav className="lucid-settings-nav" aria-label={text("设置分类", "Settings sections")}>
           {sections.map((item) => (
             <button type="button" className={section === item.id ? "active" : ""} onClick={() => setSection(item.id)} key={item.id}>
               <item.Icon size={17} /><span>{item.label}</span>
@@ -6513,62 +6618,69 @@ function SettingsDialog({ state, updateCheck, migrationBackupAvailable, updateSt
         <div className="lucid-settings-content">
           {section === "appearance" && (
             <section className="lucid-settings-section">
-              <header><span>Appearance</span><h3>克制、清晰，并与你的壁纸协调</h3></header>
+              <header><span>Appearance</span><h3>{text("克制、清晰，并与你的壁纸协调", "Quiet, clear, and balanced with your wallpaper")}</h3></header>
               <div className="lucid-setting-row">
-                <div><strong>主题</strong><span>切换浅色或深色界面</span></div>
-                <div className="settings-segments" role="radiogroup" aria-label="主题">
-                  <button type="button" role="radio" aria-checked={settings.theme === "light"} className={settings.theme === "light" ? "active" : ""} onClick={() => setSetting("theme", "light")}><Sun size={15} />浅色</button>
-                  <button type="button" role="radio" aria-checked={settings.theme === "dark"} className={settings.theme === "dark" ? "active" : ""} onClick={() => setSetting("theme", "dark")}><Moon size={15} />深色</button>
+                <div><strong>{text("界面语言", "Language")}</strong><span>{text("立即切换，并随账号同步到其他设备", "Switch instantly and sync across devices")}</span></div>
+                <div className="settings-segments" role="radiogroup" aria-label={text("界面语言", "Interface language")}>
+                  <button type="button" role="radio" aria-checked={language === "zh-CN"} className={language === "zh-CN" ? "active" : ""} onClick={() => setSetting("language", "zh-CN")}><Languages size={15} />中文</button>
+                  <button type="button" role="radio" aria-checked={language === "en-US"} className={language === "en-US" ? "active" : ""} onClick={() => setSetting("language", "en-US")}><Languages size={15} />English</button>
+                </div>
+              </div>
+              <div className="lucid-setting-row">
+                <div><strong>{text("主题", "Theme")}</strong><span>{text("切换浅色或深色界面", "Choose a light or dark interface")}</span></div>
+                <div className="settings-segments" role="radiogroup" aria-label={text("主题", "Theme")}>
+                  <button type="button" role="radio" aria-checked={settings.theme === "light"} className={settings.theme === "light" ? "active" : ""} onClick={() => setSetting("theme", "light")}><Sun size={15} />{text("浅色", "Light")}</button>
+                  <button type="button" role="radio" aria-checked={settings.theme === "dark"} className={settings.theme === "dark" ? "active" : ""} onClick={() => setSetting("theme", "dark")}><Moon size={15} />{text("深色", "Dark")}</button>
                 </div>
               </div>
               <label className="lucid-setting-row lucid-range-row">
-                <div><strong>图标尺寸</strong><span>主页与空间统一为 {settings.iconSize}px</span></div>
+                <div><strong>{text("图标尺寸", "Icon size")}</strong><span>{text(`主页与空间统一为 ${settings.iconSize}px`, `Home and Spaces use ${settings.iconSize}px`)}</span></div>
                 <input type="range" min="48" max="80" value={settings.iconSize} onChange={(event) => setSetting("iconSize", Number(event.target.value))} />
               </label>
               <label className="lucid-setting-row lucid-range-row">
-                <div><strong>界面通透度</strong><span>控制组件表面的透明程度</span></div>
+                <div><strong>{text("界面通透度", "Transparency")}</strong><span>{text("控制组件表面的透明程度", "Control the transparency of surfaces")}</span></div>
                 <input type="range" min="28" max="88" value={settings.glass} onChange={(event) => setSetting("glass", Number(event.target.value))} />
               </label>
               <div className="lucid-setting-row">
-                <div><strong>网站图标</strong><span>高清结果会缓存在本机，不会每次重新加载</span></div>
+                <div><strong>{text("网站图标", "Site icons")}</strong><span>{text("高清结果会缓存在本机，不会每次重新加载", "Resolved icons are cached locally instead of reloaded each time")}</span></div>
                 <label className="lucid-switch"><input type="checkbox" checked={settings.remoteIconLookup ?? true} onChange={(event) => setSetting("remoteIconLookup", event.target.checked)} /><span /></label>
               </div>
               <label className="lucid-setting-row">
-                <div><strong>城市</strong><span>天气小组件显示的位置</span></div>
+                <div><strong>{text("城市", "City")}</strong><span>{text("天气小组件显示的位置", "Location shown in the weather widget")}</span></div>
                 <input className="lucid-compact-input" maxLength={500} value={settings.city} onChange={(event) => setSetting("city", event.target.value)} />
               </label>
               <div className="lucid-setting-row">
-                <div><strong>设备定位</strong><span>只在获取天气时读取当前位置</span></div>
+                <div><strong>{text("设备定位", "Device location")}</strong><span>{text("只在获取天气时读取当前位置", "Read your location only when fetching weather")}</span></div>
                 <label className="lucid-switch"><input type="checkbox" checked={settings.weatherUseLocation ?? false} onChange={(event) => void onWeatherUseLocationChange(event.target.checked)} /><span /></label>
               </div>
               <div className="lucid-setting-row">
-                <div><strong>时间显示</strong><span>{settings.timeZone || "Asia/Shanghai"}</span></div>
-                <button type="button" className="lucid-inline-button" onClick={onOpenTimeZone}><Clock3 size={15} />{timeZoneLabels[settings.timeZone || "Asia/Shanghai"] || "选择时区"}</button>
+                <div><strong>{text("时间显示", "Time display")}</strong><span>{settings.timeZone || "Asia/Shanghai"}</span></div>
+                <button type="button" className="lucid-inline-button" onClick={onOpenTimeZone}><Clock3 size={15} />{timeZoneLabels[settings.timeZone || "Asia/Shanghai"] || text("选择时区", "Choose time zone")}</button>
               </div>
             </section>
           )}
 
           {section === "navigation" && (
             <section className="lucid-settings-section">
-              <header><span>Navigation</span><h3>导航固定在边缘，不改变内容中心</h3></header>
+              <header><span>Navigation</span><h3>{text("导航固定在边缘，不改变内容中心", "Navigation stays at the edge without shifting the content")}</h3></header>
               <div className="lucid-setting-row">
-                <div><strong>位置</strong><span>桌面端固定到屏幕左侧或右侧</span></div>
-                <div className="settings-segments" role="radiogroup" aria-label="桌面导航位置">
-                  <button type="button" role="radio" aria-checked={(settings.navigationSide || "left") === "left"} className={(settings.navigationSide || "left") === "left" ? "active" : ""} onClick={() => setSetting("navigationSide", "left")}><PanelLeft size={15} />左侧</button>
-                  <button type="button" role="radio" aria-checked={settings.navigationSide === "right"} className={settings.navigationSide === "right" ? "active" : ""} onClick={() => setSetting("navigationSide", "right")}><PanelRight size={15} />右侧</button>
+                <div><strong>{text("位置", "Position")}</strong><span>{text("桌面端固定到屏幕左侧或右侧", "Pin to the left or right edge on desktop")}</span></div>
+                <div className="settings-segments" role="radiogroup" aria-label={text("桌面导航位置", "Desktop navigation position")}>
+                  <button type="button" role="radio" aria-checked={(settings.navigationSide || "left") === "left"} className={(settings.navigationSide || "left") === "left" ? "active" : ""} onClick={() => setSetting("navigationSide", "left")}><PanelLeft size={15} />{text("左侧", "Left")}</button>
+                  <button type="button" role="radio" aria-checked={settings.navigationSide === "right"} className={settings.navigationSide === "right" ? "active" : ""} onClick={() => setSetting("navigationSide", "right")}><PanelRight size={15} />{text("右侧", "Right")}</button>
                 </div>
               </div>
               <div className="lucid-setting-row lucid-setting-stack">
-                <div><strong>显示方式</strong><span>自动隐藏使用稳定延迟，不会跟随鼠标抖动</span></div>
-                <div className="settings-segments settings-segments-three" role="radiogroup" aria-label="桌面导航显示方式">
-                  <button type="button" role="radio" aria-checked={(settings.navigationDisplay || "always") === "always"} className={(settings.navigationDisplay || "always") === "always" ? "active" : ""} onClick={() => setSetting("navigationDisplay", "always")}><Pin size={15} />始终</button>
-                  <button type="button" role="radio" aria-checked={settings.navigationDisplay === "auto"} className={settings.navigationDisplay === "auto" ? "active" : ""} onClick={() => setSetting("navigationDisplay", "auto")}><Eye size={15} />自动</button>
-                  <button type="button" role="radio" aria-checked={settings.navigationDisplay === "hidden"} className={settings.navigationDisplay === "hidden" ? "active" : ""} onClick={() => setSetting("navigationDisplay", "hidden")}><EyeOff size={15} />隐藏</button>
+                <div><strong>{text("显示方式", "Visibility")}</strong><span>{text("自动隐藏使用稳定延迟，不会跟随鼠标抖动", "Auto-hide uses a stable delay to avoid pointer jitter")}</span></div>
+                <div className="settings-segments settings-segments-three" role="radiogroup" aria-label={text("桌面导航显示方式", "Desktop navigation visibility")}>
+                  <button type="button" role="radio" aria-checked={(settings.navigationDisplay || "always") === "always"} className={(settings.navigationDisplay || "always") === "always" ? "active" : ""} onClick={() => setSetting("navigationDisplay", "always")}><Pin size={15} />{text("始终", "Always")}</button>
+                  <button type="button" role="radio" aria-checked={settings.navigationDisplay === "auto"} className={settings.navigationDisplay === "auto" ? "active" : ""} onClick={() => setSetting("navigationDisplay", "auto")}><Eye size={15} />{text("自动", "Auto")}</button>
+                  <button type="button" role="radio" aria-checked={settings.navigationDisplay === "hidden"} className={settings.navigationDisplay === "hidden" ? "active" : ""} onClick={() => setSetting("navigationDisplay", "hidden")}><EyeOff size={15} />{text("隐藏", "Hidden")}</button>
                 </div>
               </div>
               <button type="button" className="lucid-settings-callout" onClick={onOpenPageManager}>
                 <LayoutGrid size={18} />
-                <span><strong>编辑页面与导航图标</strong><small>修改名称、图标、顺序，或添加自己的页面</small></span>
+                <span><strong>{text("编辑页面与导航图标", "Edit pages and navigation icons")}</strong><small>{text("修改名称、图标、顺序，或添加自己的页面", "Change names, icons, order, or add your own page")}</small></span>
                 <ChevronRight size={17} />
               </button>
             </section>
@@ -6576,14 +6688,14 @@ function SettingsDialog({ state, updateCheck, migrationBackupAvailable, updateSt
 
           {section === "data" && (
             <section className="lucid-settings-section">
-              <header><span>Local-first data</span><h3>备份、恢复和迁移都由你控制</h3></header>
+              <header><span>Local-first data</span><h3>{text("备份、恢复和迁移都由你控制", "You control backup, restore, and migration")}</h3></header>
               <div className="lucid-data-actions">
-                <button type="button" onClick={onImport}><Import size={17} /><span><strong>导入网站</strong><small>支持浏览器书签与文本</small></span></button>
-                <button type="button" onClick={onExport}><Download size={17} /><span><strong>导出完整备份</strong><small>包含网站、笔记、任务和设置</small></span></button>
-                <label className="lucid-data-action"><Upload size={17} /><span><strong>恢复完整备份</strong><small>从 WhyNavo JSON 文件恢复</small></span><input type="file" accept="application/json,.json" onChange={(event) => { const file = event.target.files?.[0]; if (file) void onImportBackup(file).catch((error) => window.alert(error instanceof Error ? error.message : "备份恢复失败")); event.currentTarget.value = ""; }} /></label>
-                <button type="button" disabled={!migrationBackupAvailable} onClick={onRestoreMigrationBackup}><TimerReset size={17} /><span><strong>回到更新前数据</strong><small>{migrationBackupAvailable ? "恢复本设备最近迁移点" : "当前没有迁移恢复点"}</small></span></button>
+                <button type="button" onClick={onImport}><Import size={17} /><span><strong>{text("导入网站", "Import sites")}</strong><small>{text("支持浏览器书签与文本", "Supports browser bookmarks and text")}</small></span></button>
+                <button type="button" onClick={onExport}><Download size={17} /><span><strong>{text("导出完整备份", "Export complete backup")}</strong><small>{text("包含网站、笔记、任务和设置", "Includes sites, notes, tasks, and settings")}</small></span></button>
+                <label className="lucid-data-action"><Upload size={17} /><span><strong>{text("恢复完整备份", "Restore complete backup")}</strong><small>{text("从 WhyNavo JSON 文件恢复", "Restore from a WhyNavo JSON file")}</small></span><input type="file" accept="application/json,.json" onChange={(event) => { const file = event.target.files?.[0]; if (file) void onImportBackup(file).catch((error) => window.alert(error instanceof Error ? error.message : text("备份恢复失败", "Backup restore failed"))); event.currentTarget.value = ""; }} /></label>
+                <button type="button" disabled={!migrationBackupAvailable} onClick={onRestoreMigrationBackup}><TimerReset size={17} /><span><strong>{text("回到更新前数据", "Restore pre-update data")}</strong><small>{migrationBackupAvailable ? text("恢复本设备最近迁移点", "Restore the latest migration point on this device") : text("当前没有迁移恢复点", "No migration restore point is available")}</small></span></button>
               </div>
-              <p className="lucid-data-notice"><ShieldCheck size={15} /> 备份可能包含私人便签、待办、照片和壁纸，请像保护私人文件一样保管。</p>
+              <p className="lucid-data-notice"><ShieldCheck size={15} /> {text("备份可能包含私人便签、待办、照片和壁纸，请像保护私人文件一样保管。", "Backups may contain private notes, tasks, photos, and wallpapers. Protect them like private files.")}</p>
               {noteConflicts.length > 0 && (
                 <div className="lucid-conflict-panel">
                   <strong>{noteConflicts.length} 条笔记包含同步冲突副本</strong>
@@ -6598,22 +6710,22 @@ function SettingsDialog({ state, updateCheck, migrationBackupAvailable, updateSt
 
           {section === "about" && (
             <section className="lucid-settings-section">
-              <header><span>WhyNavo</span><h3>版本与兼容状态</h3></header>
+              <header><span>WhyNavo</span><h3>{text("版本与兼容状态", "Version and compatibility")}</h3></header>
               <div className="lucid-version-mark"><Compass size={30} /><div><strong>WhyNavo {APP_VERSION}</strong><span>Local-first new tab workspace</span></div></div>
               <dl className="lucid-version-list">
-                <div><dt>应用版本</dt><dd>{APP_VERSION}</dd></div>
-                <div><dt>数据版本</dt><dd>{state.dataSchemaVersion || DATA_SCHEMA_VERSION}</dd></div>
-                <div><dt>更新状态</dt><dd className={updateCheck.status}>{updateMessage}</dd></div>
+                <div><dt>{text("应用版本", "App version")}</dt><dd>{APP_VERSION}</dd></div>
+                <div><dt>{text("数据版本", "Data version")}</dt><dd>{state.dataSchemaVersion || DATA_SCHEMA_VERSION}</dd></div>
+                <div><dt>{text("更新状态", "Update status")}</dt><dd className={updateCheck.status}>{updateMessage}</dd></div>
               </dl>
               <div className="lucid-version-actions">
-                <button type="button" disabled={updateCheck.status === "checking"} onClick={onCheckUpdate}><RefreshCcw size={16} />检查更新</button>
-                <button type="button" onClick={() => window.open(updateTarget, "_blank", "noopener,noreferrer")}><Globe2 size={16} />发布页面</button>
+                <button type="button" disabled={updateCheck.status === "checking"} onClick={onCheckUpdate}><RefreshCcw size={16} />{text("检查更新", "Check for updates")}</button>
+                <button type="button" onClick={() => window.open(updateTarget, "_blank", "noopener,noreferrer")}><Globe2 size={16} />{text("发布页面", "Release page")}</button>
               </div>
             </section>
           )}
         </div>
       </div>
-      <div className="lucid-settings-footer"><span>所有界面设置会自动保存</span><button type="button" className="primary" onClick={onClose}>完成</button></div>
+      <div className="lucid-settings-footer"><span>{text("所有界面设置会自动保存", "Interface settings save automatically")}</span><button type="button" className="primary" onClick={onClose}>{text("完成", "Done")}</button></div>
     </DialogShell>
   );
 }
@@ -7163,6 +7275,7 @@ function DialogShell({ title, onClose, children, className, scrollResetKey }: {
   className?: string;
   scrollResetKey?: string;
 }) {
+  const language = useUiLanguage();
   const dialogRef = useRef<HTMLElement>(null);
   const bodyRef = useRef<HTMLDivElement>(null);
   useLayoutEffect(() => {
@@ -7213,7 +7326,7 @@ function DialogShell({ title, onClose, children, className, scrollResetKey }: {
       <section ref={dialogRef} className="dialog" role="dialog" aria-modal="true" aria-label={title} onKeyDown={handleDialogKeyDown} onClick={(event) => event.stopPropagation()}>
         <header>
           <h2>{title}</h2>
-          <button type="button" aria-label="关闭" title="关闭" onClick={onClose}><X size={18} /></button>
+          <button type="button" aria-label={localized(language, "关闭", "Close")} title={localized(language, "关闭", "Close")} onClick={onClose}><X size={18} /></button>
         </header>
         <div ref={bodyRef} className="dialog-body">{children}</div>
       </section>

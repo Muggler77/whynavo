@@ -62,6 +62,7 @@ export type Countdown = {
 
 export type WidgetKey = "weather" | "calendar" | "countdowns" | "todos" | "notes" | "rates" | "quote" | "focus" | "clock" | "memo" | "year" | "calculator";
 export type WidgetSize = "small" | "medium" | "wide";
+export type UiLanguage = "zh-CN" | "en-US";
 
 export type SystemNavPage = "widgets" | "shortcuts" | "search" | "notes" | "tasks" | "tools";
 export type CustomNavPageIcon =
@@ -102,6 +103,7 @@ export type SearchEngine = "baidu" | "google";
 
 export type Settings = {
   theme: "light" | "dark";
+  language?: UiLanguage;
   wallpaper?: string;
   wallpaperPreset?: string;
   wallpaperRotation?: boolean;

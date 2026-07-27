@@ -316,6 +316,7 @@ try {
   assert.deepEqual(oldDefaultVisual.settings.hiddenNavPages, ["tools"], "legacy state should adopt the restrained Sample A navigation");
   assert.equal(oldDefaultVisual.settings.navigationDisplay, "always", "legacy state should receive a visible desktop navigation");
   assert.equal(oldDefaultVisual.settings.navigationSide, "left", "legacy state should keep desktop navigation on the left");
+  assert.equal(oldDefaultVisual.settings.language, "zh-CN", "legacy state should receive a stable default interface language");
   assert.equal(oldDefaultVisual.settings.widgetOrder[0], "notes", "custom widget order must be preserved");
   assert.equal(oldDefaultVisual.settings.widgetSizes.notes, "wide", "custom widget size must be preserved");
 

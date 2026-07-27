@@ -83,6 +83,7 @@ export const defaultState = (): AppState => {
     ],
     settings: {
       theme: "light",
+      language: "zh-CN",
       wallpaperPreset: "lucid-room",
       wallpaperRotation: false,
       customWallpapers: [],
