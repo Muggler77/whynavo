@@ -311,13 +311,24 @@ try {
     settings: { ...legacyState.settings, iconSize: 64, visualRefreshVersion: 7 }
   });
   assert.equal(oldDefaultVisual.settings.iconSize, 58, "old default icon size should migrate to the new unified default");
-  assert.equal(oldDefaultVisual.settings.visualRefreshVersion, 11, "visual refresh version should advance");
+  assert.equal(oldDefaultVisual.settings.visualRefreshVersion, 13, "visual refresh version should advance");
   assert.deepEqual(oldDefaultVisual.settings.customNavPages, [], "legacy state should receive an empty custom page list");
   assert.deepEqual(oldDefaultVisual.settings.hiddenNavPages, [], "legacy state should keep all built-in pages visible");
   assert.equal(oldDefaultVisual.settings.navigationDisplay, "always", "legacy state should receive a visible desktop navigation");
   assert.equal(oldDefaultVisual.settings.navigationSide, "left", "legacy state should keep desktop navigation on the left");
   assert.equal(oldDefaultVisual.settings.widgetOrder[0], "notes", "custom widget order must be preserved");
   assert.equal(oldDefaultVisual.settings.widgetSizes.notes, "wide", "custom widget size must be preserved");
+
+  const legacyDefaultWidgetOrder = ["weather", "calendar", "todos", "countdowns", "focus", "notes", "rates", "quote", "clock", "memo", "year", "calculator"];
+  const sampleAWidgetOrder = normalizeState({
+    ...legacyState,
+    settings: { ...legacyState.settings, widgetOrder: legacyDefaultWidgetOrder, visualRefreshVersion: 12 }
+  });
+  assert.deepEqual(
+    sampleAWidgetOrder.settings.widgetOrder.slice(0, 3),
+    ["weather", "focus", "calendar"],
+    "untouched legacy widget order should adopt the Sample A primary row"
+  );
 
   const customIconSize = normalizeState({
     ...legacyState,

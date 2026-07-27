@@ -29,7 +29,7 @@ export const uid = () => {
   return `${Date.now()}-${Math.random().toString(16).slice(2)}-${Math.random().toString(16).slice(2)}`;
 };
 
-export const defaultWidgetOrder: WidgetKey[] = ["weather", "calendar", "todos", "countdowns", "focus", "notes", "rates", "quote", "clock", "memo", "year", "calculator"];
+export const defaultWidgetOrder: WidgetKey[] = ["weather", "focus", "calendar", "todos", "countdowns", "notes", "rates", "quote", "clock", "memo", "year", "calculator"];
 
 export const defaultWidgetSizes: Record<WidgetKey, WidgetSize> = {
   weather: "wide",
@@ -82,12 +82,12 @@ export const defaultState = (): AppState => {
     ],
     settings: {
       theme: "light",
-      wallpaperPreset: "coastal-glass",
+      wallpaperPreset: "lucid-room",
       wallpaperRotation: false,
       customWallpapers: [],
-      wallpaperCollection: ["coastal-glass", "neon-rain", "aurora-lake", "ocean-cliff"],
+      wallpaperCollection: ["lucid-room", "coastal-glass", "neon-rain", "aurora-lake"],
       quickNote: "",
-      visualRefreshVersion: 11,
+      visualRefreshVersion: 13,
       dateTimeColor: "#ffffff",
       widgetAccentColor: "#2dd4bf",
       glass: 42,

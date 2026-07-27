@@ -16,6 +16,7 @@ are pinned in `package-lock.json`.
   and affiliates
 - `loose-envify` - Copyright (c) 2015 Andres Suarez
 - `js-tokens` - Copyright (c) 2014-2018 Simon Lydell
+- Devicon icon artwork - Copyright (c) Devicon contributors
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -52,3 +53,13 @@ INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
 LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR
 OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
 PERFORMANCE OF THIS SOFTWARE.
+
+## CC0 1.0 assets
+
+- Simple Icons artwork - released under CC0 1.0 by Simple Icons contributors
+
+## Brand marks
+
+The Google, YouTube, X, Notion, Figma, Salesforce, Slack, and GitHub names and
+logos are trademarks of their respective owners. Their inclusion identifies
+the corresponding third-party services and does not imply endorsement.

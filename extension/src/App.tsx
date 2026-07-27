@@ -9,6 +9,7 @@ import {
   CalendarDays,
   Check,
   Clock3,
+  Compass,
   Download,
   FileText,
   Database,
@@ -19,6 +20,7 @@ import {
   Globe2,
   GraduationCap,
   HeartPulse,
+  House,
   GripVertical,
   Import,
   Image as ImageIcon,
@@ -28,6 +30,7 @@ import {
   MessageCircle,
   Plane,
   Layers,
+  LayoutGrid,
   LogOut,
   Palette,
   Pin,
@@ -41,9 +44,12 @@ import {
   Save,
   Search,
   Settings,
+  ShieldCheck,
   Shuffle,
   Sparkles,
   Star,
+  Sun,
+  Moon,
   Trash2,
   Video,
   TrendingUp,
@@ -148,6 +154,17 @@ const SHORTCUT_RENDER_BATCH = 48;
 const ICON_MANAGER_RENDER_BATCH = 80;
 const MAX_CUSTOM_WALLPAPERS = 12;
 const MAX_IMAGE_UPLOAD_BYTES = 12 * 1024 * 1024;
+
+const sampleAStarterSites = [
+  { title: "Google", url: "https://www.google.com/", icon: "/starter-icons/google.svg" },
+  { title: "YouTube", url: "https://www.youtube.com/", icon: "/starter-icons/youtube.svg" },
+  { title: "X", url: "https://x.com/", icon: "/starter-icons/x.svg" },
+  { title: "Notion", url: "https://www.notion.so/", icon: "/starter-icons/notion.svg" },
+  { title: "Figma", url: "https://www.figma.com/", icon: "/starter-icons/figma.svg" },
+  { title: "Salesforce", url: "https://www.salesforce.com/", icon: "/starter-icons/salesforce.svg" },
+  { title: "Slack", url: "https://slack.com/", icon: "/starter-icons/slack.svg" },
+  { title: "GitHub", url: "https://github.com/", icon: "/starter-icons/github.svg" }
+] as const;
 const MAX_IMAGE_DATA_URL_LENGTH = 3 * 1024 * 1024;
 const MAX_BACKUP_IMPORT_BYTES = 64 * 1024 * 1024;
 const MAX_ENTITY_RECORDS = 5000;
@@ -700,6 +717,7 @@ type WallpaperCategory = "精选" | "日系" | "动漫" | "猫咪" | "酷感";
 type BuiltInWallpaper = { id: string; name: string; url: string; mobileUrl?: string; category: WallpaperCategory };
 
 const featuredWallpapers: BuiltInWallpaper[] = [
+  { id: "lucid-room", name: "通透工作室", url: "/wallpapers/photo/lucid-room.jpg", mobileUrl: "/wallpapers/photo/mobile/lucid-room.jpg", category: "精选" },
   { id: "coastal-glass", name: "冷雾海岸", url: "/wallpapers/photo/coastal-glass.jpg", mobileUrl: "/wallpapers/photo/mobile/coastal-glass.webp", category: "精选" },
   { id: "neon-rain", name: "雨夜霓虹", url: "/wallpapers/photo/neon-rain.jpg", mobileUrl: "/wallpapers/photo/mobile/neon-rain.webp", category: "精选" },
   { id: "aurora-lake", name: "极光山湖", url: "/wallpapers/photo/aurora-lake.jpg", mobileUrl: "/wallpapers/photo/mobile/aurora-lake.webp", category: "精选" },
@@ -879,6 +897,7 @@ export default function App() {
   const localStateChannelRef = useRef<BroadcastChannel | undefined>();
   const localStatePeerIdRef = useRef(uid());
   const shellRef = useRef<HTMLDivElement>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     stateRef.current = state;
@@ -1930,8 +1949,17 @@ export default function App() {
   const selectedTimeZone = state.settings.timeZone || "Asia/Shanghai";
   const selectedTimeZoneOption = timeZoneOptions.find((item) => item.value === selectedTimeZone) || timeZoneOptions[0];
   const chinaDateText = formatterFor(selectedTimeZone, { year: "numeric", month: "long", day: "numeric", weekday: "long" }).format(clock);
-  const chinaMiniDateText = formatterFor(selectedTimeZone, { month: "long", day: "numeric", weekday: "long" }).format(clock);
   const chinaTimeText = formatterFor(selectedTimeZone, { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false }).format(clock);
+  const selectedHour = Number(formatterFor(selectedTimeZone, { hour: "2-digit", hour12: false }).format(clock).replace(/\D/g, "")) % 24;
+  const greetingLead = selectedHour < 6
+    ? "Good evening"
+    : selectedHour < 12
+      ? "Good morning"
+      : selectedHour < 18
+        ? "Good afternoon"
+        : "Good evening";
+  const accountName = sync.user?.email?.split("@")[0]?.replace(/[._-]+/g, " ").trim();
+  const homeGreeting = `${greetingLead}${accountName ? `, ${accountName}` : ""}.`;
 
   const saveSyncRestorePoint = async (
     label: string,
@@ -3016,7 +3044,7 @@ export default function App() {
     calendar: <CalendarWidget key="calendar" widgetKey="calendar" size={widgetSizes.calendar} date={today} state={state} updateState={updateState} />,
     countdowns: <CountdownWidget key="countdowns" widgetKey="countdowns" size={widgetSizes.countdowns} state={state} updateState={updateState} />,
     todos: <TodoWidget key="todos" widgetKey="todos" size={widgetSizes.todos} state={state} updateState={updateState} />,
-    focus: <FocusWidget key="focus" widgetKey="focus" size={widgetSizes.focus} />,
+    focus: <FocusWidget key="focus" widgetKey="focus" size={widgetSizes.focus} state={state} updateState={updateState} />,
     notes: <PhotoWidget key="notes" widgetKey="notes" size={widgetSizes.notes} state={state} updateState={updateState} />,
     rates: <RatesWidget key="rates" widgetKey="rates" size={widgetSizes.rates} rates={rates} message={ratesMessage} refreshing={ratesRefreshing} onRefresh={() => refreshExternalData(state, true)} />,
     clock: <WorldClockWidget key="clock" widgetKey="clock" size={widgetSizes.clock} date={clock} timeZone={state.settings.timeZone || "Asia/Shanghai"} />,
@@ -3093,6 +3121,9 @@ export default function App() {
       content: widgetRenderers[key]
     };
   });
+  const primaryWidgetItems = widgetGridItems.slice(0, 3);
+  const primaryWidgetKeys = primaryWidgetItems.map((item) => item.id);
+  const secondaryWidgetItems = widgetGridItems.filter((item) => !primaryWidgetKeys.includes(item.id));
   const staticWidgetsPanel = (
     <section className="widgets home-widgets" aria-label="主页小组件">
       {widgetGridItems.map((item) => (
@@ -3189,36 +3220,60 @@ export default function App() {
       <div className="shell" ref={shellRef}>
         <header className="topbar">
           <div className="brand">
-            <span className="mark"><img src="./icons/icon32.png" alt="" /></span>
+            <span className="mark"><Compass size={22} strokeWidth={1.55} aria-hidden="true" /></span>
             <div>
               <h1>WhyNavo</h1>
-              <p>{chinaMiniDateText}</p>
             </div>
           </div>
           <div className="actions">
+            <button
+              type="button"
+              className="top-action"
+              aria-label={state.settings.theme === "dark" ? "切换到浅色主题" : "切换到深色主题"}
+              title={state.settings.theme === "dark" ? "切换到浅色主题" : "切换到深色主题"}
+              onClick={() => updateState((current) => ({
+                ...current,
+                settings: {
+                  ...current.settings,
+                  theme: current.settings.theme === "dark" ? "light" : "dark",
+                  updatedAt: nowIso()
+                }
+              }))}
+            >
+              {state.settings.theme === "dark" ? <Moon size={17} /> : <Sun size={17} />}
+            </button>
+            <button type="button" className="top-action mobile-settings" aria-label="设置" title="设置" onClick={() => setDialog("settings")}><Settings size={17} /></button>
             <button className="account-button" aria-label="账号与云同步" title="账号与云同步" onClick={() => setDialog("sync")}>
               <UserCircle size={17} />
-              <span>{sync.user?.email || "未登录"}</span>
+              <span>{sync.user ? "Logged in" : "Unlogged"}</span>
             </button>
           </div>
         </header>
 
-        <section className="hero">
-          <div className="hero-date">
-            <strong>{chinaDateText}</strong>
-            <span>{chinaTimeText}</span>
-            <button type="button" className="timezone-button" title="选择时区" onClick={() => setDialog("timezone")}>{selectedTimeZoneOption.label}<span>{selectedTimeZoneOption.value}</span></button>
-          </div>
+        <section className={`hero ${activePage === "widgets" ? "sample-a-hero" : "compact-page-hero"}`}>
+          {activePage === "widgets" ? (
+            <div className="home-greeting">
+              <h2>{homeGreeting}</h2>
+              <p>Focus on what matters. You’re in control.</p>
+            </div>
+          ) : (
+            <div className="hero-date">
+              <strong>{chinaDateText}</strong>
+              <span>{chinaTimeText}</span>
+              <button type="button" className="timezone-button" title="选择时区" onClick={() => setDialog("timezone")}>{selectedTimeZoneOption.label}<span>{selectedTimeZoneOption.value}</span></button>
+            </div>
+          )}
           <div className="search hero-search">
             {USE_BROWSER_DEFAULT_SEARCH
               ? <span className="engine-toggle engine-default">默认</span>
               : <button type="button" className="engine-toggle" title="点击切换搜索引擎" onClick={toggleSearchEngine}>{searchEngines[currentSearchEngine].label}</button>}
             <Search size={20} />
             <input
+              ref={searchInputRef}
               value={searchText}
               onChange={(event) => setSearchText(event.target.value)}
               onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); runSearch(); } }}
-              placeholder={USE_BROWSER_DEFAULT_SEARCH ? "浏览器默认搜索" : `${searchEngines[currentSearchEngine].label}搜索`}
+              placeholder={activePage === "widgets" ? "Search apps, sites, notes, tasks..." : (USE_BROWSER_DEFAULT_SEARCH ? "浏览器默认搜索" : `${searchEngines[currentSearchEngine].label}搜索`)}
             />
             <button type="button" className="search-submit" aria-label="搜索" title="搜索" onClick={runSearch}><Search size={18} /></button>
           </div>
@@ -3262,40 +3317,79 @@ export default function App() {
           }}
         >
           <div className="page-nav-main">
-            <button className={activePage === "widgets" ? "active" : ""} onClick={() => goToPage("widgets")} title="主页小组件">
-              <CalendarDays size={21} />
-              <span>主页</span>
+            <button className={activePage === "widgets" ? "active" : ""} onClick={() => goToPage("widgets")} title="首页">
+              <House size={19} />
+              <span>Home</span>
             </button>
             {!hiddenNavPages.has("shortcuts") && (
-              <button className={activePage === "shortcuts" && !activeCustomPageId ? "active" : ""} onClick={() => goToPage("shortcuts")} title="网站导航">
-                <Layers size={21} />
-                <span>网站</span>
+              <button className={activePage === "shortcuts" && !activeCustomPageId ? "active" : ""} onClick={() => goToPage("shortcuts")} title="空间">
+                <LayoutGrid size={19} />
+                <span>Spaces</span>
               </button>
             )}
             {!hiddenNavPages.has("tools") && (
-              <button className={activePage === "tools" ? "active" : ""} onClick={() => goToPage("tools")} title="工具箱">
-                <BookOpen size={21} />
-                <span>工具</span>
+              <button className={`mobile-only-nav ${activePage === "tools" ? "active" : ""}`} onClick={() => goToPage("tools")} title="工具">
+                <BookOpen size={19} />
+                <span>Tools</span>
               </button>
             )}
+            <button type="button" onClick={() => {
+              if (activePage !== "widgets") goToPage("widgets");
+              window.requestAnimationFrame(() => searchInputRef.current?.focus());
+            }} title="搜索">
+              <Search size={19} />
+              <span>Search</span>
+            </button>
+            <button type="button" onClick={() => {
+              if (activePage !== "widgets") goToPage("widgets");
+              window.requestAnimationFrame(() => document.querySelector('[data-widget-key="memo"]')?.scrollIntoView({ behavior: "smooth", block: "center" }));
+            }} title="笔记">
+              <FileText size={19} />
+              <span>Notes</span>
+            </button>
+            <button type="button" onClick={() => {
+              if (activePage !== "widgets") goToPage("widgets");
+              window.requestAnimationFrame(() => document.querySelector('[data-widget-key="todos"]')?.scrollIntoView({ behavior: "smooth", block: "center" }));
+            }} title="任务">
+              <Check size={19} />
+              <span>Tasks</span>
+            </button>
             {customNavPages.map((page) => {
               const CustomPageIcon = customNavPageIcons[page.icon]?.Icon || Star;
               return (
                 <button className={activeCustomPageId === page.id ? "active" : ""} onClick={() => goToCustomPage(page)} title={page.name} key={page.id}>
-                  <CustomPageIcon size={21} />
+                  <CustomPageIcon size={19} />
                   <span>{page.name}</span>
                 </button>
               );
             })}
           </div>
           <div className="page-nav-secondary">
-            <button onClick={() => setDialog("pages")} title="管理页面" aria-label="管理页面"><Plus size={18} /></button>
-            <button onClick={() => setDialog("settings")} title="设置"><Settings size={18} /></button>
+            {!hiddenNavPages.has("tools") && (
+              <button className={activePage === "tools" ? "active" : ""} onClick={() => goToPage("tools")} title="工具">
+                <BookOpen size={19} />
+                <span>Tools</span>
+              </button>
+            )}
+            <button onClick={() => setDialog("settings")} title="设置"><Settings size={18} /><span>Settings</span></button>
             {navigationDisplay === "hidden" && (
               <button className="nav-hide-control" onClick={() => setNavigationOpen(false)} title="隐藏导航" aria-label="隐藏导航"><EyeOff size={18} /></button>
             )}
           </div>
         </nav>
+        <button
+          type="button"
+          className={`page-nav-edit ${layoutEditing ? "active" : ""}`}
+          onClick={() => {
+            if (activePage !== "widgets") goToPage("widgets");
+            const next = !layoutEditing;
+            setLayoutEditing(next);
+            showToast(next ? "布局编辑已开启" : "主页布局已保存");
+          }}
+        >
+          {layoutEditing ? <Check size={17} /> : <GripVertical size={17} />}
+          <span>{layoutEditing ? "Done" : "Edit layout"}</span>
+        </button>
 
         {activePage === "shortcuts" && state.settings.dockPosition === "top" && <Dock shortcuts={pinned} />}
 
@@ -3304,33 +3398,73 @@ export default function App() {
           className={["workspace", "page-" + activePage, activeCustomPageId ? "page-custom" : "", pageMotion ? "page-motion-" + pageMotion : ""].filter(Boolean).join(" ")}
         >
           {activePage === "widgets" ? (
-            <section className="home-dashboard">
-              <div className="dashboard-toolbar" role="toolbar" aria-label="主页工具">
-                <button
-                  type="button"
-                  className={`dashboard-tool ${layoutEditing ? "active" : ""}`}
-                  aria-label={layoutEditing ? "完成布局编辑" : "编辑主页布局"}
-                  title={layoutEditing ? "完成布局编辑" : "编辑主页布局"}
-                  onClick={() => {
-                    const next = !layoutEditing;
-                    setLayoutEditing(next);
-                    showToast(next ? "布局编辑已开启：拖动卡片右上角手柄调整位置" : "主页布局已保存");
-                  }}
-                >
-                  {layoutEditing ? <Check size={17} /> : <GripVertical size={17} />}
-                </button>
-                <button type="button" className="dashboard-tool" aria-label="添加网站" title="添加网站" onClick={() => openNewShortcut()}><Plus size={17} /></button>
-                <button type="button" className="dashboard-tool" aria-label="资源中心" title="资源中心" onClick={() => setDialog("library")}><Palette size={17} /></button>
-                <button type="button" className="dashboard-tool" aria-label="刷新数据" title="刷新数据" onClick={() => void refreshExternalData(state, true)}><RefreshCcw size={17} /></button>
+            <section className={`home-dashboard sample-a-home ${layoutEditing ? "is-editing" : ""}`}>
+              <div className="sample-a-canvas">
+                <section className="sample-a-sites-panel">
+                  <header>
+                    <div>
+                      <span>Quick access</span>
+                      <h2>My Sites</h2>
+                    </div>
+                    <button type="button" aria-label="添加网站" title="添加网站" onClick={() => openNewShortcut()}><Plus size={17} /></button>
+                  </header>
+                  <HomeShortcuts
+                    tiles={homeShortcutTiles.slice(0, 12)}
+                    iconSize={state.settings.iconSize}
+                    editing={layoutEditing}
+                    onOpenFolder={(folderId) => setOpenFolderId(folderId)}
+                    onMoveTile={moveHomeTile}
+                  />
+                  {!homeShortcutTiles.length && (
+                    <StarterSites />
+                  )}
+                </section>
+
+                {layoutEditing ? (
+                  <section className="sample-a-editing-grid">
+                    {widgetsPanel}
+                  </section>
+                ) : (
+                  <section className="sample-a-primary-widgets" aria-label="主要小组件">
+                    {primaryWidgetItems.map((item) => (
+                      <div className="widget-sortable-shell widget-size-wide" data-widget-key={item.id} key={item.id}>
+                        {item.content}
+                      </div>
+                    ))}
+                  </section>
+                )}
               </div>
-              <HomeShortcuts
-                tiles={homeShortcutTiles}
-                iconSize={state.settings.iconSize}
-                editing={layoutEditing}
-                onOpenFolder={(folderId) => setOpenFolderId(folderId)}
-                onMoveTile={moveHomeTile}
-              />
-              {widgetsPanel}
+
+              {!layoutEditing && secondaryWidgetItems.length > 0 && (
+                <section className="sample-a-secondary-section">
+                  <header>
+                    <div>
+                      <span>更多组件</span>
+                      <h2>你的工作区</h2>
+                    </div>
+                    <div className="sample-a-section-actions">
+                      <button type="button" aria-label="资源中心" title="资源中心" onClick={() => setDialog("library")}><Palette size={17} /></button>
+                      <button type="button" aria-label="刷新数据" title="刷新数据" onClick={() => void refreshExternalData(state, true)}><RefreshCcw size={17} /></button>
+                    </div>
+                  </header>
+                  <div className="sample-a-secondary-widgets">
+                    {secondaryWidgetItems.map((item) => (
+                      <div className={`widget-sortable-shell widget-size-${item.size}`} data-widget-key={item.id} key={item.id}>
+                        {item.content}
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              )}
+
+              <footer className="sample-a-local-note">
+                <ShieldCheck size={15} />
+                <span>Local-first. Your data stays on your device.</span>
+              </footer>
+              <div className="sample-a-corner-actions" aria-label="主页快捷操作">
+                <button type="button" aria-label="壁纸与组件" title="壁纸与组件" onClick={() => setDialog("library")}><ImageIcon size={17} /></button>
+                <button type="button" aria-label="添加网站" title="添加网站" onClick={() => openNewShortcut()}><Plus size={19} /></button>
+              </div>
             </section>
           ) : activePage === "tools" ? (
             <ToolHub
@@ -3999,6 +4133,30 @@ function HomeShortcuts({ tiles, iconSize, editing, onOpenFolder, onMoveTile }: {
   );
 }
 
+function StarterSites() {
+  return (
+    <section className="home-shortcuts sample-a-starter-sites" aria-label="推荐网站">
+      <div className="home-shortcuts-row" style={{ "--icon": "64px" } as React.CSSProperties}>
+        {sampleAStarterSites.map((site) => (
+          <a
+            className="home-shortcut"
+            href={site.url}
+            key={site.title}
+            title={site.title}
+            target="_blank"
+            rel="noreferrer"
+          >
+            <span className="shortcut-icon">
+              <img src={site.icon} alt="" loading="eager" decoding="async" />
+            </span>
+            <span>{site.title}</span>
+          </a>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 function Dock({ shortcuts }: { shortcuts: Shortcut[] }) {
   if (!shortcuts.length) return null;
   return (
@@ -4293,7 +4451,7 @@ function WeatherWidget({ widgetKey, size, weather, city, useLocation, refreshing
     .join(" · ") || placeLabel;
   const precipitation = weather?.forecast?.[0]?.precipitationProbability;
   return (
-    <Widget title="天气" meta={weather ? "实时" : "连接中"} widgetKey={widgetKey} tone={`weather weather-${weatherTone}`} size={size} action={<button title={refreshing ? "正在刷新" : "刷新天气"} disabled={refreshing} onClick={() => void onRefresh()}><RefreshCcw size={14} className={refreshing ? "spin" : undefined} /></button>}>
+    <Widget title="Weather" meta={compactPlace || "Shanghai"} widgetKey={widgetKey} tone={`weather weather-${weatherTone}`} size={size} action={<button title={refreshing ? "正在刷新" : "刷新天气"} disabled={refreshing} onClick={() => void onRefresh()}><RefreshCcw size={14} className={refreshing ? "spin" : undefined} /></button>}>
       <div className="weather-scene" aria-hidden="true">
         <span className="weather-sun" />
         <span className="weather-cloud one" />
@@ -4408,6 +4566,23 @@ function CalendarWidget({ widgetKey, size, date, state, updateState }: { widgetK
   const weekdayLabel = date.toLocaleDateString("zh-CN", { weekday: "long" });
   const monthPrefix = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
   const monthRecordCount = Object.keys(records).filter((key) => key.startsWith(monthPrefix)).length;
+  const sampleWeekDays = useMemo(() => {
+    const mondayOffset = (date.getDay() + 6) % 7;
+    const monday = new Date(date.getFullYear(), date.getMonth(), date.getDate() - mondayOffset);
+    return Array.from({ length: 7 }, (_, index) => {
+      const value = new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() + index);
+      return {
+        date: value,
+        key: calendarDateKey(value),
+        label: value.toLocaleDateString("en-US", { weekday: "short" }).toUpperCase()
+      };
+    });
+  }, [date]);
+  const agendaEntries = Object.entries(records)
+    .filter(([, text]) => Boolean(text.trim()))
+    .sort(([left], [right]) => left.localeCompare(right))
+    .filter(([key]) => key >= todayKey)
+    .slice(0, 3);
 
   if (size === "small") {
     return (
@@ -4433,17 +4608,63 @@ function CalendarWidget({ widgetKey, size, date, state, updateState }: { widgetK
     );
   }
 
+  if (size === "wide") {
+    return (
+      <Widget title="Calendar" meta={`${monthRecordCount} events`} widgetKey={widgetKey} tone="calendar" size={size} action={<button type="button" title="记录今天" onClick={() => openDate(todayKey)}>Today</button>}>
+        <div className="sample-calendar">
+          <strong className="sample-calendar-month">{date.toLocaleDateString("en-US", { month: "long", year: "numeric" })}</strong>
+          <div className="sample-calendar-week" aria-label="本周日期">
+            {sampleWeekDays.map((item) => (
+              <button
+                type="button"
+                className={item.key === todayKey ? "today" : ""}
+                key={item.key}
+                onClick={() => openDate(item.key)}
+                title={records[item.key] || "点击记录当天事项"}
+              >
+                <span>{item.label}</span>
+                <strong>{item.date.getDate()}</strong>
+              </button>
+            ))}
+          </div>
+          <div className="sample-calendar-agenda">
+            {agendaEntries.map(([key, text], index) => (
+              <button type="button" key={key} onClick={() => openDate(key)} title={calendarDateLabel(key)}>
+                <span>{index === 0 ? "Today" : calendarDateLabel(key)}</span>
+                <strong>{text}</strong>
+              </button>
+            ))}
+            {!agendaEntries.length && (
+              <>
+                <button type="button" className="empty-event" onClick={() => openDate(todayKey)}>
+                  <span>Today</span>
+                  <strong>New event</strong>
+                </button>
+                <span className="sample-calendar-placeholder" aria-hidden="true" />
+                <span className="sample-calendar-placeholder" aria-hidden="true" />
+              </>
+            )}
+          </div>
+          <button type="button" className="sample-calendar-add" onClick={() => openDate(todayKey)}><Plus size={14} /> New event</button>
+        </div>
+        {editingDate && (
+          <DialogShell title={calendarDateLabel(editingDate)} onClose={() => setEditingDate(undefined)} className="widget-popover calendar-popover">
+            <div className="calendar-editor">
+              <textarea maxLength={MAX_CALENDAR_RECORD_CHARS} value={draft} onChange={(event) => setDraft(event.target.value)} placeholder="记录这一天要做的事" autoFocus />
+              <div className="calendar-editor-actions">
+                <button type="button" onClick={clearRecord}>清除</button>
+                <button type="button" className="primary-mini" onClick={saveRecord}>保存</button>
+              </div>
+            </div>
+          </DialogShell>
+        )}
+      </Widget>
+    );
+  }
+
   return (
     <Widget title={(date.getMonth() + 1) + " 月"} meta={`${monthRecordCount} 条记录`} widgetKey={widgetKey} tone="calendar" size={size} action={<button type="button" title="记录今天" onClick={() => openDate(todayKey)}><CalendarDays size={16} /></button>}>
       <div className={`calendar-layout calendar-layout-${size}`}>
-        {size === "wide" && (
-          <button type="button" className="calendar-today-panel" onClick={() => openDate(todayKey)} title={records[todayKey] || "点击记录今天"}>
-            <span>{date.getFullYear()}</span>
-            <strong>{date.getDate()}</strong>
-            <b>{weekdayLabel}</b>
-            <small>{records[todayKey] || "给今天留下一条记录"}</small>
-          </button>
-        )}
         <div className="calendar-grid calendar-clickable">
           {["日", "一", "二", "三", "四", "五", "六"].map((day) => <span key={day} className="muted calendar-weekday">{day}</span>)}
           {days.map((item, index) => item ? (
@@ -4742,9 +4963,20 @@ function QuoteWidget({ widgetKey, size, date }: { widgetKey: WidgetKey; size: Wi
   );
 }
 
-function FocusWidget({ widgetKey, size }: { widgetKey: WidgetKey; size: WidgetSize }) {
+function FocusWidget({ widgetKey, size, state, updateState }: {
+  widgetKey: WidgetKey;
+  size: WidgetSize;
+  state: AppState;
+  updateState: (updater: (state: AppState) => AppState) => void;
+}) {
   const [seconds, setSeconds] = useState(25 * 60);
   const [running, setRunning] = useState(false);
+  const todos = state.todos
+    .filter((item) => !item.deletedAt)
+    .sort((a, b) => a.order - b.order);
+  const activeTodos = todos.filter((item) => !item.done);
+  const featuredTodo = activeTodos[0];
+  const detailTodos = todos.filter((item) => item.id !== featuredTodo?.id).slice(0, 3);
   useEffect(() => {
     if (!running) return;
     const timer = window.setInterval(() => {
@@ -4762,21 +4994,47 @@ function FocusWidget({ widgetKey, size }: { widgetKey: WidgetKey; size: WidgetSi
   const minutes = Math.floor(seconds / 60).toString().padStart(2, "0");
   const rest = (seconds % 60).toString().padStart(2, "0");
   const progress = 1 - seconds / (25 * 60);
+  const toggleTodo = (id: string) => updateState((current) => ({
+    ...current,
+    todos: current.todos.map((item) => item.id === id ? { ...item, done: !item.done, updatedAt: nowIso() } : item)
+  }));
   return (
-    <Widget title="专注" meta={running ? "进行中" : "25 分钟"} widgetKey={widgetKey} tone="focus" size={size} action={<Clock3 size={16} />}>
-      <div className="focus-widget">
-        <div className="focus-dial-wrap">
-          <span className="focus-orbit" aria-hidden="true" />
-          <button className="focus-ring" style={{ "--progress": String(progress * 360) + "deg" } as React.CSSProperties} onClick={() => setRunning((value) => !value)} title={running ? "暂停" : "开始"}>
-            <strong>{minutes}:{rest}</strong>
-            <span>{running ? "暂停" : "开始"}</span>
+    <Widget title="Focus" meta={running ? "In progress" : `${activeTodos.length} tasks`} widgetKey={widgetKey} tone="focus" size={size}>
+      <div className="focus-command">
+        <div className="focus-command-hero">
+          <span>当前重点</span>
+          <strong>{featuredTodo?.text || "开始一段不被打扰的时间"}</strong>
+          <button
+            type="button"
+            className="focus-command-timer"
+            style={{ "--progress": `${progress * 360}deg` } as React.CSSProperties}
+            onClick={() => setRunning((value) => !value)}
+            title={running ? "暂停专注" : "开始专注"}
+          >
+            <b>{minutes}:{rest}</b>
+            <small>{running ? "暂停" : "开始"}</small>
           </button>
         </div>
-        <div className="focus-session">
-          <small>当前周期</small>
-          <strong>{running ? "保持节奏" : "准备开始"}</strong>
-          <div className="focus-session-dots" aria-hidden="true"><i className={progress > 0 ? "active" : ""} /><i /><i /><i /></div>
-          <button className="focus-reset" onClick={() => { setRunning(false); setSeconds(25 * 60); }}><TimerReset size={14} /> 重置</button>
+        <div className="focus-command-list">
+          {detailTodos.map((todo) => (
+            <label key={todo.id}>
+              <input type="checkbox" checked={todo.done} onChange={() => toggleTodo(todo.id)} />
+              <span>{todo.text}</span>
+              <small>{todo.done ? "完成" : "待办"}</small>
+            </label>
+          ))}
+          {!detailTodos.length && (
+            <button type="button" className="focus-command-empty" onClick={() => document.querySelector('[data-widget-key="todos"]')?.scrollIntoView({ behavior: "smooth", block: "center" })}>
+              <Plus size={14} /> Add a task
+            </button>
+          )}
+          {Array.from({ length: Math.max(0, 3 - detailTodos.length - (detailTodos.length ? 0 : 1)) }, (_, index) => (
+            <span className="focus-command-placeholder" aria-hidden="true" key={`focus-placeholder-${index}`}><i /><b /></span>
+          ))}
+        </div>
+        <div className="focus-command-footer">
+          <span>{running ? "保持专注，完成当前重点" : "25 分钟专注周期"}</span>
+          <button type="button" onClick={() => { setRunning(false); setSeconds(25 * 60); }}><TimerReset size={14} /> 重置</button>
         </div>
       </div>
     </Widget>

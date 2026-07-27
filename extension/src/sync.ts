@@ -1020,7 +1020,8 @@ type SyncRecord = {
 };
 
 
-const defaultWidgetOrder: WidgetKey[] = ["weather", "calendar", "todos", "countdowns", "focus", "notes", "rates", "quote", "clock", "memo", "year", "calculator"];
+const legacyDefaultWidgetOrder: WidgetKey[] = ["weather", "calendar", "todos", "countdowns", "focus", "notes", "rates", "quote", "clock", "memo", "year", "calculator"];
+const defaultWidgetOrder: WidgetKey[] = ["weather", "focus", "calendar", "todos", "countdowns", "notes", "rates", "quote", "clock", "memo", "year", "calculator"];
 
 const defaultWidgets: Record<WidgetKey, boolean> = {
   weather: true,
@@ -1396,6 +1397,8 @@ export function normalizeState(state: AppState): AppState {
   const visualVersion = state.settings.visualRefreshVersion || 0;
   const normalizedWidgets = { ...defaultWidgets, ...(state.settings.widgets || {}) };
   const normalizedWidgetSizes = { ...defaultWidgetSizes, ...(state.settings.widgetSizes || {}) };
+  const normalizedWidgetOrder = normalizeWidgetOrder(state.settings.widgetOrder);
+  const usesLegacyDefaultWidgetOrder = normalizedWidgetOrder.every((key, index) => key === legacyDefaultWidgetOrder[index]);
   if (visualVersion < 6) {
     (["clock", "memo", "year", "calculator"] as WidgetKey[]).forEach((key) => {
       normalizedWidgets[key] = false;
@@ -1404,18 +1407,24 @@ export function normalizeState(state: AppState): AppState {
   const settings: Settings = {
     ...state.settings,
     wallpaper: visualVersion < 5 ? undefined : normalizeStoredImageReference(state.settings.wallpaper),
-    wallpaperPreset: visualVersion < 5 ? "aurora-lake" : state.settings.wallpaperPreset || "aurora-lake",
+    wallpaperPreset: visualVersion < 12 && state.settings.wallpaperPreset === "coastal-glass"
+      ? "lucid-room"
+      : visualVersion < 5
+        ? "aurora-lake"
+        : state.settings.wallpaperPreset || "lucid-room",
     wallpaperRotation: visualVersion < 5 ? false : state.settings.wallpaperRotation ?? false,
-    visualRefreshVersion: 11,
+    visualRefreshVersion: 13,
     iconSize: Math.min(80, Math.max(48, visualVersion < 8 && state.settings.iconSize === 64 ? 58 : state.settings.iconSize || 58)),
     glass: Math.min(88, Math.max(28, state.settings.glass || 42)),
     customWallpapers: state.settings.customWallpapers || [],
-    wallpaperCollection: state.settings.wallpaperCollection || ["coastal-glass", "neon-rain", "aurora-lake", "ocean-cliff"],
+    wallpaperCollection: state.settings.wallpaperCollection || ["lucid-room", "coastal-glass", "neon-rain", "aurora-lake"],
     quickNote: state.settings.quickNote || "",
     photoFrameImage: normalizeStoredImageReference(state.settings.photoFrameImage),
     iconPresentation: state.settings.iconPresentation || "original",
     widgets: normalizedWidgets,
-    widgetOrder: normalizeWidgetOrder(state.settings.widgetOrder),
+    widgetOrder: visualVersion < 13 && usesLegacyDefaultWidgetOrder
+      ? [...defaultWidgetOrder]
+      : normalizedWidgetOrder,
     widgetSizes: normalizedWidgetSizes,
     customNavPages: (state.settings.customNavPages || []).filter((page, index, pages) => (
       Boolean(page?.id && page.name?.trim() && page.groupId)
