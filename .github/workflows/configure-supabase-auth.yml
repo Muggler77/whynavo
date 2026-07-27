@@ -1,4 +1,4 @@
-name: Configure whytab Supabase Auth
+name: Configure WhyNavo Supabase Auth
 
 on:
   workflow_dispatch:
@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     concurrency:
-      group: whytab-production-database-access
+      group: whynavo-production-database-access
       cancel-in-progress: false
     env:
       SUPABASE_PROJECT_REF: keafulupzvfljvbzwgrq

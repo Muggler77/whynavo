@@ -10,9 +10,9 @@ import {
   inspectBackup
 } from "./backup-envelope.mjs";
 
-const directory = await mkdtemp(join(tmpdir(), "whytab-backup-test-"));
+const directory = await mkdtemp(join(tmpdir(), "whynavo-backup-test-"));
 const publicKey = join(directory, "recovery-public.pem");
-const privateKey = join(tmpdir(), `whytab-backup-test-private-${process.pid}.pem`);
+const privateKey = join(tmpdir(), `whynavo-backup-test-private-${process.pid}.pem`);
 const input = join(directory, "database.tar.gz");
 const encrypted = join(directory, "database.tar.gz.enc");
 const decrypted = join(directory, "database-restored.tar.gz");

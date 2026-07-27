@@ -1,4 +1,4 @@
-# whytab 数据模型
+# WhyNavo 数据模型
 
 插件前端使用本地 IndexedDB 保存完整 `AppState`，并通过 `sync_snapshots` 表做整包云同步。Supabase 迁移同时创建了细粒度表，方便后续把同步升级成逐条记录合并；当前客户端不能直接访问这些旧表。
 

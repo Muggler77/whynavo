@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { verifyBackupExport } from "./verify-backup-export.mjs";
 
-const directory = await mkdtemp(join(tmpdir(), "whytab-backup-export-test-"));
+const directory = await mkdtemp(join(tmpdir(), "whynavo-backup-export-test-"));
 
 try {
   await Promise.all([

@@ -39,7 +39,7 @@ const forbiddenContent = [
   },
   { label: "personal machine path", pattern: /\/(?:Users|Volumes)\/[^\s/]+(?:\/|\b)/ },
   { label: "retired custom domain", pattern: /why[.-]tool[.-]com/i },
-  { label: "retired community domain", pattern: /whytab[.-]is-a[.-]dev/i },
+  { label: "retired community domain", pattern: /whynavo[.-]is-a[.-]dev/i },
   { label: "retired product branding", pattern: /\bwetab\b/i }
 ];
 const allowedExampleEmails = new Set(["name@example.com"]);

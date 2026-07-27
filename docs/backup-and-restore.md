@@ -1,6 +1,6 @@
 # Encrypted Backup and Restore
 
-This runbook covers the official whytab production database. A backup is valid only when its ciphertext exists outside Supabase and a restore has been tested in a separate project.
+This runbook covers the official WhyNavo production database. A backup is valid only when its ciphertext exists outside Supabase and a restore has been tested in a separate project.
 
 ## Security Model
 
@@ -16,7 +16,7 @@ This protects backup contents from a compromise of R2 or the upload credential a
 
 ## One-Time Setup
 
-1. Enable R2 and create a private bucket dedicated to whytab production backups. Do not enable public access or a custom public domain.
+1. Enable R2 and create a private bucket dedicated to WhyNavo production backups. Do not enable public access or a custom public domain.
 2. Add a lifecycle rule that retains daily backups for 35 days and then deletes them. Do not create longer-lived copies without first updating the public privacy notice and confirming a lawful operational need.
 3. Create an R2 S3 credential restricted to object read/write access for only that bucket.
 4. Generate the recovery key pair on an operator-controlled encrypted device:
@@ -24,8 +24,8 @@ This protects backup contents from a compromise of R2 or the upload credential a
    ```bash
    export BACKUP_KEY_PASSPHRASE='use-a-unique-long-passphrase'
    node scripts/backup-envelope.mjs keygen \
-     /tmp/whytab-backup-public.pem \
-     /absolute/offline/location/whytab-backup-private.pem
+     /tmp/whynavo-backup-public.pem \
+     /absolute/offline/location/whynavo-backup-private.pem
    ```
 
    The command refuses to place the private key inside the repository. Store the private key and passphrase separately in at least two access-controlled offline locations.
@@ -33,7 +33,7 @@ This protects backup contents from a compromise of R2 or the upload credential a
 5. Base64-encode the public key, not the private key:
 
    ```bash
-   base64 < /tmp/whytab-backup-public.pem
+   base64 < /tmp/whynavo-backup-public.pem
    ```
 
 6. Add these GitHub Actions secrets:
@@ -67,9 +67,9 @@ Perform this test before public launch and at least once every 90 days:
    ```bash
    export BACKUP_KEY_PASSPHRASE='the-offline-key-passphrase'
    node scripts/backup-envelope.mjs decrypt \
-     whytab-database.tar.gz.enc \
-     whytab-database.tar.gz \
-     /absolute/offline/location/whytab-backup-private.pem
+     whynavo-database.tar.gz.enc \
+     whynavo-database.tar.gz \
+     /absolute/offline/location/whynavo-backup-private.pem
    ```
 
 4. Extract `roles.sql`, `schema.sql`, `auth-data.sql`, and `data.sql`.
@@ -83,7 +83,7 @@ If production recovery uses a backup containing an account that was deleted afte
 
 ## Incident Handling
 
-The backup workflow runs daily and `Report whytab Backup Incidents` opens a `backup-alert` issue after a failed run. A successful later run closes the incident automatically. The operator must keep repository issue notifications enabled.
+The backup workflow runs daily and `Report WhyNavo Backup Incidents` opens a `backup-alert` issue after a failed run. A successful later run closes the incident automatically. The operator must keep repository issue notifications enabled.
 
 Treat any of these as a production incident:
 

@@ -6,7 +6,7 @@ import { pathToFileURL } from "node:url";
 import { build } from "esbuild";
 
 const repoRoot = new URL("..", import.meta.url).pathname;
-const tempDir = await mkdtemp(join(tmpdir(), "whytab-migration-test-"));
+const tempDir = await mkdtemp(join(tmpdir(), "whynavo-migration-test-"));
 const migrationsOutput = join(tempDir, "migrations.mjs");
 const syncOutput = join(tempDir, "sync.mjs");
 const dbOutput = join(tempDir, "db.mjs");
@@ -298,7 +298,7 @@ try {
   assert.notEqual(accountScopedKey("sync-restore-point", "user-1"), accountScopedKey("sync-restore-point", "user-2"), "restore points must be account scoped");
   assert.notEqual(accountScopedKey("migration-backup", "user-1"), accountScopedKey("migration-backup"), "signed-in and anonymous backups must not share a key");
 
-  const current = migrateState({ ...migrated.state, clientVersion: "0.6.0" });
+  const current = migrateState({ ...migrated.state });
   assert.equal(current.migrated, false, "current state should not create another migration");
 
   const invalid = migrateState({ bad: true });
@@ -625,7 +625,7 @@ try {
   }));
   assert.equal(untrustedUpdateManifest.status, "available", "a valid update manifest must still report an available version");
   if (untrustedUpdateManifest.status === "available") {
-    assert.equal(untrustedUpdateManifest.manifest.updateUrl, "https://github.com/Muggler77/whytab/releases/latest", "untrusted update links must fall back to the official release page");
+    assert.equal(untrustedUpdateManifest.manifest.updateUrl, "https://github.com/Muggler77/whynavo/releases/latest", "untrusted update links must fall back to the official release page");
     assert.equal(untrustedUpdateManifest.manifest.releaseNotesUrl, undefined, "untrusted release-note links must not reach the interface");
   }
   const malformedUpdateManifest = await checkForUpdate(async () => Response.json({
@@ -1015,7 +1015,7 @@ try {
   assert.equal(extensionManifest.host_permissions.includes("https://api.pwnedpasswords.com/*"), true, "the extension must allow the privacy-preserving leaked-password range check");
   assert.match(
     extensionManifest.content_security_policy?.extension_pages || "",
-    /frame-src https:\/\/whytab\.pages\.dev/,
+    /frame-src https:\/\/whynavo\.pages\.dev/,
     "the extension must allow only the official hosted CAPTCHA frame"
   );
   const captchaClient = await readFile(join(repoRoot, "extension/public/captcha.js"), "utf8");
@@ -1036,7 +1036,7 @@ try {
   assert.match(confirmationClient, /allowedParameters = new Set\(\["token", "type", "redirect_to"\]\)/, "the confirmation page must allow only the exact Supabase verification parameters");
   assert.match(confirmationClient, /event\.isTrusted[\s\S]*window\.location\.replace\(verificationUrl\)/, "verification must require a trusted user click and avoid retaining the token page in history");
   const serviceWorker = await readFile(join(repoRoot, "extension/public/sw.js"), "utf8");
-  assert.match(serviceWorker, new RegExp(`whytab-shell-v${packageManifest.version.replaceAll(".", "\\.")}`), "Service Worker cache must be versioned with the release");
+  assert.match(serviceWorker, new RegExp(`whynavo-shell-v${packageManifest.version.replaceAll(".", "\\.")}`), "Service Worker cache must be versioned with the release");
   assert.match(serviceWorker, /captcha\.html/, "the Service Worker must explicitly handle the CAPTCHA page");
   assert.match(serviceWorker, /confirm\.html/, "the Service Worker must not replace the email-confirmation page with an offline app shell");
   assert.match(serviceWorker, /cacheKey = isAppShell \? "\.\/" : request/, "document navigation must not overwrite the home-page cache");
@@ -1117,7 +1117,7 @@ try {
   assert.match(
     appSource,
     /type: "account-signed-out"[\s\S]*userId: signingOutUserId/,
-    "local sign-out must notify every open whytab tab on the same browser device"
+    "local sign-out must notify every open whynavo tab on the same browser device"
   );
   assert.match(
     appSource,
@@ -1272,17 +1272,17 @@ try {
   assert.match(
     appSource,
     /\["state-saved", "account-deleted", "account-signed-out"\]\.includes[\s\S]*message\.type === "account-deleted"[\s\S]*cleanupDeletedAccountData\(messageUserId\)/,
-    "account deletion must clear every open same-origin whytab tab"
+    "account deletion must clear every open same-origin whynavo tab"
   );
   assert.match(
     appSource,
     /message\.type === "account-signed-out"[\s\S]*messageUserId !== activeUserIdRef\.current[\s\S]*transitionToAnonymousState\(/,
-    "a local sign-out must hide account data in every open same-origin whytab tab"
+    "a local sign-out must hide account data in every open same-origin whynavo tab"
   );
   assert.match(
     appSource,
     /type: "account-signed-out"[\s\S]*userId: signingOutUserId/,
-    "sign-out must notify every open same-origin whytab tab even when Auth is offline"
+    "sign-out must notify every open same-origin whynavo tab even when Auth is offline"
   );
   assert.match(appSource, /setWeather\(undefined\)/, "account transitions must immediately remove the previous account's visible weather");
   assert.match(appSource, /handleTerminalAuthFailure\(error, current\)/, "terminal Auth failures during automatic sync must switch away from account data");
@@ -1436,7 +1436,7 @@ try {
   );
   assert.doesNotMatch(deployWorkflow, /SUPABASE_DB_PASSWORD|SUPABASE_DB_URL/, "production deployment must not retain a database credential");
   assert.doesNotMatch(deployWorkflow, /network-restrictions update|supabase db push|supabase link/, "production deployment must keep direct database ingress closed");
-  assert.match(deployWorkflow, /deploy:supabase-migrations -- --through 0013/, "production deployment must prepare the backward-compatible sync and session APIs before publishing the client");
+  assert.match(deployWorkflow, /deploy:supabase-migrations -- --through 0013[\s\S]*deploy:supabase-migrations -- --only 0015/, "production deployment must prepare the backward-compatible sync and WhyNavo identifier APIs before publishing the client");
   assert.match(deployWorkflow, /supabase functions deploy[\s\S]*--use-api/, "production Edge Functions must deploy without opening direct database ingress");
   assert.match(deployWorkflow, /pages deploy extension\/web-dist[\s\S]*Verify hosted app before irreversible cutover[\s\S]*Retire the unsupported sync API[\s\S]*deploy:supabase-migrations/, "the unsupported sync API must be revoked only after the new Pages client passes its hosted smoke test");
   assert.match(
@@ -1445,14 +1445,15 @@ try {
     "the draft rollout must not revoke the old-client API before the matching release is public"
   );
   assert.ok(
-    deployWorkflow.indexOf("deploy:supabase-migrations -- --through 0013") < deployWorkflow.indexOf("pages deploy extension/web-dist")
+    deployWorkflow.indexOf("deploy:supabase-migrations -- --only 0015") < deployWorkflow.indexOf("pages deploy extension/web-dist")
       && deployWorkflow.lastIndexOf("npm run deploy:supabase-migrations") > deployWorkflow.indexOf("pages deploy extension/web-dist"),
     "the production rollout must preserve old-client compatibility until the new Pages bundle switches"
   );
   assert.match(deployWorkflow, /Verify hosted app before irreversible cutover[\s\S]*Retire the unsupported sync API[\s\S]*Verify production security configuration[\s\S]*Verify hosted app after irreversible cutover/, "release activation must smoke-test both before and after the irreversible database cutover");
   assert.match(deployWorkflow, /cancel-in-progress: false/, "a rollout must not be cancelled after the backend changes but before the Pages bundle switches");
   const migrationDeployment = await readFile(join(repoRoot, "scripts/apply-supabase-migrations.mjs"), "utf8");
-  assert.match(migrationDeployment, /--through/, "the migration deployer must support a bounded compatibility phase");
+  assert.match(migrationDeployment, /--through[\s\S]*--only/, "the migration deployer must support bounded and targeted compatibility phases");
+  assert.match(migrationDeployment, /targetedMigrationRequirements[\s\S]*\["0015", \["0013"\]\]/, "the targeted brand migration must refuse to run before its compatibility prerequisite");
   assert.match(migrationDeployment, /pg_advisory_xact_lock/, "production migrations must serialize concurrent deployers");
   assert.match(migrationDeployment, /supabase_migrations\.schema_migrations/, "the Management API migration path must preserve the official migration ledger");
   const managementClient = await readFile(join(repoRoot, "scripts/supabase-management.mjs"), "utf8");
@@ -1473,7 +1474,7 @@ try {
   assert.match(supabaseProductionGate, /security_update_password_require_current_password === true/, "production must enforce current-password verification");
   assert.match(supabaseProductionGate, /refresh_token_rotation_enabled === true/, "production must enforce refresh-token rotation");
   assert.match(supabaseProductionGate, /session_activity_exists[\s\S]*server-enforced sync session policy/, "production must verify the database-enforced session policy");
-  assert.match(supabaseProductionGate, /snapshot_select_policy[\s\S]*has_whytab_sync_session[\s\S]*account ownership and session expiry/, "production must keep transitional direct reads account-scoped and session-bound");
+  assert.match(supabaseProductionGate, /snapshot_select_policy[\s\S]*has_whynavo_sync_session[\s\S]*account ownership and session expiry/, "production must keep transitional direct reads account-scoped and session-bound");
   assert.match(supabaseProductionGate, /rate_limit_email_sent[\s\S]*1000/, "production email sending must have a reviewed throughput boundary");
   assert.match(supabaseProductionGate, /hook_send_email_enabled === true/, "production must require the signed transactional-email hook");
   assert.match(supabaseProductionGate, /mailer_templates_confirmation_content === confirmationTemplate/, "production must reject signup email-template drift");
@@ -1492,12 +1493,12 @@ try {
   assert.match(releaseWorkflow, /npm run verify:release/, "release tags must match every user-visible version marker");
   assert.match(
     releaseWorkflow,
-    /release:\s*\n\s+if: vars\.WHYTAB_PRODUCTION_ENABLED == 'true'/,
+    /release:\s*\n\s+if: vars\.WHYNAVO_PRODUCTION_ENABLED == 'true'/,
     "release publication must remain disabled until the production launch gate is explicitly enabled"
   );
   assert.match(
     releaseWorkflow,
-    /deploy:supabase-migrations -- --through 0013[\s\S]*Deploy backward-compatible Edge Functions[\s\S]*Configure reviewed Supabase Auth settings[\s\S]*Verify production predeployment gates[\s\S]*Prepare private draft release/,
+    /deploy:supabase-migrations -- --through 0013[\s\S]*deploy:supabase-migrations -- --only 0015[\s\S]*Deploy backward-compatible Edge Functions[\s\S]*Configure reviewed Supabase Auth settings[\s\S]*Verify production predeployment gates[\s\S]*Prepare private draft release/,
     "the draft release artifact must be prepared only after its backward-compatible database and function dependencies are ready"
   );
   assert.match(
@@ -1507,7 +1508,7 @@ try {
   );
   assert.match(
     releaseWorkflow,
-    /release:[\s\S]*concurrency:[\s\S]*group: whytab-production-database-access[\s\S]*cancel-in-progress: false/,
+    /release:[\s\S]*concurrency:[\s\S]*group: whynavo-production-database-access[\s\S]*cancel-in-progress: false/,
     "release preparation must serialize with production backups and database cutovers"
   );
   assert.match(
@@ -1601,19 +1602,23 @@ try {
   assert.match(sessionPolicyMigration, /references auth\.sessions\(id\) on delete cascade/, "sync session state must be removed when the Auth session ends");
   assert.match(sessionPolicyMigration, /session_created_at < checked_at - interval '90 days'/, "cloud sessions must have a server-enforced 90-day absolute lifetime");
   assert.match(sessionPolicyMigration, /activity_last_seen_at < checked_at - interval '30 days'/, "cloud sessions must expire after 30 days of inactivity");
-  assert.match(sessionPolicyMigration, /has_whytab_sync_session[\s\S]*auth\.uid\(\) = user_id[\s\S]*has_whytab_sync_session\(user_id\)/, "published 0.5.x clients must retain RLS-protected reads without bypassing the new session policy");
-  assert.match(sessionPolicyMigration, /pull_sync_snapshot_for_user[\s\S]*assert_whytab_sync_session/, "snapshot reads must enforce the account-bound session policy");
-  assert.match(sessionPolicyMigration, /push_sync_snapshot_for_user[\s\S]*assert_whytab_sync_session/, "snapshot writes must enforce the account-bound session policy");
+  assert.match(sessionPolicyMigration, /has_whynavo_sync_session[\s\S]*auth\.uid\(\) = user_id[\s\S]*has_whynavo_sync_session\(user_id\)/, "published 0.5.x clients must retain RLS-protected reads without bypassing the new session policy");
+  assert.match(sessionPolicyMigration, /pull_sync_snapshot_for_user[\s\S]*assert_whynavo_sync_session/, "snapshot reads must enforce the account-bound session policy");
+  assert.match(sessionPolicyMigration, /push_sync_snapshot_for_user[\s\S]*assert_whynavo_sync_session/, "snapshot writes must enforce the account-bound session policy");
   assert.match(
     sessionPolicyMigration,
     /create or replace function public\.push_sync_snapshot\([\s\S]*public\.push_sync_snapshot_for_user\([\s\S]*current_user_id/,
     "the staged legacy write API must delegate to the account-bound, session-limited, rate-limited implementation"
   );
   assert.match(syncSource, /rpc\("pull_sync_snapshot_for_user"[\s\S]*p_user_id: expectedUserId/, "snapshot reads must use the account-bound server API");
-  assert.match(syncSource, /whytab session revoked[\s\S]*whytab session expired[\s\S]*whytab session inactive/, "server session-policy failures must terminate the local Auth view");
+  assert.match(syncSource, /whynavo session revoked[\s\S]*whynavo session expired[\s\S]*whynavo session inactive/, "server session-policy failures must terminate the local Auth view");
   const retiredSyncMigration = await readFile(join(repoRoot, "supabase/migrations/0014_retire_legacy_sync_access.sql"), "utf8");
   assert.match(retiredSyncMigration, /revoke all on function public\.push_sync_snapshot\(text, jsonb, bigint\) from public, anon, authenticated/, "the post-client migration must revoke every public role from the old sync API");
   assert.doesNotMatch(retiredSyncMigration, /revoke select on table public\.sync_snapshots from authenticated/, "the 0.6.0 migration must not break RLS-protected reads used by published 0.5.x clients");
+  const brandIdentifierMigration = await readFile(join(repoRoot, "supabase/migrations/0015_migrate_brand_identifiers.sql"), "utf8");
+  assert.match(brandIdentifierMigration, /'why' \|\| 'tab'[\s\S]*pg_get_functiondef[\s\S]*replace[\s\S]*current_token/, "the deployed session-policy functions must migrate to the new brand without losing their security-definer bodies");
+  assert.match(brandIdentifierMigration, /drop policy if exists "Users own sync snapshots"[\s\S]*create policy "Users own sync snapshots"[\s\S]*has_whynavo_sync_session/, "the snapshot read policy must switch to the renamed session guard");
+  assert.match(brandIdentifierMigration, /revoke all on function public\.assert_whynavo_sync_session[\s\S]*grant execute on function public\.has_whynavo_sync_session/, "the renamed session helpers must not become callable by anonymous users");
   assert.match(syncSource, /next_revision\) === -1[\s\S]*同步操作过于频繁/, "the client must explain a server-side synchronization rate limit instead of retrying it as a conflict");
   assert.match(syncSource, /data as \{ deleted\?: unknown \}\)\.deleted !== true[\s\S]*AccountDeletionOutcomeUnknownError/, "account deletion must require an explicit success response");
   assert.match(appSource, /mergeAndSaveStateForAccount\(current, deletingUserId\)[\s\S]*markLocalAccountDeletionPending\(deletingUserId\)[\s\S]*deleteAccount\(/, "account deletion must persist the target partition before sending the irreversible request");
@@ -1624,7 +1629,7 @@ try {
   assert.equal(webManifest.icons.some((icon) => icon.sizes === "192x192"), true, "PWA must provide a 192px install icon");
   assert.equal(webManifest.icons.some((icon) => icon.sizes === "512x512"), true, "PWA must provide a 512px install icon");
   const resetPasswordTemplate = await readFile(join(repoRoot, "docs/supabase-reset-password-email.html"), "utf8");
-  assert.match(resetPasswordTemplate, /whytab\.pages\.dev\/icons\/icon128\.png/, "password reset email must use the public whytab logo");
+  assert.match(resetPasswordTemplate, /whynavo\.pages\.dev\/icons\/icon128\.png/, "password reset email must use the public whynavo logo");
   assert.match(resetPasswordTemplate, /confirm\.html#token=\{\{ \.TokenHash \}\}[\s\S]*type=recovery/, "password reset email must use the prefetch-safe confirmation page");
   assert.doesNotMatch(resetPasswordTemplate, /\{\{ \.ConfirmationURL \}\}/, "password reset email must not expose a directly consumable one-time link");
   const signupEmailTemplate = await readFile(join(repoRoot, "docs/supabase-confirm-signup-email.html"), "utf8");

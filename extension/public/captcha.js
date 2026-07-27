@@ -7,7 +7,7 @@
   const parentOrigin = params.get("parentOrigin") || "";
   const error = document.getElementById("error");
 
-  const allowedParent = parentOrigin === "https://whytab.pages.dev"
+  const allowedParent = parentOrigin === "https://whynavo.pages.dev"
     || /^chrome-extension:\/\/[a-p]{32}$/.test(parentOrigin);
 
   const send = (type, extra = {}) => {
@@ -19,10 +19,10 @@
       error.textContent = message;
       error.hidden = false;
     }
-    send("whytab-turnstile-error", { message });
+    send("whynavo-turnstile-error", { message });
   };
 
-  window.onWhytabTurnstileLoad = () => {
+  window.onWhyNavoTurnstileLoad = () => {
     if (!allowedParent || !/^[A-Za-z0-9_-]{10,128}$/.test(sitekey) || !instance) {
       showError("安全验证配置无效");
       return;
@@ -41,15 +41,15 @@
         appearance: "always",
         retry: "auto",
         "refresh-expired": "auto",
-        callback: (token) => send("whytab-turnstile-success", { token }),
-        "expired-callback": () => send("whytab-turnstile-expired"),
-        "timeout-callback": () => send("whytab-turnstile-expired"),
+        callback: (token) => send("whynavo-turnstile-success", { token }),
+        "expired-callback": () => send("whynavo-turnstile-expired"),
+        "timeout-callback": () => send("whynavo-turnstile-expired"),
         "error-callback": () => {
           showError("安全验证失败，请稍后重试");
           return true;
         }
       });
-      send("whytab-turnstile-ready");
+      send("whynavo-turnstile-ready");
     } catch {
       showError("安全验证加载失败");
     }

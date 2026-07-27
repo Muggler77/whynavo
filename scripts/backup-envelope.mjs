@@ -26,8 +26,8 @@ import { dirname, isAbsolute, resolve, sep } from "node:path";
 import { pathToFileURL } from "node:url";
 import { pipeline } from "node:stream/promises";
 
-const MAGIC = Buffer.from("WHYTAB-ENCRYPTED-BACKUP-V1\n", "ascii");
-const FORMAT = "whytab-encrypted-backup";
+const MAGIC = Buffer.from("WHYNAVO-ENCRYPTED-BACKUP-V1\n", "ascii");
+const FORMAT = "whynavo-encrypted-backup";
 const FORMAT_VERSION = 1;
 const ALGORITHM = "RSA-OAEP-SHA256+A256GCM";
 const MAX_HEADER_BYTES = 64 * 1024;

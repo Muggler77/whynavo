@@ -1,4 +1,4 @@
-name: Audit whytab Supabase Production
+name: Audit WhyNavo Supabase Production
 
 on:
   workflow_dispatch:
@@ -16,7 +16,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: whytab-production-database-access
+  group: whynavo-production-database-access
   cancel-in-progress: false
 
 jobs:

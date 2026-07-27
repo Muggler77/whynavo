@@ -1,15 +1,15 @@
-# whytab Configuration and Operations
+# WhyNavo Configuration and Operations
 
-This document describes how to configure and operate whytab without exposing private credentials or user data.
+This document describes how to configure and operate WhyNavo without exposing private credentials or user data.
 
-whytab can be used in two modes:
+WhyNavo can be used in two modes:
 
-- Official hosted product: normal users register or sign in at `https://whytab.pages.dev/` and use the hosted sync service.
+- Official hosted product: normal users register or sign in at `https://whynavo.pages.dev/` and use the hosted sync service.
 - Self-hosted framework: developers fork the repository, provide their own frontend configuration, Supabase project, email delivery setup, and deployment target.
 
 ## Local-First Behavior
 
-whytab stores user data in the browser profile first:
+WhyNavo stores user data in the browser profile first:
 
 - Shortcuts
 - Groups and folders
@@ -45,7 +45,7 @@ For the official Cloudflare Pages workflow, configure repository secrets for the
 - `VITE_SUPABASE_ANON_KEY`
 - `VITE_TURNSTILE_SITE_KEY`
 
-The workflow fixes `VITE_AUTH_REDIRECT_URL` and `VITE_CAPTCHA_FRAME_URL` to the official Pages origin. Cloudflare deployment also requires the repository secrets `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`; the API token must be restricted to Pages write access for the whytab account. `SUPABASE_ACCESS_TOKEN` lets the workflow apply reviewed SQL through the official Management API and deploy versioned Edge Functions without storing a database password or connection string. Direct database ingress remains closed throughout deployment. Backward-compatible sync changes are prepared first; the legacy entry point is revoked only after the replacement Release is public and its update manifest is active.
+The workflow fixes `VITE_AUTH_REDIRECT_URL` and `VITE_CAPTCHA_FRAME_URL` to the official Pages origin. Cloudflare deployment also requires the repository secrets `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`; the API token must be restricted to Pages write access for the WhyNavo account. `SUPABASE_ACCESS_TOKEN` lets the workflow apply reviewed SQL through the official Management API and deploy versioned Edge Functions without storing a database password or connection string. Direct database ingress remains closed throughout deployment. Backward-compatible sync changes are prepared first; the legacy entry point is revoked only after the replacement Release is public and its update manifest is active.
 
 Do not commit real values to source control.
 
@@ -55,28 +55,28 @@ Email verification is controlled in the Supabase project, not in the end-user UI
 
 Recommended Auth URL settings:
 
-- Site URL: `https://whytab.pages.dev/`
-- Redirect URLs / Additional Redirect URLs: `https://whytab.pages.dev/`
+- Site URL: `https://whynavo.pages.dev/`
+- Redirect URLs / Additional Redirect URLs: `https://whynavo.pages.dev/`
 - Local development redirect URL, if needed: `http://localhost:5173/`
 
 The app passes `emailRedirectTo` during registration. Hosted web builds redirect back to the current web app URL. Extension builds redirect to the public web app so the verification link can complete in a normal browser page.
 
 Recommended sender settings:
 
-- Sender name: `whytab`
+- Sender name: `WhyNavo`
 - Sender email: use a verified sender/domain that belongs to the project.
 
-The built-in Supabase Auth sender may be used only for restricted administrator testing. Its branded bilingual registration and recovery templates are tracked in `docs/supabase-confirm-signup-email.html` and `docs/supabase-reset-password-email.html`. Both templates use whytab's explicit-click confirmation page so mailbox link scanners cannot consume the one-time token.
+The built-in Supabase Auth sender may be used only for restricted administrator testing. Its branded bilingual registration and recovery templates are tracked in `docs/supabase-confirm-signup-email.html` and `docs/supabase-reset-password-email.html`. Both templates use WhyNavo's explicit-click confirmation page so mailbox link scanners cannot consume the one-time token.
 
 Cloudflare's shared `pages.dev` zone cannot be verified as a custom email sender domain. Keep public registration disabled until an owned domain has been verified and Custom SMTP or the audited Send Email Hook in `docs/auth-email-delivery.md` is configured and delivery-tested.
 
 Recommended confirmation email subject:
 
 ```txt
-Verify your whytab email / 验证 whytab 邮箱
+Verify your WhyNavo email / 验证 WhyNavo 邮箱
 ```
 
-Use the full HTML body in `docs/supabase-confirm-signup-email.html`. It includes the public whytab logo at `https://whytab.pages.dev/icons/icon128.png`, explains why the email was sent, and keeps the wording focused on verifying a sync account. Use `docs/supabase-reset-password-email.html` for recovery messages.
+Use the full HTML body in `docs/supabase-confirm-signup-email.html`. It includes the public WhyNavo logo at `https://whynavo.pages.dev/icons/icon128.png`, explains why the email was sent, and keeps the wording focused on verifying a sync account. Use `docs/supabase-reset-password-email.html` for recovery messages.
 
 The templates must keep Supabase's `{{ .TokenHash }}` variable unchanged. The token is placed in the URL fragment of `confirm.html`, validated locally, and sent to Supabase only after the user explicitly continues.
 
@@ -120,7 +120,7 @@ This ensures signed-in users can only read and write their own rows.
 
 Current app versions use `sync_snapshots` for full-state sync. The migration also includes finer-grained tables so future versions can move toward per-record sync.
 
-Current clients use account-bound read and write RPCs. The client supplies the account ID of the currently visible local partition, and the database rejects the request unless it exactly matches `auth.uid()`. The database also verifies the JWT session against `auth.sessions` and enforces a 90-day maximum lifetime plus a 30-day inactivity limit for whytab cloud-data access. The older account-unbound write RPC is revoked after the compatible client is live. Published 0.5.x clients temporarily retain direct read permission, but RLS restricts it to the authenticated user's row and invokes the same session-expiry policy.
+Current clients use account-bound read and write RPCs. The client supplies the account ID of the currently visible local partition, and the database rejects the request unless it exactly matches `auth.uid()`. The database also verifies the JWT session against `auth.sessions` and enforces a 90-day maximum lifetime plus a 30-day inactivity limit for WhyNavo cloud-data access. The older account-unbound write RPC is revoked after the compatible client is live. Published 0.5.x clients temporarily retain direct read permission, but RLS restricts it to the authenticated user's row and invokes the same session-expiry policy.
 
 Sync actions:
 

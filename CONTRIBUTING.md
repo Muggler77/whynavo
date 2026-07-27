@@ -1,4 +1,4 @@
-# Contributing to whytab
+# Contributing to WhyNavo
 
 ## Before You Start
 

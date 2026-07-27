@@ -37,7 +37,7 @@ const trustedReleaseUrl = (value: unknown) => {
   if (typeof value !== "string" || value.length > 2048) return undefined;
   try {
     const url = new URL(value);
-    const basePath = "/Muggler77/whytab/releases/";
+    const basePath = "/Muggler77/whynavo/releases/";
     if (
       url.protocol !== "https:"
       || url.hostname !== "github.com"

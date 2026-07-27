@@ -3,7 +3,7 @@ import { resolve } from "node:path";
 
 import { validatePublishedPredecessorManifest } from "./version-manifest.mjs";
 
-const sourceUrl = "https://whytab.pages.dev/latest-version.json";
+const sourceUrl = "https://whynavo.pages.dev/latest-version.json";
 const outputPath = resolve(process.argv[2] || "extension/web-dist/latest-version.json");
 const packageJson = JSON.parse(
   await readFile(new URL("../package.json", import.meta.url), "utf8")

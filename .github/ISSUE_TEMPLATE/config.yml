@@ -1,5 +1,5 @@
 blank_issues_enabled: false
 contact_links:
   - name: Private security report
-    url: https://github.com/Muggler77/whytab/security/advisories/new
+    url: https://github.com/Muggler77/whynavo/security/advisories/new
     about: Report vulnerabilities privately. Never include credentials or user data in a public issue.

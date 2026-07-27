@@ -1,5 +1,5 @@
 name: Bug report
-description: Report a reproducible whytab problem without including private user data.
+description: Report a reproducible WhyNavo problem without including private user data.
 title: "[Bug] "
 labels:
   - bug
@@ -11,8 +11,8 @@ body:
   - type: input
     id: version
     attributes:
-      label: whytab version
-      placeholder: "0.6.0"
+      label: WhyNavo version
+      placeholder: "0.7.0"
     validations:
       required: true
   - type: dropdown

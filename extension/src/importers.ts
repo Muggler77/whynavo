@@ -19,7 +19,7 @@ export const normalizeIconReference = (value: unknown) => {
   if (typeof value !== "string" || value.length > MAX_IMPORTED_ICON_CHARS) return undefined;
   const candidate = value.trim();
   if (!candidate) return undefined;
-  if (candidate.startsWith("whytab-icon:")) return candidate;
+  if (candidate.startsWith("whynavo-icon:")) return candidate;
   if (/^data:image\/(?:avif|gif|jpeg|png|webp);base64,[a-z0-9+/=\r\n]+$/i.test(candidate)) return candidate;
   if (candidate.length > MAX_REMOTE_ICON_URL_CHARS) return undefined;
   try {

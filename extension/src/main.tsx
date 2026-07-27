@@ -17,7 +17,7 @@ class ErrorBoundary extends React.Component<React.PropsWithChildren, ErrorBounda
       return (
         <main className="root-error">
           <section>
-            <h1>whytab 暂时没有正常打开</h1>
+            <h1>WhyNavo 暂时没有正常打开</h1>
             <p>页面脚本遇到了错误。你的本机数据不会因此被清除，请重新加载后再试。</p>
             <button onClick={() => window.location.reload()}>重新加载</button>
           </section>

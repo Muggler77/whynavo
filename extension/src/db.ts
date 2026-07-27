@@ -3,9 +3,11 @@ import { MIGRATION_BACKUP_KEY, isAppState, migrateState } from "./migrations";
 import { mergeLocalPeerState, normalizeState, validateAppStatePayload } from "./sync";
 import type { AppState } from "./types";
 
-const DB_NAME = "whytab";
+const DB_NAME = "whynavo";
+const LEGACY_DB_NAME = ["why", "tab"].join("");
 const DB_VERSION = 1;
 const STORE = "kv";
+const DATABASE_MIGRATION_MARKER = "database-brand-migration-v1";
 const STATE_KEY = "app-state";
 const ANONYMOUS_STATE_KEY = "app-state:anonymous";
 const accountStateKey = (userId?: string) => userId ? `app-state:user:${userId}` : ANONYMOUS_STATE_KEY;
@@ -20,45 +22,148 @@ export const accountScopedKey = (base: string, userId?: string) => `${base}:${us
 
 let dbPromise: Promise<IDBDatabase> | undefined;
 
+const openDatabase = (name: string) => new Promise<IDBDatabase>((resolve, reject) => {
+  let abandoned = false;
+  const request = indexedDB.open(name, DB_VERSION);
+  request.onupgradeneeded = () => {
+    const db = request.result;
+    if (!db.objectStoreNames.contains(STORE)) db.createObjectStore(STORE);
+  };
+  request.onsuccess = () => {
+    const db = request.result;
+    if (abandoned) {
+      db.close();
+      return;
+    }
+    db.onversionchange = () => {
+      db.close();
+    };
+    resolve(db);
+  };
+  request.onblocked = () => {
+    if (abandoned) return;
+    abandoned = true;
+    reject(new Error("IndexedDB upgrade is blocked by another WhyNavo tab"));
+  };
+  request.onerror = () => {
+    if (abandoned) return;
+    abandoned = true;
+    reject(request.error);
+  };
+});
+
+type LegacyDatabaseEntry = {
+  key: IDBValidKey;
+  value: unknown;
+};
+
+async function listDatabaseNames(): Promise<string[] | undefined> {
+  const factory = indexedDB as IDBFactory & {
+    databases?: () => Promise<Array<{ name?: string }>>;
+  };
+  if (typeof factory.databases !== "function") return undefined;
+  const databases = await factory.databases();
+  return databases.flatMap((database) => database.name ? [database.name] : []);
+}
+
+async function readDatabaseEntries(db: IDBDatabase): Promise<LegacyDatabaseEntry[]> {
+  if (!db.objectStoreNames.contains(STORE)) return [];
+  return new Promise((resolve, reject) => {
+    const entries: LegacyDatabaseEntry[] = [];
+    const tx = db.transaction(STORE, "readonly");
+    const request = tx.objectStore(STORE).openCursor();
+    request.onsuccess = () => {
+      const cursor = request.result;
+      if (!cursor) return;
+      entries.push({ key: cursor.key, value: cursor.value });
+      cursor.continue();
+    };
+    request.onerror = () => reject(request.error);
+    tx.oncomplete = () => resolve(entries);
+    tx.onerror = () => reject(tx.error);
+    tx.onabort = () => reject(tx.error || new Error("IndexedDB migration read aborted"));
+  });
+}
+
+async function hasDatabaseMigrationMarker(db: IDBDatabase): Promise<boolean> {
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE, "readonly");
+    const request = tx.objectStore(STORE).get(DATABASE_MIGRATION_MARKER);
+    request.onsuccess = () => resolve(Boolean(request.result));
+    request.onerror = () => reject(request.error);
+    tx.onerror = () => reject(tx.error);
+    tx.onabort = () => reject(tx.error || new Error("IndexedDB migration marker read aborted"));
+  });
+}
+
+async function migrateLegacyDatabase(): Promise<void> {
+  if (LEGACY_DB_NAME === DB_NAME) return;
+
+  const targetDb = await openDatabase(DB_NAME);
+  try {
+    if (await hasDatabaseMigrationMarker(targetDb)) return;
+
+    const knownDatabaseNames = await listDatabaseNames();
+    if (knownDatabaseNames && !knownDatabaseNames.includes(LEGACY_DB_NAME)) return;
+
+    let legacyDb: IDBDatabase;
+    try {
+      legacyDb = await openDatabase(LEGACY_DB_NAME);
+    } catch {
+      // Browsers without database enumeration may report a missing legacy DB as
+      // an open error. A fresh WhyNavo database is still safe to create.
+      return;
+    }
+
+    try {
+      const entries = await readDatabaseEntries(legacyDb);
+      if (!entries.length) return;
+
+      const existingKeys = await new Promise<IDBValidKey[]>((resolve, reject) => {
+        const keys: IDBValidKey[] = [];
+        const tx = targetDb.transaction(STORE, "readonly");
+        const request = tx.objectStore(STORE).openKeyCursor();
+        request.onsuccess = () => {
+          const cursor = request.result;
+          if (!cursor) return;
+          keys.push(cursor.key);
+          cursor.continue();
+        };
+        request.onerror = () => reject(request.error);
+        tx.oncomplete = () => resolve(keys);
+        tx.onerror = () => reject(tx.error);
+        tx.onabort = () => reject(tx.error || new Error("IndexedDB migration key read aborted"));
+      });
+      const existingKeySet = new Set(existingKeys.map((key) => String(key)));
+      await new Promise<void>((resolve, reject) => {
+        const tx = targetDb.transaction(STORE, "readwrite");
+        const store = tx.objectStore(STORE);
+        for (const entry of entries) {
+          if (!existingKeySet.has(String(entry.key))) store.put(entry.value, entry.key);
+        }
+        store.put({ migratedAt: new Date().toISOString() }, DATABASE_MIGRATION_MARKER);
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject(tx.error);
+        tx.onabort = () => reject(tx.error || new Error("IndexedDB migration write aborted"));
+      });
+    } finally {
+      legacyDb.close();
+    }
+  } finally {
+    targetDb.close();
+  }
+}
+
 const openDb = () => {
   if (dbPromise) return dbPromise;
-  let openingPromise: Promise<IDBDatabase>;
-  openingPromise = new Promise((resolve, reject) => {
-    let abandoned = false;
-    const request = indexedDB.open(DB_NAME, DB_VERSION);
-    const clearOpeningPromise = () => {
-      if (dbPromise === openingPromise) dbPromise = undefined;
-    };
-    request.onupgradeneeded = () => {
-      const db = request.result;
-      if (!db.objectStoreNames.contains(STORE)) db.createObjectStore(STORE);
-    };
-    request.onsuccess = () => {
-      const db = request.result;
-      if (abandoned) {
-        db.close();
-        return;
-      }
-      db.onversionchange = () => {
-        db.close();
-        clearOpeningPromise();
-      };
-      resolve(db);
-    };
-    request.onblocked = () => {
-      if (abandoned) return;
-      abandoned = true;
-      clearOpeningPromise();
-      reject(new Error("IndexedDB upgrade is blocked by another whytab tab"));
-    };
-    request.onerror = () => {
-      if (abandoned) return;
-      abandoned = true;
-      clearOpeningPromise();
-      reject(request.error);
-    };
-  });
+  const openingPromise = (async () => {
+    await migrateLegacyDatabase();
+    return openDatabase(DB_NAME);
+  })();
   dbPromise = openingPromise;
+  openingPromise.catch(() => {
+    if (dbPromise === openingPromise) dbPromise = undefined;
+  });
   return openingPromise;
 };
 

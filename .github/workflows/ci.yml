@@ -1,4 +1,4 @@
-name: Verify whytab
+name: Verify WhyNavo
 
 on:
   push:

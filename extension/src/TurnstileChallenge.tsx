@@ -65,24 +65,24 @@ const TurnstileChallenge = forwardRef<TurnstileChallengeHandle, TurnstileChallen
           || event.data?.instance !== instance
         ) return;
 
-        if (event.data.type === "whytab-turnstile-ready") {
+        if (event.data.type === "whynavo-turnstile-ready") {
           setStatus("ready");
           setMessage("请完成安全验证");
           return;
         }
-        if (event.data.type === "whytab-turnstile-success" && event.data.token) {
+        if (event.data.type === "whynavo-turnstile-success" && event.data.token) {
           onToken(event.data.token);
           setStatus("verified");
           setMessage("安全验证已完成");
           return;
         }
-        if (event.data.type === "whytab-turnstile-expired") {
+        if (event.data.type === "whynavo-turnstile-expired") {
           onToken("");
           setStatus("ready");
           setMessage("验证已过期，请重新完成");
           return;
         }
-        if (event.data.type === "whytab-turnstile-error") {
+        if (event.data.type === "whynavo-turnstile-error") {
           onToken("");
           setStatus("error");
           setMessage(event.data.message || "安全验证暂时不可用，请刷新后重试");

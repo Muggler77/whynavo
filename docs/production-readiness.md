@@ -1,6 +1,6 @@
 # Production Readiness
 
-This document defines the release gates for the official whytab service. A source build or successful static deployment alone is not a production launch.
+This document defines the release gates for the official WhyNavo service. A source build or successful static deployment alone is not a production launch.
 
 ## Required Release Gates
 
@@ -21,14 +21,14 @@ This document defines the release gates for the official whytab service. A sourc
 - The public repository includes an explicit license, operator identity, public privacy contact, security contact, and jurisdiction-appropriate privacy and terms text reviewed by the operator.
 - Extension releases are distributed through a trusted update channel. Unpacked Chrome or Edge extensions are testing installs and do not receive automatic updates.
 - Availability, Auth health, final migration state, function versions, database privileges, Security Advisor results, closed direct database ingress, and the public Edge Function are checked hourly. A failed monitor run automatically opens or updates a `production-alert` issue and closes it after recovery. The repository operator must keep GitHub issue notifications enabled and separately review email-provider delivery failures.
-- Scheduled production monitoring, database backups, release publication, and Pages deployment remain disabled until the repository variable `WHYTAB_PRODUCTION_ENABLED` is set to `true`. Manual monitoring and backup runs stay available for pre-launch validation; release and deployment runs stay fail-closed. Enable the variable only after every gate in this document has passed, so incomplete setup cannot create misleading production incidents or a partial public release.
+- Scheduled production monitoring, database backups, release publication, and Pages deployment remain disabled until the repository variable `WHYNAVO_PRODUCTION_ENABLED` is set to `true`. Manual monitoring and backup runs stay available for pre-launch validation; release and deployment runs stay fail-closed. Enable the variable only after every gate in this document has passed, so incomplete setup cannot create misleading production incidents or a partial public release.
 
 ## Data Safety Acceptance
 
 - Anonymous, signed-in, and cached offline data occupy separate local partitions.
 - Cross-tab Auth account changes persist the outgoing partition and activate the incoming account before any further synchronization.
-- Local sign-out is broadcast to every open whytab tab in the same browser profile; each tab persists its pending edits before hiding the account partition, including when Auth is offline.
-- If the outgoing account partition cannot be written because browser storage is unavailable or full, whytab cancels the account transition, keeps the visible content in memory, and asks the user to export a complete backup instead of exposing or overwriting another partition.
+- Local sign-out is broadcast to every open WhyNavo tab in the same browser profile; each tab persists its pending edits before hiding the account partition, including when Auth is offline.
+- If the outgoing account partition cannot be written because browser storage is unavailable or full, WhyNavo cancels the account transition, keeps the visible content in memory, and asks the user to export a complete backup instead of exposing or overwriting another partition.
 - Concurrent same-account tabs merge inside one IndexedDB write transaction and converge through a lightweight local notification instead of overwriting the full local snapshot.
 - Anonymous data is adopted exactly once after sign-in and cannot be adopted by another account.
 - Account activation is committed only after cloud data is loaded and validated; failure restores the previous local state.

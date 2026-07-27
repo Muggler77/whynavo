@@ -9,12 +9,12 @@ permissions:
   contents: read
 
 concurrency:
-  group: whytab-production-database-access
+  group: whynavo-production-database-access
   cancel-in-progress: false
 
 jobs:
   backup:
-    if: vars.WHYTAB_PRODUCTION_ENABLED == 'true' || github.event_name == 'workflow_dispatch'
+    if: vars.WHYNAVO_PRODUCTION_ENABLED == 'true' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
@@ -191,7 +191,7 @@ jobs:
             -x "auth.sso_domains" \
             -x "auth.sso_providers"
           node scripts/verify-backup-export.mjs .backup-work/database
-          tar -C .backup-work/database -czf .backup-work/whytab-database.tar.gz \
+          tar -C .backup-work/database -czf .backup-work/whynavo-database.tar.gz \
             roles.sql schema.sql auth-data.sql data.sql
           close_ingress
           trap - EXIT INT TERM
@@ -240,7 +240,7 @@ jobs:
           echo "BACKUP_ID=$backup_id" >> "$GITHUB_ENV"
           node scripts/backup-envelope.mjs \
             encrypt \
-            .backup-work/whytab-database.tar.gz \
+            .backup-work/whynavo-database.tar.gz \
             ".backup-work/${backup_id}.tar.gz.enc"
           node scripts/backup-envelope.mjs inspect ".backup-work/${backup_id}.tar.gz.enc"
           sha256sum ".backup-work/${backup_id}.tar.gz.enc" \

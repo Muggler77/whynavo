@@ -1,4 +1,4 @@
-name: Publish whytab Release
+name: Publish WhyNavo Release
 
 on:
   push:
@@ -13,11 +13,11 @@ permissions:
 
 jobs:
   release:
-    if: vars.WHYTAB_PRODUCTION_ENABLED == 'true'
+    if: vars.WHYNAVO_PRODUCTION_ENABLED == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     concurrency:
-      group: whytab-production-database-access
+      group: whynavo-production-database-access
       cancel-in-progress: false
     env:
       SUPABASE_PROJECT_REF: keafulupzvfljvbzwgrq
@@ -53,14 +53,19 @@ jobs:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
           VITE_TURNSTILE_SITE_KEY: ${{ secrets.VITE_TURNSTILE_SITE_KEY }}
-          VITE_AUTH_REDIRECT_URL: https://whytab.pages.dev/
-          VITE_CAPTCHA_FRAME_URL: https://whytab.pages.dev/captcha.html
+          VITE_AUTH_REDIRECT_URL: https://whynavo.pages.dev/
+          VITE_CAPTCHA_FRAME_URL: https://whynavo.pages.dev/captcha.html
         run: npm run verify:production-config
 
       - name: Apply backward-compatible database migrations
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
         run: npm run deploy:supabase-migrations -- --through 0013
+
+      - name: Apply WhyNavo identifier compatibility migration
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: npm run deploy:supabase-migrations -- --only 0015
 
       - name: Setup Supabase CLI
         uses: supabase/setup-cli@3c2f5e2ae34c34e428e8e206e2c4d21fa2d20fbf # v2.1.1
@@ -90,8 +95,8 @@ jobs:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
           VITE_TURNSTILE_SITE_KEY: ${{ secrets.VITE_TURNSTILE_SITE_KEY }}
-          VITE_AUTH_REDIRECT_URL: https://whytab.pages.dev/
-          VITE_CAPTCHA_FRAME_URL: https://whytab.pages.dev/captcha.html
+          VITE_AUTH_REDIRECT_URL: https://whynavo.pages.dev/
+          VITE_CAPTCHA_FRAME_URL: https://whynavo.pages.dev/captcha.html
         run: npm run build
 
       - name: Audit runtime and build dependencies
@@ -99,15 +104,15 @@ jobs:
 
       - name: Create Chrome and Edge archive
         working-directory: extension/dist
-        run: zip -r "../../whytab-${GITHUB_REF_NAME}-chrome-web-store.zip" . -x '*.DS_Store'
+        run: zip -r "../../whynavo-${GITHUB_REF_NAME}-chrome-web-store.zip" . -x '*.DS_Store'
 
       - name: Create SHA-256 checksum
-        run: sha256sum "whytab-${GITHUB_REF_NAME}-chrome-web-store.zip" > "whytab-${GITHUB_REF_NAME}-chrome-web-store.zip.sha256"
+        run: sha256sum "whynavo-${GITHUB_REF_NAME}-chrome-web-store.zip" > "whynavo-${GITHUB_REF_NAME}-chrome-web-store.zip.sha256"
 
       - name: Attest release provenance
         uses: actions/attest@36051bcae73b7c2a8a6945a48cbf80953c6baa35 # v4
         with:
-          subject-path: "whytab-${{ github.ref_name }}-chrome-web-store.zip"
+          subject-path: "whynavo-${{ github.ref_name }}-chrome-web-store.zip"
 
       - name: Prepare private draft release
         env:
@@ -122,18 +127,18 @@ jobs:
           fi
           if [ "$release_state" = "true" ]; then
             gh release upload "${GITHUB_REF_NAME}" \
-              "whytab-${GITHUB_REF_NAME}-chrome-web-store.zip#Chrome and Edge unpacked extension" \
-              "whytab-${GITHUB_REF_NAME}-chrome-web-store.zip.sha256#SHA-256 checksum" \
+              "whynavo-${GITHUB_REF_NAME}-chrome-web-store.zip#Chrome and Edge unpacked extension" \
+              "whynavo-${GITHUB_REF_NAME}-chrome-web-store.zip.sha256#SHA-256 checksum" \
               --clobber
             gh release edit "${GITHUB_REF_NAME}" \
-              --title "whytab ${GITHUB_REF_NAME}" \
+              --title "WhyNavo ${GITHUB_REF_NAME}" \
               --notes-file "docs/releases/${GITHUB_REF_NAME}.md" \
               --draft
           else
             gh release create "${GITHUB_REF_NAME}" \
-              "whytab-${GITHUB_REF_NAME}-chrome-web-store.zip#Chrome and Edge unpacked extension" \
-              "whytab-${GITHUB_REF_NAME}-chrome-web-store.zip.sha256#SHA-256 checksum" \
-              --title "whytab ${GITHUB_REF_NAME}" \
+              "whynavo-${GITHUB_REF_NAME}-chrome-web-store.zip#Chrome and Edge unpacked extension" \
+              "whynavo-${GITHUB_REF_NAME}-chrome-web-store.zip.sha256#SHA-256 checksum" \
+              --title "WhyNavo ${GITHUB_REF_NAME}" \
               --notes-file "docs/releases/${GITHUB_REF_NAME}.md" \
               --verify-tag \
               --draft

@@ -40,7 +40,7 @@ const forbiddenHistory = [
   ["assigned private environment value", "(CLOUDFLARE_API_TOKEN|DATABASE_URL|POSTGRES_PASSWORD|RESEND_API_KEY|R2_ACCESS_KEY_ID|R2_SECRET_ACCESS_KEY|SEND_EMAIL_HOOK_SECRET|SMTP_PASSWORD|SUPABASE_ACCESS_TOKEN|SUPABASE_DB_PASSWORD|SUPABASE_SERVICE_ROLE_KEY|TURNSTILE_SECRET_KEY)[[:space:]]*=[[:space:]]*[^[:space:]#<{]+"],
   ["personal machine path", "/(Users|Volumes)/[^[:space:]/]+(/|$)"],
   ["retired custom domain", "why[.-]tool[.-]com"],
-  ["retired community domain", "whytab[.-]is-a[.-]dev"],
+  ["retired community domain", "whynavo[.-]is-a[.-]dev"],
   ["retired product branding", "(^|[^[:alnum:]_])wetab([^[:alnum:]_]|$)"]
 ];
 

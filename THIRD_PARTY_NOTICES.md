@@ -1,6 +1,6 @@
 # Third-Party Notices
 
-whytab includes the following runtime open-source software. Version numbers
+WhyNavo includes the following runtime open-source software. Version numbers
 are pinned in `package-lock.json`.
 
 ## MIT-licensed components

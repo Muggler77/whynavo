@@ -1,4 +1,4 @@
-/* WhyTab 0.4: translucent, wallpaper-first product interface. */
+/* WhyNavo 0.4: translucent, wallpaper-first product interface. */
 
 :root {
   font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", "Microsoft YaHei", sans-serif;
@@ -51,7 +51,7 @@
   --wt-widget-base: #18181b;
 }
 
-:root[data-whytab-theme="light"] {
+:root[data-whynavo-theme="light"] {
   color-scheme: light;
   --wt-canvas: #e9ebee;
   --wt-canvas-overlay: rgba(255, 255, 255, 0.12);

@@ -1,24 +1,24 @@
-# whytab
+# WhyNavo
 
-whytab is a local-first new tab dashboard for shortcuts, widgets, notes, todos, weather, exchange rates, and optional cross-device sync.
+WhyNavo is a local-first new tab dashboard for shortcuts, widgets, notes, todos, weather, exchange rates, and optional cross-device sync.
 
 It is built as a Chrome / Edge Manifest V3 extension and as a responsive web app for mobile and tablet use. The core idea is simple: user data should work locally first, remain exportable, and only sync to the cloud after the user signs in.
 
-Current release: **0.6.0**. See the [bilingual release notes](docs/releases/0.6.0.md).
+Current release: **0.7.0**. See the [bilingual release notes](docs/releases/0.7.0.md).
 
-> **上线状态 / Launch status:** 公开源码和本地 0.6.0 构建目前可用于审查与测试。在线注册和云同步仍处于预发布阶段，必须等到对应的公开 Release、正式邮件发件域名、加密异地备份、数据库迁移和线上冒烟测试全部通过后再作为正式服务推广。当前请勿把在线服务用于唯一的重要数据副本。
+> **上线状态 / Launch status:** 公开源码和本地 0.7.0 构建目前可用于审查与测试。在线注册和云同步仍处于预发布阶段，必须等到对应的公开 Release、正式邮件发件域名、加密异地备份、数据库迁移和线上冒烟测试全部通过后再作为正式服务推广。当前请勿把在线服务用于唯一的重要数据副本。
 >
-> The public source and local 0.6.0 build are available for review and testing. Hosted account registration and cloud sync remain pre-release until the matching public Release, production email sender, encrypted off-site backup, database migration, and live smoke tests all pass. Do not use the hosted service as the only copy of important data yet.
+> The public source and local 0.7.0 build are available for review and testing. Hosted account registration and cloud sync remain pre-release until the matching public Release, production email sender, encrypted off-site backup, database migration, and live smoke tests all pass. Do not use the hosted service as the only copy of important data yet.
 
 ## Product and Framework
 
-whytab is both a ready-to-use product and a publicly auditable, configurable codebase.
+WhyNavo is both a ready-to-use product and a publicly auditable, configurable codebase.
 
-- For everyday users: use the official web app at `https://whytab.pages.dev/`, register or sign in with email and password, and sync with the hosted whytab service. No server setup, service URL, API key, or access key is required.
+- For everyday users: use the official web app at `https://whynavo.pages.dev/`, register or sign in with email and password, and sync with the hosted WhyNavo service. No server setup, service URL, API key, or access key is required.
 - For developers and teams: the source and repository-authored visual assets
   are available under the [MIT License](LICENSE). Preserve the
   [third-party notices](THIRD_PARTY_NOTICES.md) in redistributed builds and do
-  not imply that modified versions are endorsed by the official whytab
+  not imply that modified versions are endorsed by the official WhyNavo
   service.
 
 ## Highlights
@@ -27,7 +27,7 @@ whytab is both a ready-to-use product and a publicly auditable, configurable cod
 - Optional cloud sync: users can register or sign in with email and password to sync across devices.
 - User data isolation: cloud data is protected by Supabase Auth and Row Level Security.
 - Password safety: login, registration, and replacement passwords are checked against Have I Been Pwned with a k-anonymous five-character hash prefix; the full password and full hash stay on the device.
-- Bounded cloud sessions: account-bound database functions reject whytab cloud-data access after 90 days or 30 days of inactivity without forcing single-device sign-in.
+- Bounded cloud sessions: account-bound database functions reject WhyNavo cloud-data access after 90 days or 30 days of inactivity without forcing single-device sign-in.
 - Editable home workspace: enable layout editing to reorder shortcuts and widgets without changing their data.
 - Full-bleed website icons: real site artwork fills the icon itself without an extra colored container.
 - Translucent workspace: neutral, wallpaper-aware materials keep cards readable without imposing random widget colors.
@@ -35,7 +35,7 @@ whytab is both a ready-to-use product and a publicly auditable, configurable cod
 - Curated wallpaper library: 32 built-in choices, including 20 original desktop/mobile pairs across Japanese, illustrated, cat, and cinematic styles.
 - Personal pages: add pages to the left navigation, assign shortcut groups to them, or hide optional built-in pages.
 - Cross-platform usage: works on macOS, Windows, iOS, iPadOS, Android, and other modern browsers depending on extension/PWA support.
-- Import and backup: supports whytab JSON, browser bookmarks HTML, CSV, and old new-tab page migration input.
+- Import and backup: supports WhyNavo JSON, browser bookmarks HTML, CSV, and old new-tab page migration input.
 - Private by default on each device: the app remains usable offline and does not require sign-in for local use.
 
 ## Download and Use
@@ -45,10 +45,10 @@ whytab is both a ready-to-use product and a publicly auditable, configurable cod
 Open the public web app:
 
 ```text
-https://whytab.pages.dev/
+https://whynavo.pages.dev/
 ```
 
-This is the easiest way to try whytab on iPhone, iPad, Android, tablets, and desktop browsers.
+This is the easiest way to try WhyNavo on iPhone, iPad, Android, tablets, and desktop browsers.
 
 - iPhone / iPad: open the link in Safari, tap Share, then choose "Add to Home Screen".
 - Android: open the link in Chrome or another modern browser, then choose "Install app" or "Add to Home screen".
@@ -58,7 +58,7 @@ The web app does not replace the browser's new tab page, but it provides the sam
 
 Cloudflare Pages deployment uses the root `wrangler.toml` and publishes `extension/web-dist`. The Chrome/Edge package is built separately in `extension/dist`, so Cloudflare-only files such as `_headers` can never make the browser extension invalid. The shared `pages.dev` hostname is free and can later be replaced by an owned custom domain without changing the Supabase project or synchronized user data.
 
-Automatic production deployment requires `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, `VITE_TURNSTILE_SITE_KEY`, and `SUPABASE_ACCESS_TOKEN` repository secrets. No database password or connection string is stored in GitHub. Reviewed migrations use the authenticated Supabase Management API while direct database ingress remains closed. The workflow prepares backward-compatible database and Edge Function changes, passes a strict production predeployment gate, and creates a private draft Release. It first deploys and smoke-tests the new web bundle while preserving the already-public update manifest and the protected old-client compatibility path. After the matching Release is public, a second atomic Pages deployment activates the update manifest; only then does the workflow revoke the retired write API and repeat final checks. A failed rollout therefore cannot advertise a missing archive or strand older users without an available upgrade. Release and deployment jobs also require the explicit `WHYTAB_PRODUCTION_ENABLED` repository variable.
+Automatic production deployment requires `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, `VITE_TURNSTILE_SITE_KEY`, and `SUPABASE_ACCESS_TOKEN` repository secrets. No database password or connection string is stored in GitHub. Reviewed migrations use the authenticated Supabase Management API while direct database ingress remains closed. The workflow prepares backward-compatible database and Edge Function changes, passes a strict production predeployment gate, and creates a private draft Release. It first deploys and smoke-tests the new web bundle while preserving the already-public update manifest and the protected old-client compatibility path. After the matching Release is public, a second atomic Pages deployment activates the update manifest; only then does the workflow revoke the retired write API and repeat final checks. A failed rollout therefore cannot advertise a missing archive or strand older users without an available upgrade. Release and deployment jobs also require the explicit `WHYNAVO_PRODUCTION_ENABLED` repository variable.
 
 ### Install as a Chrome or Edge new tab extension
 
@@ -66,8 +66,8 @@ The extension version replaces the browser's new tab page on desktop Chromium br
 
 For everyday use, download the automatically built, provenance-attested release archive produced by GitHub Actions:
 
-1. Open [GitHub Releases](https://github.com/Muggler77/whytab/releases/latest).
-2. Download `whytab-<version>-chrome-web-store.zip`.
+1. Open [GitHub Releases](https://github.com/Muggler77/whynavo/releases/latest).
+2. Download `whynavo-<version>-chrome-web-store.zip`.
 3. Unzip the archive to a permanent local folder.
 4. Open `chrome://extensions/` in Chrome, or `edge://extensions/` in Edge.
 5. Enable Developer mode.
@@ -78,10 +78,10 @@ For everyday use, download the automatically built, provenance-attested release 
 Each release also includes a `.sha256` checksum. Advanced users can verify the public GitHub build provenance with:
 
 ```bash
-gh attestation verify whytab-<version>-chrome-web-store.zip --repo Muggler77/whytab
+gh attestation verify whynavo-<version>-chrome-web-store.zip --repo Muggler77/whynavo
 ```
 
-Chrome does not automatically update unpacked extensions. When a new whytab release is available, download the new Release archive, replace the files in the same local folder, and click Reload on the browser's extension management page. whytab keeps user data in the browser profile, outside the release folder, and validates data compatibility before cloud sync.
+Chrome does not automatically update unpacked extensions. When a new WhyNavo release is available, download the new Release archive, replace the files in the same local folder, and click Reload on the browser's extension management page. WhyNavo keeps user data in the browser profile, outside the release folder, and validates data compatibility before cloud sync.
 
 For development or self-hosting, build from source instead. The repository intentionally does not commit a production `extension/dist` folder:
 
@@ -96,19 +96,19 @@ npm run build
 
 4. Load the generated `extension/dist` folder from the browser's extension management page.
 
-After installation, whytab stores your shortcuts, widgets, notes, todos, settings, and layout locally in the current browser profile.
+After installation, WhyNavo stores your shortcuts, widgets, notes, todos, settings, and layout locally in the current browser profile.
 
 ### Register, sign in, and sync
 
 Sign-in is optional.
 
-- You can use whytab without an account. Your data stays in the current browser profile.
+- You can use WhyNavo without an account. Your data stays in the current browser profile.
 - To sync across devices, open the account/sync panel and register with email and password.
 - Registration and replacement passwords require at least 12 characters with uppercase letters, lowercase letters, and numbers. The login panel can send a password-reset email, and signed-in users can update their password only after confirming the current password.
-- Registration and replacement-password operations fail closed when the privacy-preserving leaked-password check is unavailable. A successful login remains available if that third-party check is down, but whytab displays a warning; a known leaked login password also produces an immediate change-password warning. Only the first five characters of a locally computed SHA-1 digest are sent to the Pwned Passwords range API.
+- Registration and replacement-password operations fail closed when the privacy-preserving leaked-password check is unavailable. A successful login remains available if that third-party check is down, but WhyNavo displays a warning; a known leaked login password also produces an immediate change-password warning. Only the first five characters of a locally computed SHA-1 digest are sent to the Pwned Passwords range API.
 - Public authentication actions include a Cloudflare Turnstile anti-abuse check; the one-time challenge token is never saved as user data.
 - Use the same account on another device to sync shortcuts, widgets, notes, todos, countdowns, settings, and layout.
-- If you created data before signing in, whytab keeps it locally and carries it into your account when you sign in.
+- If you created data before signing in, WhyNavo keeps it locally and carries it into your account when you sign in.
 - Public users only need an email and password. They do not need to prepare a backend, service address, API key, access key, or advanced connection setting.
 - Keep a JSON export backup when moving browsers or resetting a device.
 
@@ -117,12 +117,12 @@ Sign-in is optional.
 在线版地址：
 
 ```text
-https://whytab.pages.dev/
+https://whynavo.pages.dev/
 ```
 
 - 手机和平板：打开上面的地址，添加到主屏幕即可使用。
 - Mac / Windows 桌面浏览器：可以直接打开在线版，也可以从源码构建后作为 Chrome / Edge 新标签页插件加载。
-- 插件安装方式：从 [GitHub Releases](https://github.com/Muggler77/whytab/releases/latest) 下载最新的 `whytab-<版本>-chrome-web-store.zip`，解压到固定目录，然后在浏览器扩展管理页选择“加载已解压的扩展程序”。
+- 插件安装方式：从 [GitHub Releases](https://github.com/Muggler77/whynavo/releases/latest) 下载最新的 `whynavo-<版本>-chrome-web-store.zip`，解压到固定目录，然后在浏览器扩展管理页选择“加载已解压的扩展程序”。
 - 每个正式 ZIP 同时提供 SHA-256 校验文件和 GitHub 构建来源证明，可核对下载文件是否来自对应的公开版本构建。
 - 不登录也可以用：数据默认保存在本机浏览器 IndexedDB。
 - 需要多设备同步时：在账号面板注册或登录，同一个账号即可同步数据。
@@ -179,7 +179,7 @@ https://whytab.pages.dev/
 
 ### 0.5.1 Cloudflare Pages 迁移
 
-- 官方网页入口迁移到免费的 `https://whytab.pages.dev/`，不再依赖旧自定义域名。
+- 官方网页入口迁移到免费的 `https://whynavo.pages.dev/`，不再依赖旧自定义域名。
 - Supabase 项目、账号、云端同步表和数据结构保持不变，已同步的数据无需迁移。
 - Chrome / Edge 扩展数据保存在扩展自身空间，不受网页域名变化影响。
 - 网页未登录数据仍遵循浏览器同源隔离：旧网址下仅存在本地的数据需要先导出 JSON，再在新网址导入。
@@ -206,7 +206,7 @@ https://whytab.pages.dev/
 - 网站真实图标直接占满图标区域，取消额外彩色大框；主页和网站页继续共用同一图标尺寸与圆润比例。
 - 全部小组件改为中性通透材质，重新梳理标题、字号、留白、数据层级和空状态，不再用互相冲突的随机强调色。
 - 网站、文件夹、页面和小组件右键菜单统一提升到最上层，修复菜单消失、被卡片遮挡和尺寸预览难以辨认的问题。
-- 新增 20 张 whytab 原创壁纸，覆盖日系、原创动漫、猫咪和酷感四种风格；每张都有独立桌面与手机文件。
+- 新增 20 张 WhyNavo 原创壁纸，覆盖日系、原创动漫、猫咪和酷感四种风格；每张都有独立桌面与手机文件。
 - 壁纸资源中心支持风格筛选、懒加载、个人壁纸集和每日轮换，手机不再下载横屏大图。
 - 手机内容在底部导航上方独立滚动，导航不遮挡卡片和文字；页面切换自动回到顶部。
 - 数据结构仍为版本 1，不修改注册、登录、账号隔离、同步协议或本地存储逻辑。
@@ -253,9 +253,9 @@ https://whytab.pages.dev/
 
 ## 产品与框架定位
 
-whytab 同时提供两种使用方式：
+WhyNavo 同时提供两种使用方式：
 
-- 普通用户：直接使用官方在线版 `https://whytab.pages.dev/`，注册或登录账号即可同步，不需要自己部署服务。
+- 普通用户：直接使用官方在线版 `https://whynavo.pages.dev/`，注册或登录账号即可同步，不需要自己部署服务。
 - 开发者或团队：可以 fork 这个仓库，把它当作一套可配置的新标签页/PWA 框架，替换界面、同步服务或部署环境，搭建自己的独立版本。
 
 ## Supported Platforms
@@ -272,7 +272,7 @@ whytab 同时提供两种使用方式：
 - Android through Chrome or other modern browsers as a web app
 - Tablet layouts with touch-friendly navigation and safe-area support
 
-The browser extension replaces the new tab page where the browser supports `chrome_url_overrides.newtab`. On mobile systems that do not support that extension API, whytab can still run as a web app.
+The browser extension replaces the new tab page where the browser supports `chrome_url_overrides.newtab`. On mobile systems that do not support that extension API, WhyNavo can still run as a web app.
 
 ## Features
 
@@ -286,7 +286,7 @@ The browser extension replaces the new tab page where the browser supports `chro
 - Automatic favicon matching
 - Custom icon URL and built-in fallback icons
 - Search/filter shortcuts
-- Import from browser bookmarks, CSV, old new-tab page captures, or whytab JSON
+- Import from browser bookmarks, CSV, old new-tab page captures, or WhyNavo JSON
 
 ### Widgets
 
@@ -445,7 +445,7 @@ If a very early version stored local data under the pre-account-isolation global
 
 ## Mobile and Tablet Web App
 
-The same frontend can be deployed to Cloudflare Pages or another static hosting provider. The official public build uses `https://whytab.pages.dev/`. On iPhone and iPad, open that URL in Safari and use "Add to Home Screen". On Android, use the browser's install/add-to-home-screen option.
+The same frontend can be deployed to Cloudflare Pages or another static hosting provider. The official public build uses `https://whynavo.pages.dev/`. On iPhone and iPad, open that URL in Safari and use "Add to Home Screen". On Android, use the browser's install/add-to-home-screen option.
 
 After signing in with the same account, mobile and desktop clients can merge shortcuts, widgets, notes, todos, and settings.
 
@@ -460,7 +460,7 @@ The hosted sync backend uses Supabase:
 - Row Level Security to isolate per-user data
 - An Edge Function for cached Bank of China exchange-rate data
 
-Public users do not need to enter service URLs or API keys. The official hosted app at `https://whytab.pages.dev/` already contains the public client configuration required to talk to the whytab sync service. A user only registers or signs in with email and password.
+Public users do not need to enter service URLs or API keys. The official hosted app at `https://whynavo.pages.dev/` already contains the public client configuration required to talk to the WhyNavo sync service. A user only registers or signs in with email and password.
 
 Only developers who fork the repository and self-host their own independent copy need to configure `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, and `VITE_AUTH_REDIRECT_URL`, apply every SQL migration in `supabase/migrations/` in numeric order, configure the required function secrets, and deploy the Edge Functions in `supabase/functions/`. In that mode, this repository works as a configurable framework: the frontend, Auth provider, database project, email domain, and deployment target can be replaced by the self-hosting developer.
 
@@ -470,7 +470,7 @@ For email verification, configure the Supabase Auth Site URL and Redirect URLs t
 
 Supported import formats:
 
-- whytab JSON
+- WhyNavo JSON
 - Browser bookmarks HTML
 - CSV
 - Old new-tab page capture output
@@ -505,4 +505,4 @@ Before making this repository public, the following checks are expected:
 - [Privacy and Security](docs/privacy-and-security.md)
 - [Production readiness gates](docs/production-readiness.md)
 - [Encrypted backup and restore](docs/backup-and-restore.md)
-- [Configuration and operations](docs/whytab-configuration-and-usage.md)
+- [Configuration and operations](docs/whynavo-configuration-and-usage.md)

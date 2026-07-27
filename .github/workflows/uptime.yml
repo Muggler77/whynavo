@@ -1,4 +1,4 @@
-name: Monitor whytab Production
+name: Monitor WhyNavo Production
 
 on:
   schedule:
@@ -10,7 +10,7 @@ permissions:
 
 jobs:
   smoke:
-    if: vars.WHYTAB_PRODUCTION_ENABLED == 'true' || github.event_name == 'workflow_dispatch'
+    if: vars.WHYNAVO_PRODUCTION_ENABLED == 'true' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:

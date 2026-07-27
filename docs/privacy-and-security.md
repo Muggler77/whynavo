@@ -1,6 +1,6 @@
 # Privacy and Security
 
-whytab is designed around local-first personal data.
+WhyNavo is designed around local-first personal data.
 
 ## What Stays Local
 
@@ -22,7 +22,7 @@ This data is not sent to the sync backend unless the user signs in.
 
 ## What Syncs After Login
 
-After login, whytab syncs the app state to Supabase so the same account can be used across desktop, phone, and tablet clients.
+After login, WhyNavo syncs the app state to Supabase so the same account can be used across desktop, phone, and tablet clients.
 
 Cloud sync includes:
 
@@ -36,21 +36,21 @@ Cloud sync includes:
 
 Private photo-frame images and filenames, inline wallpaper data, uploaded custom wallpapers, and uploaded shortcut or folder icons are deliberately removed from cloud snapshots. They remain on the device and can be moved through a user-created complete backup.
 
-Supabase Auth maintains browser-local access and refresh session tokens so a signed-in device can keep its session. whytab does not place those tokens in application state, IndexedDB, exported backups, or synchronization snapshots. Local sign-out removes the current device session; global sign-out revokes the account's refresh sessions. Cloud-data reads and writes also enforce a server-side 90-day maximum session lifetime and a 30-day inactivity limit.
+Supabase Auth maintains browser-local access and refresh session tokens so a signed-in device can keep its session. WhyNavo does not place those tokens in application state, IndexedDB, exported backups, or synchronization snapshots. Local sign-out removes the current device session; global sign-out revokes the account's refresh sessions. Cloud-data reads and writes also enforce a server-side 90-day maximum session lifetime and a 30-day inactivity limit.
 
 Cloud snapshots are protected by Auth, RLS, account-scoped restore points, optimistic concurrency, a fixed `primary` snapshot name, and a 2 MB server-side payload boundary. Current clients read and write through account-bound authenticated RPCs. During the 0.6.0 transition, published 0.5.x clients may still read only their own row through an RLS policy that enforces the same session-expiry check; the legacy account-unbound write RPC is revoked. Cloud fields are not end-to-end encrypted, so the hosted database operator can technically access synchronized content. Do not place passwords or highly sensitive secrets in notes or shortcut titles.
 
-For registration and password replacement, the browser checks the password before submission by computing its SHA-1 hash locally and sending only the first five hash characters to the free Have I Been Pwned Pwned Passwords range API. Those operations stop if the check fails or finds a known leak. Login first sends the password over HTTPS to Supabase Auth; after successful authentication, whytab performs the same k-anonymous check and shows a warning instead of locking an existing user out when the third-party check is unavailable. The complete password and complete hash are never sent to Have I Been Pwned, padded responses are compared locally, and no result is stored.
+For registration and password replacement, the browser checks the password before submission by computing its SHA-1 hash locally and sending only the first five hash characters to the free Have I Been Pwned Pwned Passwords range API. Those operations stop if the check fails or finds a known leak. Login first sends the password over HTTPS to Supabase Auth; after successful authentication, WhyNavo performs the same k-anonymous check and shows a warning instead of locking an existing user out when the third-party check is unavailable. The complete password and complete hash are never sent to Have I Been Pwned, padded responses are compared locally, and no result is stored.
 
 ## Website Icons
 
-When automatic website icon lookup is enabled, whytab can request icons over HTTPS from the saved website and public favicon providers such as Google, DuckDuckGo, and Simple Icons. Those requests can reveal the requested website hostname to the provider. Plaintext remote icon URLs are rejected. Resolved icon locations are cached per local account partition, and image responses use a bounded browser cache to reduce repeat requests without loading every icon at startup.
+When automatic website icon lookup is enabled, WhyNavo can request icons over HTTPS from the saved website and public favicon providers such as Google, DuckDuckGo, and Simple Icons. Those requests can reveal the requested website hostname to the provider. Plaintext remote icon URLs are rejected. Resolved icon locations are cached per local account partition, and image responses use a bounded browser cache to reduce repeat requests without loading every icon at startup.
 
 Users can disable automatic website icon lookup in Settings. Manually selected local or direct icon images continue to work.
 
-whytab does not include advertising or behavioral analytics SDKs and does not sell user data. Hosting, authentication, CAPTCHA, and email providers can still process operational logs required to deliver and protect those services. The public privacy notice describes retention, deletion, cross-region processing, and the minimum age for a sync account.
+WhyNavo does not include advertising or behavioral analytics SDKs and does not sell user data. Hosting, authentication, CAPTCHA, and email providers can still process operational logs required to deliver and protect those services. The public privacy notice describes retention, deletion, cross-region processing, and the minimum age for a sync account.
 
-Application content in IndexedDB is not additionally encrypted by whytab. Data-at-rest protection therefore depends on the browser profile, operating-system account, device lock, and disk encryption. This limitation is stated explicitly in the public privacy notice.
+Application content in IndexedDB is not additionally encrypted by WhyNavo. Data-at-rest protection therefore depends on the browser profile, operating-system account, device lock, and disk encryption. This limitation is stated explicitly in the public privacy notice.
 
 The repository contains a fail-closed workflow for encrypted off-site disaster
 backups, but the public notice must describe that storage as active only after
@@ -89,7 +89,7 @@ VITE_SUPABASE_URL
 VITE_SUPABASE_ANON_KEY
 ```
 
-The Supabase publishable key is safe to use in browser clients when RLS is configured correctly. It is not a `service_role` key and cannot bypass Row Level Security. The public whytab hosted app includes the browser-visible configuration needed for normal users to register, sign in, and sync.
+The Supabase publishable key is safe to use in browser clients when RLS is configured correctly. It is not a `service_role` key and cannot bypass Row Level Security. The public WhyNavo hosted app includes the browser-visible configuration needed for normal users to register, sign in, and sync.
 
 Never commit:
 

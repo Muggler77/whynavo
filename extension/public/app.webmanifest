@@ -1,6 +1,6 @@
 {
-  "name": "whytab",
-  "short_name": "whytab",
+  "name": "WhyNavo",
+  "short_name": "WhyNavo",
   "description": "可跨设备同步的快捷导航、小组件与效率主页",
   "lang": "zh-CN",
   "start_url": "./",

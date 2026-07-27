@@ -1,8 +1,8 @@
-name: Report whytab Production Incidents
+name: Report WhyNavo Production Incidents
 
 on:
   workflow_run:
-    workflows: ["Monitor whytab Production"]
+    workflows: ["Monitor WhyNavo Production"]
     types: [completed]
 
 permissions:
@@ -11,7 +11,7 @@ permissions:
 
 jobs:
   report:
-    if: vars.WHYTAB_PRODUCTION_ENABLED == 'true'
+    if: vars.WHYNAVO_PRODUCTION_ENABLED == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     env:
@@ -42,5 +42,5 @@ jobs:
             gh issue create \
               --title "Production availability check failed" \
               --label production-alert \
-              --body "The automated whytab production check failed. Review the workflow logs without posting credentials or user data: $RUN_URL"
+              --body "The automated WhyNavo production check failed. Review the workflow logs without posting credentials or user data: $RUN_URL"
           fi

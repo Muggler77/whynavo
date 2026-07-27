@@ -1,4 +1,4 @@
-name: Prepare whytab Supabase Production
+name: Prepare WhyNavo Supabase Production
 
 on:
   workflow_dispatch:
@@ -7,7 +7,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: whytab-production-database-access
+  group: whynavo-production-database-access
   cancel-in-progress: false
 
 jobs:
@@ -32,6 +32,9 @@ jobs:
 
       - name: Apply backward-compatible migrations
         run: npm run deploy:supabase-migrations -- --through 0013
+
+      - name: Apply WhyNavo identifier compatibility migration
+        run: npm run deploy:supabase-migrations -- --only 0015
 
       - name: Setup Supabase CLI
         uses: supabase/setup-cli@3c2f5e2ae34c34e428e8e206e2c4d21fa2d20fbf # v2.1.1

@@ -11,7 +11,7 @@ revoke all on table public.sync_session_activity from public, anon, authenticate
 create index if not exists sync_session_activity_user_idx
   on public.sync_session_activity(user_id, last_seen_at desc);
 
-create or replace function public.assert_whytab_sync_session(p_user_id uuid)
+create or replace function public.assert_whynavo_sync_session(p_user_id uuid)
 returns void
 language plpgsql
 security definer
@@ -37,7 +37,7 @@ begin
   end;
 
   if current_session_id is null then
-    raise exception 'Whytab session revoked';
+    raise exception 'WhyNavo session revoked';
   end if;
 
   select session.created_at
@@ -47,11 +47,11 @@ begin
     and session.user_id = current_user_id;
 
   if not found then
-    raise exception 'Whytab session revoked';
+    raise exception 'WhyNavo session revoked';
   end if;
 
   if session_created_at < checked_at - interval '90 days' then
-    raise exception 'Whytab session expired';
+    raise exception 'WhyNavo session expired';
   end if;
 
   insert into public.sync_session_activity (
@@ -76,15 +76,15 @@ begin
   for update;
 
   if not found then
-    raise exception 'Whytab session revoked';
+    raise exception 'WhyNavo session revoked';
   end if;
 
   if activity_first_seen_at < checked_at - interval '90 days' then
-    raise exception 'Whytab session expired';
+    raise exception 'WhyNavo session expired';
   end if;
 
   if activity_last_seen_at < checked_at - interval '30 days' then
-    raise exception 'Whytab session inactive';
+    raise exception 'WhyNavo session inactive';
   end if;
 
   update public.sync_session_activity
@@ -94,9 +94,9 @@ begin
 end;
 $$;
 
-revoke all on function public.assert_whytab_sync_session(uuid) from public, anon, authenticated;
+revoke all on function public.assert_whynavo_sync_session(uuid) from public, anon, authenticated;
 
-create or replace function public.has_whytab_sync_session(p_user_id uuid)
+create or replace function public.has_whynavo_sync_session(p_user_id uuid)
 returns boolean
 language plpgsql
 security definer
@@ -106,13 +106,13 @@ begin
   if p_user_id is null or p_user_id is distinct from auth.uid() then
     return false;
   end if;
-  perform public.assert_whytab_sync_session(p_user_id);
+  perform public.assert_whynavo_sync_session(p_user_id);
   return true;
 end;
 $$;
 
-revoke all on function public.has_whytab_sync_session(uuid) from public, anon;
-grant execute on function public.has_whytab_sync_session(uuid) to authenticated;
+revoke all on function public.has_whynavo_sync_session(uuid) from public, anon;
+grant execute on function public.has_whynavo_sync_session(uuid) to authenticated;
 
 drop policy if exists "Users own sync snapshots" on public.sync_snapshots;
 create policy "Users own sync snapshots" on public.sync_snapshots
@@ -120,7 +120,7 @@ create policy "Users own sync snapshots" on public.sync_snapshots
   to authenticated
   using (
     auth.uid() = user_id
-    and public.has_whytab_sync_session(user_id)
+    and public.has_whynavo_sync_session(user_id)
   );
 
 create or replace function public.pull_sync_snapshot_for_user(
@@ -133,7 +133,7 @@ security definer
 set search_path = ''
 as $$
 begin
-  perform public.assert_whytab_sync_session(p_user_id);
+  perform public.assert_whynavo_sync_session(p_user_id);
 
   if p_name is distinct from 'primary' then
     raise exception 'Unsupported snapshot name';
@@ -166,7 +166,7 @@ declare
   rate_count integer;
   current_window timestamptz;
 begin
-  perform public.assert_whytab_sync_session(p_user_id);
+  perform public.assert_whynavo_sync_session(p_user_id);
 
   if p_name is distinct from 'primary' then
     raise exception 'Unsupported snapshot name';

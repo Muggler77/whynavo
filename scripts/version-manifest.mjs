@@ -1,5 +1,5 @@
 const RELEASE_VERSION_PATTERN = /^\d+\.\d+\.\d+$/;
-const OFFICIAL_RELEASE_URL = "https://github.com/Muggler77/whytab/releases/latest";
+const OFFICIAL_RELEASE_URL = "https://github.com/Muggler77/whynavo/releases/latest";
 
 export const compareReleaseVersions = (left, right) => {
   const a = left.split(".").map(Number);

@@ -1,8 +1,8 @@
 {
-  "latestVersion": "0.6.0",
-  "minimumSupportedVersion": "0.6.0",
+  "latestVersion": "0.7.0",
+  "minimumSupportedVersion": "0.7.0",
   "dataSchemaVersion": 1,
   "severity": "critical",
-  "releaseNotesUrl": "https://github.com/Muggler77/whytab/releases/latest",
-  "updateUrl": "https://github.com/Muggler77/whytab/releases/latest"
+  "releaseNotesUrl": "https://github.com/Muggler77/whynavo/releases/latest",
+  "updateUrl": "https://github.com/Muggler77/whynavo/releases/latest"
 }

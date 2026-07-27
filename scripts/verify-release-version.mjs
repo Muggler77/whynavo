@@ -18,8 +18,8 @@ const rootLicense = await readFile(new URL("../LICENSE", import.meta.url), "utf8
 const packagedLicense = await readFile(new URL("../extension/public/LICENSE.txt", import.meta.url), "utf8");
 const thirdPartyNotices = await readFile(new URL("../extension/public/THIRD_PARTY_NOTICES.txt", import.meta.url), "utf8");
 
-assert.equal(manifest.name, "whytab - Local-first New Tab", "extension store name must remain distinguishable");
-assert.equal(manifest.short_name, "whytab", "extension short name must preserve the product brand");
+assert.equal(manifest.name, "WhyNavo - Local-first New Tab", "extension store name must remain distinguishable");
+assert.equal(manifest.short_name, "WhyNavo", "extension short name must preserve the product brand");
 
 for (const [label, version] of [
   ["root package", rootPackage.version],
@@ -32,11 +32,11 @@ for (const [label, version] of [
 }
 
 const escapedVersion = releaseVersion.replaceAll(".", "\\.");
-assert.match(serviceWorker, new RegExp(`whytab-shell-v${escapedVersion}`));
+assert.match(serviceWorker, new RegExp(`whynavo-shell-v${escapedVersion}`));
 assert.match(indexHtml, new RegExp(`app\\.webmanifest\\?v=${escapedVersion}`));
-assert.match(releaseNotes, new RegExp(`(?:^|\\n)# whytab ${escapedVersion}(?:\\n|$)`));
+assert.match(releaseNotes, new RegExp(`(?:^|\\n)# WhyNavo ${escapedVersion}(?:\\n|$)`));
 assert.equal(packagedLicense, rootLicense, "packaged license must match the repository license");
 assert.match(thirdPartyNotices, /@supabase\/supabase-js/);
 assert.match(thirdPartyNotices, /lucide-react/);
 
-console.log(`Release metadata is consistent for whytab ${releaseVersion}.`);
+console.log(`Release metadata is consistent for WhyNavo ${releaseVersion}.`);

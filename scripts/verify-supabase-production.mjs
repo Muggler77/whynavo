@@ -9,7 +9,7 @@ import {
 
 const repoRoot = fileURLToPath(new URL("..", import.meta.url));
 const projectRef = supabaseProjectRef();
-const officialOrigin = "https://whytab.pages.dev/";
+const officialOrigin = "https://whynavo.pages.dev/";
 const migrationPattern = /^(\d{4})_[a-z0-9_]+\.sql$/;
 const phaseIndex = process.argv.indexOf("--phase");
 const phase = phaseIndex >= 0 ? process.argv[phaseIndex + 1] : "final";
@@ -23,9 +23,9 @@ if (
 }
 const isFinal = phase === "final";
 const requiredPasswordCharacters = "abcdefghijklmnopqrstuvwxyz:ABCDEFGHIJKLMNOPQRSTUVWXYZ:0123456789";
-const retiredDomainPattern = /why[.-]tool[.-]com|whytab[.-]is-a[.-]dev/i;
-const confirmationSubject = "Verify your whytab email / 验证 whytab 邮箱";
-const recoverySubject = "Reset your whytab password / 重置 whytab 密码";
+const retiredDomainPattern = /why[.-]tool[.-]com|whynavo[.-]is-a[.-]dev/i;
+const confirmationSubject = "Verify your WhyNavo email / 验证 WhyNavo 邮箱";
+const recoverySubject = "Reset your WhyNavo password / 重置 WhyNavo 密码";
 const [confirmationTemplate, recoveryTemplate] = await Promise.all([
   readFile(join(repoRoot, "docs/supabase-confirm-signup-email.html"), "utf8"),
   readFile(join(repoRoot, "docs/supabase-reset-password-email.html"), "utf8")
@@ -221,7 +221,7 @@ const functionsBySlug = new Map(
 for (const [slug, expected] of minimumFunctionVersions) {
   const deployed = functionsBySlug.get(slug);
   requireCondition(deployed?.status === "ACTIVE", `${slug} is not active`);
-  requireCondition(Number(deployed?.version) >= expected.version, `${slug} is older than the 0.6.0 production function`);
+  requireCondition(Number(deployed?.version) >= expected.version, `${slug} is older than the reviewed production function`);
   requireCondition(deployed?.verify_jwt === expected.verifyJwt, `${slug} has an unsafe JWT verification setting`);
 }
 
@@ -238,7 +238,7 @@ if (isFinal) {
     "Production database migrations do not exactly match the repository"
   );
 } else {
-  const requiredPredeployVersions = localMigrationVersions.filter((version) => version <= "0013");
+  const requiredPredeployVersions = ["0013", "0015"];
   const unknownRemoteVersions = remoteMigrationVersions.filter((version) => !localMigrationVersions.includes(version));
   requireCondition(unknownRemoteVersions.length === 0, "Production contains an unreviewed migration");
   requireCondition(
@@ -274,7 +274,7 @@ requireCondition(
 );
 requireCondition(
   /auth\.uid\(\).*user_id/i.test(String(databaseSecurity?.snapshot_select_policy || ""))
-    && /has_whytab_sync_session/i.test(String(databaseSecurity?.snapshot_select_policy || "")),
+    && /has_whynavo_sync_session/i.test(String(databaseSecurity?.snapshot_select_policy || "")),
   "The compatibility snapshot-read policy does not enforce account ownership and session expiry"
 );
 requireCondition(
@@ -303,7 +303,7 @@ requireCondition(
 
 const allowedAdvisorFindings = new Set([
   "rls_enabled_no_policy:public.exchange_rate_cache",
-  "authenticated_security_definer_function_executable:public.has_whytab_sync_session",
+  "authenticated_security_definer_function_executable:public.has_whynavo_sync_session",
   "authenticated_security_definer_function_executable:public.pull_sync_snapshot_for_user",
   "authenticated_security_definer_function_executable:public.push_sync_snapshot_for_user"
 ]);
@@ -334,7 +334,7 @@ if (failures.length) {
 if (!serverLeakedPasswordProtectionEnabled) {
   console.warn(
     "Supabase server-side leaked-password protection is unavailable on the selected Free plan; "
-      + "the reviewed whytab client-side k-anonymous check remains mandatory and is not equivalent to a backend control."
+      + "the reviewed WhyNavo client-side k-anonymous check remains mandatory and is not equivalent to a backend control."
   );
 }
 console.log(`Supabase production ${phase} Auth, database, function, and network gates passed.`);

@@ -1,6 +1,6 @@
 import { readFile } from "node:fs/promises";
 
-const origin = (process.env.WHYTAB_ORIGIN || "https://whytab.pages.dev").replace(/\/$/, "");
+const origin = (process.env.WHYNAVO_ORIGIN || "https://whynavo.pages.dev").replace(/\/$/, "");
 const packageJson = JSON.parse(await readFile(new URL("../package.json", import.meta.url), "utf8"));
 const allowPreviousVersionManifest = process.env.ALLOW_PREVIOUS_VERSION_MANIFEST === "1";
 const releasePattern = /^\d+\.\d+\.\d+$/;
@@ -43,7 +43,7 @@ const fetchWithRetry = async (path, attempts = 6) => {
 const home = await fetchWithRetry("/");
 const homeHtml = await home.text();
 const homeCsp = home.headers.get("content-security-policy") || "";
-if (!/<title>whytab<\/title>/.test(homeHtml)) throw new Error("Hosted home page is not the whytab app");
+if (!/<title>WhyNavo<\/title>/.test(homeHtml)) throw new Error("Hosted home page is not the WhyNavo app");
 if (!homeCsp.includes("default-src 'self'")) {
   throw new Error("Hosted home page is missing the expected Content-Security-Policy");
 }
@@ -133,7 +133,7 @@ if (!webManifestResponse.headers.get("content-type")?.includes("manifest")) {
 }
 const webManifest = await webManifestResponse.json();
 if (
-  webManifest.name !== "whytab"
+  webManifest.name !== "WhyNavo"
   || webManifest.display !== "standalone"
   || webManifest.start_url !== "./"
   || !Array.isArray(webManifest.icons)
@@ -141,7 +141,7 @@ if (
 ) throw new Error("Hosted PWA manifest is incomplete");
 
 const serviceWorker = await (await fetchWithRetry("/sw.js")).text();
-if (!serviceWorker.includes(`whytab-shell-v${packageJson.version}`)) {
+if (!serviceWorker.includes(`whynavo-shell-v${packageJson.version}`)) {
   throw new Error("Hosted Service Worker cache is not versioned with the release");
 }
 if (!serviceWorker.includes("captcha.html")) throw new Error("Hosted Service Worker does not isolate CAPTCHA navigation");
@@ -265,4 +265,4 @@ if (supabaseUrl && supabaseAnonKey) {
   ) throw new Error("Rate function returned an invalid production payload");
 }
 
-console.log(`Hosted smoke test passed for whytab ${packageJson.version}.`);
+console.log(`Hosted smoke test passed for WhyNavo ${packageJson.version}.`);

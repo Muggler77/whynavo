@@ -1,4 +1,4 @@
-# whytab Release Data Safety
+# WhyNavo Release Data Safety
 
 User data is local-first and must survive extension updates without user action. A release is blocked if any item below fails.
 

@@ -137,9 +137,9 @@ export function isTerminalAuthError(error: unknown) {
     "session not found",
     "user not found",
     "jwt expired",
-    "whytab session revoked",
-    "whytab session expired",
-    "whytab session inactive"
+    "whynavo session revoked",
+    "whynavo session expired",
+    "whynavo session inactive"
   ].some((fragment) => message.includes(fragment));
 }
 
@@ -510,7 +510,7 @@ const validRasterDataUrl = (value: unknown, maxLength = 4 * 1024 * 1024) => (
 const validImageReference = (value: unknown, maxLength = 4 * 1024 * 1024) => {
   if (value === undefined) return true;
   if (typeof value !== "string" || !value || value.length > maxLength) return false;
-  if (/^whytab-icon:[a-z0-9-]{1,80}$/i.test(value)) return true;
+  if (/^whynavo-icon:[a-z0-9-]{1,80}$/i.test(value)) return true;
   if (validRasterDataUrl(value, maxLength)) return true;
   if (value.length > MAX_REMOTE_IMAGE_URL_LENGTH) return false;
   try {
@@ -522,7 +522,7 @@ const validImageReference = (value: unknown, maxLength = 4 * 1024 * 1024) => {
 };
 const normalizeStoredImageReference = (value: unknown, allowBuiltIn = false) => {
   if (typeof value !== "string" || !value || value.length > 4 * 1024 * 1024) return undefined;
-  if (allowBuiltIn && /^whytab-icon:[a-z0-9-]{1,80}$/i.test(value)) return value;
+  if (allowBuiltIn && /^whynavo-icon:[a-z0-9-]{1,80}$/i.test(value)) return value;
   if (validRasterDataUrl(value)) return value;
   if (value.length > MAX_REMOTE_IMAGE_URL_LENGTH) return undefined;
   try {
@@ -1256,10 +1256,10 @@ const schemaVersion = (state?: Partial<AppState>) => state?.dataSchemaVersion ||
 
 function ensureRemoteCompatible(remote: AppState) {
   if (schemaVersion(remote) > DATA_SCHEMA_VERSION) {
-    throw new Error("云端数据来自更新版本，请先升级 whytab 再同步");
+    throw new Error("云端数据来自更新版本，请先升级 WhyNavo 再同步");
   }
   if (remote.minimumClientVersion && compareVersions(APP_VERSION, remote.minimumClientVersion) < 0) {
-    throw new Error("当前版本过旧，请先升级 whytab 再同步");
+    throw new Error("当前版本过旧，请先升级 WhyNavo 再同步");
   }
 }
 

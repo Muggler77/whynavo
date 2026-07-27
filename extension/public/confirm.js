@@ -1,6 +1,6 @@
 (() => {
   const SUPABASE_ORIGIN = "https://keafulupzvfljvbzwgrq.supabase.co";
-  const PUBLIC_APP_ORIGIN = "https://whytab.pages.dev";
+  const PUBLIC_APP_ORIGIN = "https://whynavo.pages.dev";
   const MAX_CONFIRMATION_URL_LENGTH = 4096;
   const VALID_ACTIONS = new Set([
     "signup",
@@ -18,7 +18,7 @@
 
   const fail = () => {
     status.dataset.state = "error";
-    status.textContent = "验证请求无效或已损坏，请返回 whytab 后重新发起。";
+    status.textContent = "验证请求无效或已损坏，请返回 WhyNavo 后重新发起。";
     continueButton.disabled = true;
   };
 

@@ -38,7 +38,7 @@ if (!/^[a-z0-9]{20}$/.test(projectRef)) {
   throw new Error("VITE_SUPABASE_URL must contain a valid Supabase project reference");
 }
 if (projectRef !== OFFICIAL_SUPABASE_PROJECT_REF) {
-  throw new Error("VITE_SUPABASE_URL must use the official whytab Supabase project");
+  throw new Error("VITE_SUPABASE_URL must use the official whynavo Supabase project");
 }
 
 if (!/^(sb_publishable_[A-Za-z0-9_-]+|eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+)$/.test(required.VITE_SUPABASE_ANON_KEY)) {
@@ -56,10 +56,10 @@ if (required.VITE_SUPABASE_ANON_KEY.startsWith("eyJ")) {
   }
 }
 
-if (required.VITE_AUTH_REDIRECT_URL !== "https://whytab.pages.dev/") {
-  throw new Error("VITE_AUTH_REDIRECT_URL must match the official whytab Pages origin");
+if (required.VITE_AUTH_REDIRECT_URL !== "https://whynavo.pages.dev/") {
+  throw new Error("VITE_AUTH_REDIRECT_URL must match the official whynavo Pages origin");
 }
-if (required.VITE_CAPTCHA_FRAME_URL !== "https://whytab.pages.dev/captcha.html") {
+if (required.VITE_CAPTCHA_FRAME_URL !== "https://whynavo.pages.dev/captcha.html") {
   throw new Error("VITE_CAPTCHA_FRAME_URL must use the official isolated CAPTCHA page");
 }
 

@@ -40,7 +40,7 @@ type AuthEmailPayload = {
 const resendApiKey = Deno.env.get("RESEND_API_KEY") || "";
 const hookSecret = (Deno.env.get("SEND_EMAIL_HOOK_SECRET") || "").replace(/^v1,whsec_/, "");
 const fromAddress = Deno.env.get("AUTH_EMAIL_FROM") || "";
-const defaultPublicAppUrl = "https://whytab.pages.dev/";
+const defaultPublicAppUrl = "https://whynavo.pages.dev/";
 const configuredPublicAppUrl = Deno.env.get("AUTH_EMAIL_PUBLIC_APP_URL") || defaultPublicAppUrl;
 const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
 const normalizedPublicAppUrl = (() => {
@@ -113,74 +113,74 @@ async function deliveryIdempotencyKey(eventId: string, recipient: string, delive
   const input = new TextEncoder().encode(`${eventId}\0${recipient.toLowerCase()}\0${deliveryIndex}`);
   const digest = await crypto.subtle.digest("SHA-256", input);
   const hex = Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
-  return `whytab-auth/${hex}`;
+  return `whynavo-auth/${hex}`;
 }
 
 const subjects: Record<AuthEmailAction, string> = {
-  signup: "确认你的 whytab 同步账号",
-  invite: "你被邀请使用 whytab",
-  magiclink: "登录你的 whytab 账号",
-  recovery: "重置你的 whytab 密码",
-  email: "确认你的 whytab 操作",
-  email_change: "确认你的 whytab 邮箱变更",
-  email_change_current: "确认你的 whytab 原邮箱",
-  email_change_new: "确认你的 whytab 新邮箱",
-  reauthentication: "确认你的 whytab 操作",
-  password_changed_notification: "你的 whytab 密码已修改",
-  email_changed_notification: "你的 whytab 邮箱已修改",
-  phone_changed_notification: "你的 whytab 账号信息已修改",
-  identity_linked_notification: "whytab 已添加新的登录方式",
-  identity_unlinked_notification: "whytab 已移除登录方式",
-  mfa_factor_enrolled_notification: "whytab 已添加新的验证方式",
-  mfa_factor_unenrolled_notification: "whytab 已移除验证方式"
+  signup: "确认你的 WhyNavo 同步账号",
+  invite: "你被邀请使用 WhyNavo",
+  magiclink: "登录你的 WhyNavo 账号",
+  recovery: "重置你的 WhyNavo 密码",
+  email: "确认你的 WhyNavo 操作",
+  email_change: "确认你的 WhyNavo 邮箱变更",
+  email_change_current: "确认你的 WhyNavo 原邮箱",
+  email_change_new: "确认你的 WhyNavo 新邮箱",
+  reauthentication: "确认你的 WhyNavo 操作",
+  password_changed_notification: "你的 WhyNavo 密码已修改",
+  email_changed_notification: "你的 WhyNavo 邮箱已修改",
+  phone_changed_notification: "你的 WhyNavo 账号信息已修改",
+  identity_linked_notification: "WhyNavo 已添加新的登录方式",
+  identity_unlinked_notification: "WhyNavo 已移除登录方式",
+  mfa_factor_enrolled_notification: "WhyNavo 已添加新的验证方式",
+  mfa_factor_unenrolled_notification: "WhyNavo 已移除验证方式"
 };
 
 const englishSubjects: Record<AuthEmailAction, string> = {
-  signup: "Confirm your whytab sync account",
-  invite: "You are invited to whytab",
-  magiclink: "Sign in to your whytab account",
-  recovery: "Reset your whytab password",
-  email: "Confirm your whytab action",
-  email_change: "Confirm your whytab email change",
-  email_change_current: "Confirm your current whytab email",
-  email_change_new: "Confirm your new whytab email",
-  reauthentication: "Confirm your whytab action",
-  password_changed_notification: "Your whytab password was changed",
-  email_changed_notification: "Your whytab email was changed",
-  phone_changed_notification: "Your whytab account information was changed",
-  identity_linked_notification: "A sign-in method was added to whytab",
-  identity_unlinked_notification: "A sign-in method was removed from whytab",
-  mfa_factor_enrolled_notification: "A verification method was added to whytab",
-  mfa_factor_unenrolled_notification: "A verification method was removed from whytab"
+  signup: "Confirm your WhyNavo sync account",
+  invite: "You are invited to WhyNavo",
+  magiclink: "Sign in to your WhyNavo account",
+  recovery: "Reset your WhyNavo password",
+  email: "Confirm your WhyNavo action",
+  email_change: "Confirm your WhyNavo email change",
+  email_change_current: "Confirm your current WhyNavo email",
+  email_change_new: "Confirm your new WhyNavo email",
+  reauthentication: "Confirm your WhyNavo action",
+  password_changed_notification: "Your WhyNavo password was changed",
+  email_changed_notification: "Your WhyNavo email was changed",
+  phone_changed_notification: "Your WhyNavo account information was changed",
+  identity_linked_notification: "A sign-in method was added to WhyNavo",
+  identity_unlinked_notification: "A sign-in method was removed from WhyNavo",
+  mfa_factor_enrolled_notification: "A verification method was added to WhyNavo",
+  mfa_factor_unenrolled_notification: "A verification method was removed from WhyNavo"
 };
 
 const notificationContent: Partial<Record<AuthEmailAction, { intro: string; nextStep: string }>> = {
   password_changed_notification: {
-    intro: "你的 whytab 账号密码刚刚被修改。",
+    intro: "你的 WhyNavo 账号密码刚刚被修改。",
     nextStep: "如果这不是你本人操作，请立即使用密码重置功能重新保护账号。"
   },
   email_changed_notification: {
-    intro: "你的 whytab 账号邮箱刚刚被修改。",
+    intro: "你的 WhyNavo 账号邮箱刚刚被修改。",
     nextStep: "如果这不是你本人操作，请立即联系项目维护者并保护原邮箱账号。"
   },
   phone_changed_notification: {
-    intro: "你的 whytab 账号信息刚刚被修改。",
+    intro: "你的 WhyNavo 账号信息刚刚被修改。",
     nextStep: "如果这不是你本人操作，请立即检查账号安全。"
   },
   identity_linked_notification: {
-    intro: "你的 whytab 账号刚刚添加了新的登录方式。",
+    intro: "你的 WhyNavo 账号刚刚添加了新的登录方式。",
     nextStep: "如果这不是你本人操作，请立即检查并移除未知登录方式。"
   },
   identity_unlinked_notification: {
-    intro: "你的 whytab 账号刚刚移除了一个登录方式。",
+    intro: "你的 WhyNavo 账号刚刚移除了一个登录方式。",
     nextStep: "如果这不是你本人操作，请立即检查账号安全。"
   },
   mfa_factor_enrolled_notification: {
-    intro: "你的 whytab 账号刚刚添加了新的多因素验证方式。",
+    intro: "你的 WhyNavo 账号刚刚添加了新的多因素验证方式。",
     nextStep: "如果这不是你本人操作，请立即检查账号安全。"
   },
   mfa_factor_unenrolled_notification: {
-    intro: "你的 whytab 账号刚刚移除了一个多因素验证方式。",
+    intro: "你的 WhyNavo 账号刚刚移除了一个多因素验证方式。",
     nextStep: "如果这不是你本人操作，请立即检查账号安全。"
   }
 };
@@ -224,23 +224,23 @@ function buildConfirmationPageUrl(verificationUrl: string) {
 
 function renderEmail(action: AuthEmailAction, verificationUrl: string, token?: string) {
   const isSignup = action === "signup";
-  const title = subjects[action] || "确认你的 whytab 账号";
-  const englishTitle = englishSubjects[action] || "Confirm your whytab account";
+  const title = subjects[action] || "确认你的 WhyNavo 账号";
+  const englishTitle = englishSubjects[action] || "Confirm your WhyNavo account";
   const notification = notificationContent[action];
   const intro = notification?.intro || (isSignup
-    ? "你刚刚使用此邮箱注册了 whytab 同步账号。whytab 会优先把你的快捷方式、小组件、笔记、待办和设置保存在当前浏览器本地。"
-    : "你刚刚请求了 whytab 账号相关操作。");
-  const nextStep = notification?.nextStep || (isSignup ? "完成邮箱验证后，你可以在其他设备登录同一个账号，用于同步自己的 whytab 数据。" : "请确认这是你本人发起的操作，然后继续。");
+    ? "你刚刚使用此邮箱注册了 WhyNavo 同步账号。WhyNavo 会优先把你的快捷方式、小组件、笔记、待办和设置保存在当前浏览器本地。"
+    : "你刚刚请求了 WhyNavo 账号相关操作。");
+  const nextStep = notification?.nextStep || (isSignup ? "完成邮箱验证后，你可以在其他设备登录同一个账号，用于同步自己的 WhyNavo 数据。" : "请确认这是你本人发起的操作，然后继续。");
   const buttonText = isSignup ? "确认邮箱并启用同步 / Confirm email" : "确认并继续 / Confirm and continue";
   const englishIntro = notification
-    ? "A security-related change was just made or requested for your whytab account."
+    ? "A security-related change was just made or requested for your WhyNavo account."
     : isSignup
-      ? "This message was sent because this email address was used to create a whytab synchronization account."
-      : "This message was sent because a whytab account action was requested for this email address.";
+      ? "This message was sent because this email address was used to create a WhyNavo synchronization account."
+      : "This message was sent because a WhyNavo account action was requested for this email address.";
   const englishNextStep = notification
-    ? "If this was not you, protect your email account and use whytab password recovery immediately."
+    ? "If this was not you, protect your email account and use WhyNavo password recovery immediately."
     : isSignup
-      ? "Confirm the address to sign in on other devices and synchronize your own whytab data."
+      ? "Confirm the address to sign in on other devices and synchronize your own WhyNavo data."
       : "Continue only if you initiated this request.";
 
   const confirmationPageUrl = buildConfirmationPageUrl(verificationUrl);
@@ -258,7 +258,7 @@ function renderEmail(action: AuthEmailAction, verificationUrl: string, token?: s
          <a href="${escapedConfirmationPageUrl}" style="display:inline-block;background:#0f172a;color:#ffffff;text-decoration:none;border-radius:10px;padding:12px 22px;font-size:15px;font-weight:700;">${buttonText}</a>
        </p>`
     : escapedToken
-      ? `<p style="margin:0 0 24px;color:#475569;font-size:14px;">请在 whytab 页面中输入上面的验证码。</p>`
+      ? `<p style="margin:0 0 24px;color:#475569;font-size:14px;">请在 WhyNavo 页面中输入上面的验证码。</p>`
       : "";
 
   return {
@@ -270,7 +270,7 @@ function renderEmail(action: AuthEmailAction, verificationUrl: string, token?: s
         <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:560px;background:#ffffff;border:1px solid #e6ebf2;border-radius:16px;overflow:hidden;">
           <tr>
             <td style="padding:30px 32px 18px;text-align:center;">
-              <img src="${publicLogoUrl}" width="64" height="64" alt="whytab" style="display:block;margin:0 auto 16px;border-radius:16px;">
+              <img src="${publicLogoUrl}" width="64" height="64" alt="WhyNavo" style="display:block;margin:0 auto 16px;border-radius:16px;">
               <div style="font-size:22px;font-weight:700;letter-spacing:0;color:#0f172a;">${title}</div>
               <div style="margin-top:8px;font-size:14px;line-height:1.7;color:#64748b;">请完成验证，以保护你的账号安全。</div>
             </td>
@@ -292,7 +292,7 @@ function renderEmail(action: AuthEmailAction, verificationUrl: string, token?: s
           </tr>
           <tr>
             <td style="padding:18px 32px;background:#f8fafc;border-top:1px solid #edf2f7;color:#64748b;font-size:12px;line-height:1.7;text-align:center;">
-              whytab · local-first new tab dashboard<br>
+              WhyNavo · local-first new tab dashboard<br>
               <a href="${normalizedPublicAppUrl}" style="color:#0f766e;text-decoration:none;">${normalizedPublicAppUrl}</a>
             </td>
           </tr>
@@ -317,7 +317,7 @@ ${englishIntro}
 
 ${englishNextStep} If you did not request this action, you can ignore this email.
 
-whytab
+WhyNavo
 ${normalizedPublicAppUrl}`
   };
 }

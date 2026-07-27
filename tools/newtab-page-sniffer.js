@@ -19,7 +19,7 @@
   const text = JSON.stringify({ shortcuts: rows }, null, 2);
   navigator.clipboard
     ?.writeText(text)
-    .then(() => alert(`已复制 ${rows.length} 个链接，回到 whytab 导入即可。`))
+    .then(() => alert(`已复制 ${rows.length} 个链接，回到 WhyNavo 导入即可。`))
     .catch(() => {
       console.log(text);
       alert("浏览器阻止了自动复制，数据已输出到控制台。");

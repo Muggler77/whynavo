@@ -135,8 +135,8 @@ const friendlyAuthError = (error: unknown, fallback: string) => {
 };
 
 const SYNC_RESTORE_KEY = "sync-restore-point";
-const PUBLIC_AUTH_REDIRECT_URL = "https://whytab.pages.dev/";
-const HOSTED_APP_ORIGIN = "https://whytab.pages.dev";
+const PUBLIC_AUTH_REDIRECT_URL = "https://whynavo.pages.dev/";
+const HOSTED_APP_ORIGIN = "https://whynavo.pages.dev";
 const USE_BROWSER_DEFAULT_SEARCH = window.location.protocol === "chrome-extension:" && Boolean(globalThis.chrome?.search?.query);
 const homePageOrder: HomePage[] = ["widgets", "shortcuts", "tools"];
 const WEATHER_CACHE_MAX_AGE_MS = 60 * 60 * 1000;
@@ -164,9 +164,9 @@ const isStrongPassword = (value: string) => (
   && /[A-Z]/.test(value)
   && /[0-9]/.test(value)
 );
-const LEGACY_RESOLVED_ICON_CACHE_KEY = "whytab:resolved-icons:v1";
-const RESOLVED_ICON_CACHE_KEY_PREFIX = "whytab:resolved-icons:v2";
-const LOCAL_STATE_CHANNEL = "whytab-local-state:v1";
+const LEGACY_RESOLVED_ICON_CACHE_KEY = "whynavo:resolved-icons:v1";
+const RESOLVED_ICON_CACHE_KEY_PREFIX = "whynavo:resolved-icons:v2";
+const LOCAL_STATE_CHANNEL = "whynavo-local-state:v1";
 const MAX_RESOLVED_ICON_CACHE_ENTRIES = 300;
 const FAILED_ICON_CACHE_PREFIX = "failed:";
 let remoteIconLookupEnabled = true;
@@ -340,7 +340,7 @@ const comparableUrl = (url: string) => {
 
 const iconUrlMatches = (value: string | undefined, hosts: string[], pathPrefix: string) => {
   const normalized = normalizeIconReference(value);
-  if (!normalized || normalized.startsWith("whytab-icon:")) return false;
+  if (!normalized || normalized.startsWith("whynavo-icon:")) return false;
   try {
     const parsed = new URL(normalized);
     return hosts.includes(parsed.hostname.toLowerCase()) && parsed.pathname.startsWith(pathPrefix);
@@ -353,7 +353,7 @@ const isGeneratedFavicon = (url?: string) => (
   || iconUrlMatches(url, ["icons.duckduckgo.com"], "/ip3/")
 );
 const isSimpleIconsUrl = (url?: string) => iconUrlMatches(url, ["cdn.simpleicons.org"], "/");
-const builtInIconPrefix = "whytab-icon:";
+const builtInIconPrefix = "whynavo-icon:";
 const builtInShortcutIcons = [
   { id: "general", label: "通用", Icon: Globe2, tone: "#38BDF8" },
   { id: "ai", label: "AI", Icon: Bot, tone: "#A78BFA" },
@@ -512,7 +512,7 @@ const iconCandidatesFor = (url: string, iconUrl?: string, title = "") => {
   return candidates.filter((item): item is IconCandidate => {
     if (!item) return false;
     const safeUrl = normalizeIconReference(item.url);
-    if (!safeUrl || safeUrl.startsWith("whytab-icon:") || seen.has(safeUrl)) return false;
+    if (!safeUrl || safeUrl.startsWith("whynavo-icon:") || seen.has(safeUrl)) return false;
     item.url = safeUrl;
     seen.add(safeUrl);
     return true;
@@ -653,7 +653,7 @@ function FolderIconContent({ iconUrl, size }: { iconUrl?: string; size: number }
   const [failed, setFailed] = useState(false);
   useEffect(() => setFailed(false), [iconUrl]);
   const safeIconUrl = normalizeIconReference(iconUrl);
-  if (!safeIconUrl || safeIconUrl.startsWith("whytab-icon:") || failed) return <Folder size={size} />;
+  if (!safeIconUrl || safeIconUrl.startsWith("whynavo-icon:") || failed) return <Folder size={size} />;
   return (
     <img
       src={safeIconUrl}
@@ -689,11 +689,11 @@ const currencyNames: Record<CurrencyCode, string> = {
 };
 
 const dailyQuotes = [
-  { text: "先把桌面变成愿意打开的地方，再把事情慢慢放进去。", source: "whytab" },
-  { text: "好的工具不抢注意力，只把下一步放到手边。", source: "whytab" },
-  { text: "今天只要推进一件真正重要的小事，就已经很赚。", source: "whytab" },
-  { text: "主页不是展示柜，是每天第一个工作台。", source: "whytab" },
-  { text: "少一点入口焦虑，多一点顺手抵达。", source: "whytab" }
+  { text: "先把桌面变成愿意打开的地方，再把事情慢慢放进去。", source: "WhyNavo" },
+  { text: "好的工具不抢注意力，只把下一步放到手边。", source: "WhyNavo" },
+  { text: "今天只要推进一件真正重要的小事，就已经很赚。", source: "WhyNavo" },
+  { text: "主页不是展示柜，是每天第一个工作台。", source: "WhyNavo" },
+  { text: "少一点入口焦虑，多一点顺手抵达。", source: "WhyNavo" }
 ];
 
 type WallpaperCategory = "精选" | "日系" | "动漫" | "猫咪" | "酷感";
@@ -885,9 +885,9 @@ export default function App() {
   }, [state]);
 
   useEffect(() => {
-    document.documentElement.dataset.whytabTheme = state.settings.theme;
+    document.documentElement.dataset.whynavoTheme = state.settings.theme;
     return () => {
-      delete document.documentElement.dataset.whytabTheme;
+      delete document.documentElement.dataset.whynavoTheme;
     };
   }, [state.settings.theme]);
 
@@ -1517,7 +1517,7 @@ export default function App() {
         setDialog("sync");
         showToast(waitingForAccountRecovery
           ? "密码重置会话已保存，连接网络后继续"
-          : user ? "请设置新的 whytab 登录密码" : "密码重置会话无效，请重新发送重置邮件");
+          : user ? "请设置新的 WhyNavo 登录密码" : "密码重置会话无效，请重新发送重置邮件");
         if (!user && !waitingForAccountRecovery) clearAuthCallbackUrl();
       } else if (recoveryLinkAttemptRef.current) {
         if (!waitingForAccountRecovery) {
@@ -1575,7 +1575,7 @@ export default function App() {
       if (message.type === "account-signed-out" && messageUserId) {
         if (messageUserId !== activeUserIdRef.current) return;
         void transitionToAnonymousState(
-          "已在本设备的另一个 whytab 标签页退出",
+          "已在本设备的另一个 WhyNavo 标签页退出",
           "本设备已退出账号，当前标签已切换到未登录数据"
         );
         return;
@@ -1601,7 +1601,7 @@ export default function App() {
         });
         setSync({ user: null, syncing: false, autoSync: blank.sync.autoSync, message: "未登录" });
         setDialog(null);
-        showToast("此账号已在另一个 whytab 标签中删除，本机账号数据已清理");
+        showToast("此账号已在另一个 WhyNavo 标签中删除，本机账号数据已清理");
         return;
       }
 
@@ -2114,7 +2114,7 @@ export default function App() {
             }
             if (passwordRecoveryRef.current) {
               setDialog("sync");
-              showToast("账号数据已恢复，请设置新的 whytab 登录密码");
+              showToast("账号数据已恢复，请设置新的 WhyNavo 登录密码");
             }
           })
           .catch(async (error) => {
@@ -2553,8 +2553,8 @@ export default function App() {
 
   const exportData = () => {
     const backupState = prepareCompleteBackupState(stateRef.current);
-    downloadJson(`whytab-backup-${new Date().toISOString().slice(0, 10)}.json`, {
-      source: "whytab-backup",
+    downloadJson(`whynavo-backup-${new Date().toISOString().slice(0, 10)}.json`, {
+      source: "whynavo-backup",
       version: 1,
       exportedAt: nowIso(),
       appVersion: APP_VERSION,
@@ -2580,12 +2580,12 @@ export default function App() {
     } catch {
       throw new Error("备份文件不是有效的 JSON 文件");
     }
-    if (parsed.source !== "whytab-backup" || !parsed.state) {
-      throw new Error("这不是有效的 whytab 完整备份文件");
+    if (parsed.source !== "whynavo-backup" || !parsed.state) {
+      throw new Error("这不是有效的 WhyNavo 完整备份文件");
     }
     validateAppStatePayload(parsed.state, "备份数据");
     if ((parsed.state.dataSchemaVersion || 1) > DATA_SCHEMA_VERSION) {
-      throw new Error("备份来自更新版本，请先升级 whytab");
+      throw new Error("备份来自更新版本，请先升级 WhyNavo");
     }
     const importEpoch = accountEpochRef.current;
     const importingUserId = activeUserIdRef.current;
@@ -2776,7 +2776,7 @@ export default function App() {
       return;
     }
 
-    if (activePage !== "shortcuts" || !target.closest("#whytab-workspace") || target.closest("button, a")) return;
+    if (activePage !== "shortcuts" || !target.closest("#whynavo-workspace") || target.closest("button, a")) return;
     event.preventDefault();
     event.stopPropagation();
     setShortcutMenu(null);
@@ -3185,13 +3185,13 @@ export default function App() {
       onWheel={handlePageWheel}
       onContextMenuCapture={handleAppContextMenu}
     >
-      <a className="skip-link" href="#whytab-workspace">跳到主要内容</a>
+      <a className="skip-link" href="#whynavo-workspace">跳到主要内容</a>
       <div className="shell" ref={shellRef}>
         <header className="topbar">
           <div className="brand">
             <span className="mark"><img src="./icons/icon32.png" alt="" /></span>
             <div>
-              <h1>whytab</h1>
+              <h1>WhyNavo</h1>
               <p>{chinaMiniDateText}</p>
             </div>
           </div>
@@ -3252,7 +3252,7 @@ export default function App() {
 
         <nav
           className="page-nav"
-          aria-label="whytab 页面切换"
+          aria-label="WhyNavo 页面切换"
           onPointerEnter={openNavigation}
           onPointerLeave={scheduleNavigationClose}
           onFocusCapture={openNavigation}
@@ -3300,7 +3300,7 @@ export default function App() {
         {activePage === "shortcuts" && state.settings.dockPosition === "top" && <Dock shortcuts={pinned} />}
 
         <section
-          id="whytab-workspace"
+          id="whynavo-workspace"
           className={["workspace", "page-" + activePage, activeCustomPageId ? "page-custom" : "", pageMotion ? "page-motion-" + pageMotion : ""].filter(Boolean).join(" ")}
         >
           {activePage === "widgets" ? (
@@ -5249,7 +5249,7 @@ function ImportDialog({ existingShortcuts, onClose, onImport }: {
   }, [existingShortcuts, rows]);
   return (
     <DialogShell title="导入快捷导航" onClose={onClose}>
-      <p className="hint">支持 whytab JSON、浏览器书签 HTML、CSV。CSV 格式：名称,网址,图标URL,分组,文件夹。</p>
+      <p className="hint">支持 WhyNavo JSON、浏览器书签 HTML、CSV。CSV 格式：名称,网址,图标URL,分组,文件夹。</p>
       <label className="file-pick">
         <Upload size={16} /> 选择文件
         <input
@@ -5777,7 +5777,7 @@ function SettingsDialog({ state, updateCheck, migrationBackupAvailable, updateSt
         <div className="settings-block conflict-settings">
           <div className="section-title compact-title"><div><h3>同步冲突</h3><p>{noteConflicts.length} 条旧版笔记有另一份内容</p></div></div>
           <div className="button-row split-row">
-            <button type="button" onClick={() => downloadJson(`whytab-note-conflicts-${new Date().toISOString().slice(0, 10)}.json`, noteConflicts)}><Download size={16} /> 导出冲突内容</button>
+            <button type="button" onClick={() => downloadJson(`whynavo-note-conflicts-${new Date().toISOString().slice(0, 10)}.json`, noteConflicts)}><Download size={16} /> 导出冲突内容</button>
             <button type="button" onClick={() => updateState((current) => ({ ...current, notes: current.notes.map((note) => note.conflictBody ? { ...note, conflictBody: undefined, updatedAt: nowIso() } : note) }))}><Check size={16} /> 保留当前内容</button>
           </div>
         </div>
@@ -6073,8 +6073,8 @@ function SyncDialog({ state, sync, updateState, legacyStateAvailable, onAdoptLeg
       <div className="sync-hero">
         <div className="sync-hero-icon"><Database size={24} /></div>
         <div>
-          <span>WHYTAB CLOUD</span>
-          <h3>{sync.user ? "账号已连接" : authMode === "login" ? "登录 whytab 账号" : "创建 whytab 账号"}</h3>
+          <span>WHYNAVO CLOUD</span>
+          <h3>{sync.user ? "账号已连接" : authMode === "login" ? "登录 WhyNavo 账号" : "创建 WhyNavo 账号"}</h3>
           <p>{sync.user ? "当前设备可以和云端数据保持一致。" : "登录后可在电脑、手机和 iPad 间同步快捷方式、小组件、笔记和设置。"}</p>
         </div>
       </div>
@@ -6136,7 +6136,7 @@ function SyncDialog({ state, sync, updateState, legacyStateAvailable, onAdoptLeg
       {legacyStateAvailable && (
         <div className="sync-legacy-import">
           <strong>检测到更新前本机数据</strong>
-          <p>旧版本把数据保存在未绑定账号的本机区域。为防止不同账号串数据，whytab 不会自动导入。</p>
+          <p>旧版本把数据保存在未绑定账号的本机区域。为防止不同账号串数据，WhyNavo 不会自动导入。</p>
           {sync.user ? (
             <button type="button" disabled={busy || legacyBusy || sync.syncing} onClick={() => void importLegacyData()}>
               <Download size={16} /> 确认属于当前账号并导入
@@ -6194,7 +6194,7 @@ function SyncDialog({ state, sync, updateState, legacyStateAvailable, onAdoptLeg
           </label>
           <p className="sync-auth-note">
             {authMode === "login"
-              ? "使用同一个账号登录其他设备，即可合并同步你的 whytab 数据。未登录时在本机整理的内容也会自动带入当前账号。"
+              ? "使用同一个账号登录其他设备，即可合并同步你的 WhyNavo 数据。未登录时在本机整理的内容也会自动带入当前账号。"
               : `注册密码需要${PASSWORD_REQUIREMENT}。验证邮箱后，即可在其他设备登录并同步。`}
           </p>
           <p className="sync-legal-note">

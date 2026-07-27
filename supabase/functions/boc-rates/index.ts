@@ -1,6 +1,6 @@
 import { createClient } from "jsr:@supabase/supabase-js@2.110.8";
 
-const OFFICIAL_WEB_ORIGIN = "https://whytab.pages.dev";
+const OFFICIAL_WEB_ORIGIN = "https://whynavo.pages.dev";
 const EXTENSION_ORIGIN = /^chrome-extension:\/\/[a-p]{32}$/;
 const MAX_SOURCE_BYTES = 2 * 1024 * 1024;
 const readNamedKeys = (name: string, legacyName: string) => {
@@ -177,7 +177,7 @@ Deno.serve(async (req) => {
   try {
     const response = await fetch("https://www.boc.cn/sourcedb/whpj/", {
       signal: AbortSignal.timeout(12_000),
-      headers: { "user-agent": "whytab-rates/1.0" }
+      headers: { "user-agent": "whynavo-rates/1.0" }
     });
     if (!response.ok) throw new Error(`rate source returned ${response.status}`);
     const sourceBytes = await readBoundedBody(response);

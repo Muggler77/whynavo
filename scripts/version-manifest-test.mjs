@@ -23,8 +23,8 @@ const validManifest = {
   latestVersion: "0.5.7",
   minimumSupportedVersion: "0.5.0",
   dataSchemaVersion: 1,
-  releaseNotesUrl: "https://github.com/Muggler77/whytab/releases/latest",
-  updateUrl: "https://github.com/Muggler77/whytab/releases/latest"
+  releaseNotesUrl: "https://github.com/Muggler77/whynavo/releases/latest",
+  updateUrl: "https://github.com/Muggler77/whynavo/releases/latest"
 };
 
 assert.equal(

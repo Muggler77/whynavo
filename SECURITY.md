@@ -2,7 +2,7 @@
 
 ## Supported Version
 
-Security fixes are shipped for the latest whytab release. The hosted web app updates automatically; unpacked browser-extension users must replace the release files and reload the extension.
+Security fixes are shipped for the latest WhyNavo release. The hosted web app updates automatically; unpacked browser-extension users must replace the release files and reload the extension.
 
 ## Reporting a Vulnerability
 

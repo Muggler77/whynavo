@@ -1,4 +1,4 @@
-name: Report whytab Backup Incidents
+name: Report WhyNavo Backup Incidents
 
 on:
   workflow_run:
@@ -11,7 +11,7 @@ permissions:
 
 jobs:
   report:
-    if: vars.WHYTAB_PRODUCTION_ENABLED == 'true'
+    if: vars.WHYNAVO_PRODUCTION_ENABLED == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     env:
