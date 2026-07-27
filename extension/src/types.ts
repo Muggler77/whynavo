@@ -63,7 +63,23 @@ export type Countdown = {
 export type WidgetKey = "weather" | "calendar" | "countdowns" | "todos" | "notes" | "rates" | "quote" | "focus" | "clock" | "memo" | "year" | "calculator";
 export type WidgetSize = "small" | "medium" | "wide";
 
-export type CustomNavPageIcon = "star" | "briefcase" | "book" | "code" | "heart" | "plane";
+export type SystemNavPage = "widgets" | "shortcuts" | "search" | "notes" | "tasks" | "tools";
+export type CustomNavPageIcon =
+  | "star"
+  | "briefcase"
+  | "book"
+  | "code"
+  | "heart"
+  | "plane"
+  | "home"
+  | "grid"
+  | "search"
+  | "file"
+  | "check"
+  | "compass"
+  | "calendar"
+  | "sparkles"
+  | "globe";
 
 export type CustomNavPage = {
   id: Id;
@@ -110,7 +126,10 @@ export type Settings = {
   widgetOrder?: WidgetKey[];
   widgetSizes?: Record<WidgetKey, WidgetSize>;
   customNavPages?: CustomNavPage[];
-  hiddenNavPages?: Array<"shortcuts" | "tools">;
+  navigationOrder?: SystemNavPage[];
+  navigationLabels?: Partial<Record<SystemNavPage, string>>;
+  navigationIcons?: Partial<Record<SystemNavPage, CustomNavPageIcon>>;
+  hiddenNavPages?: Array<Exclude<SystemNavPage, "widgets">>;
   navigationDisplay?: "always" | "auto" | "hidden";
   navigationSide?: "left" | "right";
   remoteIconLookup?: boolean;

@@ -311,9 +311,9 @@ try {
     settings: { ...legacyState.settings, iconSize: 64, visualRefreshVersion: 7 }
   });
   assert.equal(oldDefaultVisual.settings.iconSize, 58, "old default icon size should migrate to the new unified default");
-  assert.equal(oldDefaultVisual.settings.visualRefreshVersion, 13, "visual refresh version should advance");
+  assert.equal(oldDefaultVisual.settings.visualRefreshVersion, 14, "visual refresh version should advance");
   assert.deepEqual(oldDefaultVisual.settings.customNavPages, [], "legacy state should receive an empty custom page list");
-  assert.deepEqual(oldDefaultVisual.settings.hiddenNavPages, [], "legacy state should keep all built-in pages visible");
+  assert.deepEqual(oldDefaultVisual.settings.hiddenNavPages, ["tools"], "legacy state should adopt the restrained Sample A navigation");
   assert.equal(oldDefaultVisual.settings.navigationDisplay, "always", "legacy state should receive a visible desktop navigation");
   assert.equal(oldDefaultVisual.settings.navigationSide, "left", "legacy state should keep desktop navigation on the left");
   assert.equal(oldDefaultVisual.settings.widgetOrder[0], "notes", "custom widget order must be preserved");

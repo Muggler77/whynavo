@@ -1,15 +1,21 @@
 import {
+  ArrowDown,
+  ArrowUp,
   BookOpen,
   Bot,
   Briefcase,
   Brush,
   Calculator,
   Camera,
+  ChevronLeft,
+  ChevronRight,
+  CloudSun,
   Code2,
   CalendarDays,
   Check,
   Clock3,
   Compass,
+  Droplets,
   Download,
   FileText,
   Database,
@@ -25,9 +31,13 @@ import {
   Import,
   Image as ImageIcon,
   KeyRound,
+  ListTodo,
   Mail,
+  MapPin,
   Music,
   MessageCircle,
+  MoreHorizontal,
+  Navigation,
   Plane,
   Layers,
   LayoutGrid,
@@ -45,10 +55,13 @@ import {
   Search,
   Settings,
   ShieldCheck,
+  SlidersHorizontal,
   Shuffle,
   Sparkles,
   Star,
+  StickyNote,
   Sun,
+  Target,
   Moon,
   Trash2,
   Video,
@@ -59,12 +72,13 @@ import {
   Upload,
   TimerReset,
   UserCircle,
+  Wind,
   X
 } from "lucide-react";
 import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type FocusEvent, type KeyboardEvent, type MouseEvent } from "react";
 import { createPortal } from "react-dom";
 import { accountScopedKey, adoptLegacyStateForAccount, clearLocalAccountDeletionPending, clearLocalDeletedAccountMarkerForVerifiedUser, commitAnonymousStateAdoption, deleteKey, deleteLocalAccountData, downloadJson, hasLegacyUnscopedState, loadStateForAccount, markLocalAccountDeletionPending, mergeAndSaveStateForAccount, readKey, readPendingLocalAccountDeletionIds, saveStateForAccount, writeKey } from "./db";
-import { defaultState, defaultWidgetOrder, defaultWidgetSizes, nowIso, uid } from "./defaultState";
+import { defaultNavigationOrder, defaultState, defaultWidgetOrder, defaultWidgetSizes, nowIso, uid } from "./defaultState";
 import { MAX_IMPORTED_SHORTCUTS, MAX_IMPORT_TEXT_CHARS, colorFor, curatedIconCount, curatedIconFor, fallbackFaviconFor, faviconFor, importedToShortcuts, normalizeIconReference, parseImportText, siteIconCandidatesFor } from "./importers";
 import { MIGRATION_BACKUP_KEY, type StateBackup } from "./migrations";
 import { fetchRates, getCachedRates } from "./rates";
@@ -109,7 +123,7 @@ import {
   validateAppStatePayload,
   type SyncStatus
 } from "./sync";
-import type { AppState, Countdown, CustomNavPage, CustomNavPageIcon, RatesState, SearchEngine, Shortcut, ShortcutFolder, Todo, WeatherState, WidgetKey, WidgetSize } from "./types";
+import type { AppState, Countdown, CustomNavPage, CustomNavPageIcon, Note, RatesState, SearchEngine, Shortcut, ShortcutFolder, SystemNavPage, Todo, WeatherState, WidgetKey, WidgetSize } from "./types";
 import { normalizeHttpUrl, safeHttpHref } from "./urls";
 
 type Dialog = "shortcut" | "folder" | "import" | "library" | "pages" | "settings" | "sync" | "timezone" | null;
@@ -117,7 +131,7 @@ type ShortcutMenuState = { x: number; y: number; shortcutId: string } | null;
 type FolderMenuState = { x: number; y: number; folderId: string } | null;
 type PageMenuState = { x: number; y: number } | null;
 type WidgetMenuState = { x: number; y: number; widgetKey?: WidgetKey } | null;
-type HomePage = "widgets" | "shortcuts" | "tools";
+type HomePage = SystemNavPage;
 type HomeTileRef = `shortcut:${string}` | `folder:${string}`;
 type SyncMode = "merge" | "push" | "pull";
 type AuthResult = { status: "signed-in" | "verification-sent"; message: string };
@@ -144,7 +158,7 @@ const SYNC_RESTORE_KEY = "sync-restore-point";
 const PUBLIC_AUTH_REDIRECT_URL = "https://whynavo.pages.dev/";
 const HOSTED_APP_ORIGIN = "https://whynavo.pages.dev";
 const USE_BROWSER_DEFAULT_SEARCH = window.location.protocol === "chrome-extension:" && Boolean(globalThis.chrome?.search?.query);
-const homePageOrder: HomePage[] = ["widgets", "shortcuts", "tools"];
+const homePageOrder: HomePage[] = defaultNavigationOrder;
 const WEATHER_CACHE_MAX_AGE_MS = 60 * 60 * 1000;
 const RATES_CACHE_MAX_AGE_MS = 6 * 60 * 60 * 1000;
 const ICON_LOAD_TIMEOUT_MS = 5000;
@@ -342,7 +356,30 @@ const customNavPageIcons: Record<CustomNavPageIcon, { label: string; Icon: typeo
   book: { label: "学习", Icon: BookOpen },
   code: { label: "开发", Icon: Code2 },
   heart: { label: "生活", Icon: HeartPulse },
-  plane: { label: "旅行", Icon: Plane }
+  plane: { label: "旅行", Icon: Plane },
+  home: { label: "主页", Icon: House },
+  grid: { label: "空间", Icon: LayoutGrid },
+  search: { label: "搜索", Icon: Search },
+  file: { label: "笔记", Icon: FileText },
+  check: { label: "任务", Icon: Check },
+  compass: { label: "探索", Icon: Compass },
+  calendar: { label: "日程", Icon: CalendarDays },
+  sparkles: { label: "灵感", Icon: Sparkles },
+  globe: { label: "网络", Icon: Globe2 }
+};
+
+const systemNavDefaults: Record<SystemNavPage, {
+  label: string;
+  title: string;
+  description: string;
+  icon: CustomNavPageIcon;
+}> = {
+  widgets: { label: "Home", title: "主页", description: "今天最重要的内容与入口", icon: "home" },
+  shortcuts: { label: "Spaces", title: "空间", description: "按分类整理你的站点与文件夹", icon: "grid" },
+  search: { label: "Search", title: "搜索", description: "查找站点、笔记和任务", icon: "search" },
+  notes: { label: "Notes", title: "笔记", description: "记录、整理并继续写作", icon: "file" },
+  tasks: { label: "Tasks", title: "任务", description: "专注处理下一件重要的事", icon: "check" },
+  tools: { label: "Tools", title: "工具", description: "快速处理日常小任务", icon: "book" }
 };
 
 const comparableUrl = (url: string) => {
@@ -846,6 +883,7 @@ export default function App() {
   const [dialog, setDialog] = useState<Dialog>(null);
   const [activePage, setActivePage] = useState<HomePage>("widgets");
   const [activeCustomPageId, setActiveCustomPageId] = useState<string | undefined>();
+  const [activeSecondaryWidget, setActiveSecondaryWidget] = useState<WidgetKey | undefined>();
   const [pageMotion, setPageMotion] = useState<"up" | "down" | undefined>();
   const [editingShortcut, setEditingShortcut] = useState<Shortcut | undefined>();
   const [editingFolder, setEditingFolder] = useState<ShortcutFolder | undefined>();
@@ -1845,8 +1883,27 @@ export default function App() {
       .sort((a, b) => a.order - b.order);
   }, [state.settings.customNavPages]);
 
-  const hiddenNavPages = useMemo(() => new Set(state.settings.hiddenNavPages || []), [state.settings.hiddenNavPages]);
-  const visibleSystemPageOrder = useMemo(() => homePageOrder.filter((page) => page === "widgets" || !hiddenNavPages.has(page)), [hiddenNavPages]);
+  const hiddenNavPages = useMemo<Set<Exclude<SystemNavPage, "widgets">>>(
+    () => new Set(state.settings.hiddenNavPages || []),
+    [state.settings.hiddenNavPages]
+  );
+  const navigationOrder = useMemo<SystemNavPage[]>(() => {
+    const saved = state.settings.navigationOrder || [];
+    return [
+      ...saved.filter((page, index) => homePageOrder.includes(page) && saved.indexOf(page) === index),
+      ...homePageOrder.filter((page) => !saved.includes(page))
+    ];
+  }, [state.settings.navigationOrder]);
+  const visibleSystemPageOrder = useMemo(
+    () => navigationOrder.filter((page) => page === "widgets" || !hiddenNavPages.has(page)),
+    [hiddenNavPages, navigationOrder]
+  );
+  const systemNavLabel = useCallback((page: SystemNavPage) => (
+    state.settings.navigationLabels?.[page]?.trim() || systemNavDefaults[page].label
+  ), [state.settings.navigationLabels]);
+  const systemNavIcon = useCallback((page: SystemNavPage) => (
+    state.settings.navigationIcons?.[page] || systemNavDefaults[page].icon
+  ), [state.settings.navigationIcons]);
   const navigationDisplay = state.settings.navigationDisplay === "auto" || state.settings.navigationDisplay === "hidden"
     ? state.settings.navigationDisplay
     : "always";
@@ -1880,6 +1937,11 @@ export default function App() {
     setActiveLayer("all");
     setActivePage("widgets");
   }, [activeCustomPageId, customNavPages]);
+
+  useEffect(() => {
+    if (activeCustomPageId || activePage === "widgets" || !hiddenNavPages.has(activePage)) return;
+    setActivePage("widgets");
+  }, [activeCustomPageId, activePage, hiddenNavPages]);
 
   const visibleFolders = useMemo(() => {
     if (activeLayer === "pinned") return [];
@@ -1947,9 +2009,6 @@ export default function App() {
   const activeCustomNavPage = customNavPages.find((page) => page.id === activeCustomPageId);
   const today = clock;
   const selectedTimeZone = state.settings.timeZone || "Asia/Shanghai";
-  const selectedTimeZoneOption = timeZoneOptions.find((item) => item.value === selectedTimeZone) || timeZoneOptions[0];
-  const chinaDateText = formatterFor(selectedTimeZone, { year: "numeric", month: "long", day: "numeric", weekday: "long" }).format(clock);
-  const chinaTimeText = formatterFor(selectedTimeZone, { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false }).format(clock);
   const selectedHour = Number(formatterFor(selectedTimeZone, { hour: "2-digit", hour12: false }).format(clock).replace(/\D/g, "")) % 24;
   const greetingLead = selectedHour < 6
     ? "Good evening"
@@ -2504,7 +2563,79 @@ export default function App() {
     showToast("页面入口已删除，原有网站仍保留");
   };
 
-  const toggleSystemNavPage = (page: "shortcuts" | "tools") => {
+  const updateCustomNavPage = (page: CustomNavPage, name: string, icon: CustomNavPageIcon) => {
+    const label = name.trim().slice(0, 24);
+    if (!label) return;
+    const updatedAt = nowIso();
+    updateState((current) => ({
+      ...current,
+      shortcutGroups: current.shortcutGroups.map((group) => (
+        group.id === page.groupId && !group.deletedAt
+          ? { ...group, name: label, updatedAt }
+          : group
+      )),
+      settings: {
+        ...current.settings,
+        customNavPages: (current.settings.customNavPages || []).map((item) => (
+          item.id === page.id ? { ...item, name: label, icon, updatedAt } : item
+        )),
+        updatedAt
+      }
+    }));
+    showToast("页面入口已更新");
+  };
+
+  const moveCustomNavPage = (page: CustomNavPage, direction: -1 | 1) => {
+    const livePages = [...customNavPages];
+    const from = livePages.findIndex((item) => item.id === page.id);
+    const to = from + direction;
+    if (from < 0 || to < 0 || to >= livePages.length) return;
+    [livePages[from], livePages[to]] = [livePages[to], livePages[from]];
+    const orderById = new Map(livePages.map((item, order) => [item.id, order]));
+    const updatedAt = nowIso();
+    updateState((current) => ({
+      ...current,
+      settings: {
+        ...current.settings,
+        customNavPages: (current.settings.customNavPages || []).map((item) => (
+          item.deletedAt || !orderById.has(item.id)
+            ? item
+            : { ...item, order: orderById.get(item.id)!, updatedAt }
+        )),
+        updatedAt
+      }
+    }));
+  };
+
+  const updateSystemNavPage = (page: SystemNavPage, name: string, icon: CustomNavPageIcon) => {
+    const label = name.trim().slice(0, 24);
+    if (!label) return;
+    const updatedAt = nowIso();
+    updateState((current) => ({
+      ...current,
+      settings: {
+        ...current.settings,
+        navigationLabels: { ...(current.settings.navigationLabels || {}), [page]: label },
+        navigationIcons: { ...(current.settings.navigationIcons || {}), [page]: icon },
+        updatedAt
+      }
+    }));
+    showToast("导航入口已更新");
+  };
+
+  const moveSystemNavPage = (page: SystemNavPage, direction: -1 | 1) => {
+    const order = [...navigationOrder];
+    const from = order.indexOf(page);
+    const to = from + direction;
+    if (from < 0 || to < 0 || to >= order.length) return;
+    [order[from], order[to]] = [order[to], order[from]];
+    updateState((current) => ({
+      ...current,
+      settings: { ...current.settings, navigationOrder: order, updatedAt: nowIso() }
+    }));
+  };
+
+  const toggleSystemNavPage = (page: Exclude<SystemNavPage, "widgets">) => {
     const currentlyHidden = hiddenNavPages.has(page);
     updateState((current) => ({
       ...current,
@@ -3044,7 +3175,19 @@ export default function App() {
     calendar: <CalendarWidget key="calendar" widgetKey="calendar" size={widgetSizes.calendar} date={today} state={state} updateState={updateState} />,
     countdowns: <CountdownWidget key="countdowns" widgetKey="countdowns" size={widgetSizes.countdowns} state={state} updateState={updateState} />,
     todos: <TodoWidget key="todos" widgetKey="todos" size={widgetSizes.todos} state={state} updateState={updateState} />,
-    focus: <FocusWidget key="focus" widgetKey="focus" size={widgetSizes.focus} state={state} updateState={updateState} />,
+    focus: (
+      <FocusWidget
+        key="focus"
+        widgetKey="focus"
+        size={widgetSizes.focus}
+        state={state}
+        updateState={updateState}
+        onOpenTasks={() => {
+          setActiveCustomPageId(undefined);
+          setActivePage("tasks");
+        }}
+      />
+    ),
     notes: <PhotoWidget key="notes" widgetKey="notes" size={widgetSizes.notes} state={state} updateState={updateState} />,
     rates: <RatesWidget key="rates" widgetKey="rates" size={widgetSizes.rates} rates={rates} message={ratesMessage} refreshing={ratesRefreshing} onRefresh={() => refreshExternalData(state, true)} />,
     clock: <WorldClockWidget key="clock" widgetKey="clock" size={widgetSizes.clock} date={clock} timeZone={state.settings.timeZone || "Asia/Shanghai"} />,
@@ -3124,6 +3267,8 @@ export default function App() {
   const primaryWidgetItems = widgetGridItems.slice(0, 3);
   const primaryWidgetKeys = primaryWidgetItems.map((item) => item.id);
   const secondaryWidgetItems = widgetGridItems.filter((item) => !primaryWidgetKeys.includes(item.id));
+  const selectedSecondaryWidget = secondaryWidgetItems.find((item) => item.id === activeSecondaryWidget)
+    || secondaryWidgetItems[0];
   const staticWidgetsPanel = (
     <section className="widgets home-widgets" aria-label="主页小组件">
       {widgetGridItems.map((item) => (
@@ -3252,31 +3397,33 @@ export default function App() {
 
         <section className={`hero ${activePage === "widgets" ? "sample-a-hero" : "compact-page-hero"}`}>
           {activePage === "widgets" ? (
-            <div className="home-greeting">
-              <h2>{homeGreeting}</h2>
-              <p>Focus on what matters. You’re in control.</p>
-            </div>
+            <>
+              <div className="home-greeting">
+                <h2>{homeGreeting}</h2>
+                <p>Focus on what matters. You’re in control.</p>
+              </div>
+              <div className="search hero-search">
+                {USE_BROWSER_DEFAULT_SEARCH
+                  ? <span className="engine-toggle engine-default">默认</span>
+                  : <button type="button" className="engine-toggle" title="点击切换搜索引擎" onClick={toggleSearchEngine}>{searchEngines[currentSearchEngine].label}</button>}
+                <Search size={20} />
+                <input
+                  ref={searchInputRef}
+                  value={searchText}
+                  onChange={(event) => setSearchText(event.target.value)}
+                  onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); runSearch(); } }}
+                  placeholder="Search apps, sites, notes, tasks..."
+                />
+                <button type="button" className="search-submit" aria-label="搜索" title="搜索" onClick={runSearch}><Search size={18} /></button>
+              </div>
+            </>
           ) : (
-            <div className="hero-date">
-              <strong>{chinaDateText}</strong>
-              <span>{chinaTimeText}</span>
-              <button type="button" className="timezone-button" title="选择时区" onClick={() => setDialog("timezone")}>{selectedTimeZoneOption.label}<span>{selectedTimeZoneOption.value}</span></button>
+            <div className="compact-page-heading">
+              <span>{activeCustomNavPage ? "Custom space" : systemNavLabel(activePage)}</span>
+              <h2>{activeCustomNavPage?.name || systemNavDefaults[activePage].title}</h2>
+              <p>{activeCustomNavPage ? `${shortcutTiles.length} 个入口` : systemNavDefaults[activePage].description}</p>
             </div>
           )}
-          <div className="search hero-search">
-            {USE_BROWSER_DEFAULT_SEARCH
-              ? <span className="engine-toggle engine-default">默认</span>
-              : <button type="button" className="engine-toggle" title="点击切换搜索引擎" onClick={toggleSearchEngine}>{searchEngines[currentSearchEngine].label}</button>}
-            <Search size={20} />
-            <input
-              ref={searchInputRef}
-              value={searchText}
-              onChange={(event) => setSearchText(event.target.value)}
-              onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); runSearch(); } }}
-              placeholder={activePage === "widgets" ? "Search apps, sites, notes, tasks..." : (USE_BROWSER_DEFAULT_SEARCH ? "浏览器默认搜索" : `${searchEngines[currentSearchEngine].label}搜索`)}
-            />
-            <button type="button" className="search-submit" aria-label="搜索" title="搜索" onClick={runSearch}><Search size={18} /></button>
-          </div>
         </section>
 
         {navigationDisplay === "hidden" && !navigationOpen && (
@@ -3317,43 +3464,20 @@ export default function App() {
           }}
         >
           <div className="page-nav-main">
-            <button className={activePage === "widgets" ? "active" : ""} onClick={() => goToPage("widgets")} title="首页">
-              <House size={19} />
-              <span>Home</span>
-            </button>
-            {!hiddenNavPages.has("shortcuts") && (
-              <button className={activePage === "shortcuts" && !activeCustomPageId ? "active" : ""} onClick={() => goToPage("shortcuts")} title="空间">
-                <LayoutGrid size={19} />
-                <span>Spaces</span>
-              </button>
-            )}
-            {!hiddenNavPages.has("tools") && (
-              <button className={`mobile-only-nav ${activePage === "tools" ? "active" : ""}`} onClick={() => goToPage("tools")} title="工具">
-                <BookOpen size={19} />
-                <span>Tools</span>
-              </button>
-            )}
-            <button type="button" onClick={() => {
-              if (activePage !== "widgets") goToPage("widgets");
-              window.requestAnimationFrame(() => searchInputRef.current?.focus());
-            }} title="搜索">
-              <Search size={19} />
-              <span>Search</span>
-            </button>
-            <button type="button" onClick={() => {
-              if (activePage !== "widgets") goToPage("widgets");
-              window.requestAnimationFrame(() => document.querySelector('[data-widget-key="memo"]')?.scrollIntoView({ behavior: "smooth", block: "center" }));
-            }} title="笔记">
-              <FileText size={19} />
-              <span>Notes</span>
-            </button>
-            <button type="button" onClick={() => {
-              if (activePage !== "widgets") goToPage("widgets");
-              window.requestAnimationFrame(() => document.querySelector('[data-widget-key="todos"]')?.scrollIntoView({ behavior: "smooth", block: "center" }));
-            }} title="任务">
-              <Check size={19} />
-              <span>Tasks</span>
-            </button>
+            {visibleSystemPageOrder.map((page) => {
+              const PageIcon = customNavPageIcons[systemNavIcon(page)]?.Icon || House;
+              return (
+                <button
+                  className={activePage === page && !activeCustomPageId ? "active" : ""}
+                  onClick={() => goToPage(page)}
+                  title={systemNavDefaults[page].title}
+                  key={page}
+                >
+                  <PageIcon size={19} />
+                  <span>{systemNavLabel(page)}</span>
+                </button>
+              );
+            })}
             {customNavPages.map((page) => {
               const CustomPageIcon = customNavPageIcons[page.icon]?.Icon || Star;
               return (
@@ -3365,12 +3489,6 @@ export default function App() {
             })}
           </div>
           <div className="page-nav-secondary">
-            {!hiddenNavPages.has("tools") && (
-              <button className={activePage === "tools" ? "active" : ""} onClick={() => goToPage("tools")} title="工具">
-                <BookOpen size={19} />
-                <span>Tools</span>
-              </button>
-            )}
             <button onClick={() => setDialog("settings")} title="设置"><Settings size={18} /><span>Settings</span></button>
             {navigationDisplay === "hidden" && (
               <button className="nav-hide-control" onClick={() => setNavigationOpen(false)} title="隐藏导航" aria-label="隐藏导航"><EyeOff size={18} /></button>
@@ -3436,23 +3554,38 @@ export default function App() {
               </div>
 
               {!layoutEditing && secondaryWidgetItems.length > 0 && (
-                <section className="sample-a-secondary-section">
+                <section className="sample-a-widget-shelf" aria-label="更多小组件">
                   <header>
                     <div>
-                      <span>更多组件</span>
-                      <h2>你的工作区</h2>
+                      <span>More widgets</span>
+                      <h2>按需展开，不挤占主页空间</h2>
                     </div>
                     <div className="sample-a-section-actions">
                       <button type="button" aria-label="资源中心" title="资源中心" onClick={() => setDialog("library")}><Palette size={17} /></button>
                       <button type="button" aria-label="刷新数据" title="刷新数据" onClick={() => void refreshExternalData(state, true)}><RefreshCcw size={17} /></button>
                     </div>
                   </header>
-                  <div className="sample-a-secondary-widgets">
+                  <div className="sample-a-widget-tabs" role="tablist" aria-label="选择小组件">
                     {secondaryWidgetItems.map((item) => (
-                      <div className={`widget-sortable-shell widget-size-${item.size}`} data-widget-key={item.id} key={item.id}>
-                        {item.content}
-                      </div>
+                      <button
+                        type="button"
+                        role="tab"
+                        aria-selected={selectedSecondaryWidget?.id === item.id}
+                        className={selectedSecondaryWidget?.id === item.id ? "active" : ""}
+                        onClick={() => setActiveSecondaryWidget(item.id)}
+                        key={item.id}
+                      >
+                        {item.icon}
+                        <span>{item.label}</span>
+                      </button>
                     ))}
+                  </div>
+                  <div className="sample-a-widget-stage">
+                    {selectedSecondaryWidget && (
+                      <div className={`widget-sortable-shell widget-size-${selectedSecondaryWidget.size}`} data-widget-key={selectedSecondaryWidget.id}>
+                        {selectedSecondaryWidget.content}
+                      </div>
+                    )}
                   </div>
                 </section>
               )}
@@ -3466,6 +3599,23 @@ export default function App() {
                 <button type="button" aria-label="添加网站" title="添加网站" onClick={() => openNewShortcut()}><Plus size={19} /></button>
               </div>
             </section>
+          ) : activePage === "search" ? (
+            <SearchWorkspace
+              query={searchText}
+              onQueryChange={setSearchText}
+              onWebSearch={runSearch}
+              onToggleEngine={toggleSearchEngine}
+              engineLabel={USE_BROWSER_DEFAULT_SEARCH ? "Browser" : searchEngines[currentSearchEngine].label}
+              shortcuts={allShortcuts}
+              notes={state.notes}
+              todos={state.todos}
+              onOpenNotes={() => goToPage("notes")}
+              onOpenTasks={() => goToPage("tasks")}
+            />
+          ) : activePage === "notes" ? (
+            <NotesWorkspace state={state} updateState={updateState} />
+          ) : activePage === "tasks" ? (
+            <TasksWorkspace state={state} updateState={updateState} />
           ) : activePage === "tools" ? (
             <ToolHub
               shortcutCount={allShortcuts.length}
@@ -3733,8 +3883,15 @@ export default function App() {
         <PageManagerDialog
           customPages={customNavPages}
           hiddenPages={hiddenNavPages}
+          systemOrder={navigationOrder}
+          systemLabels={state.settings.navigationLabels || {}}
+          systemIcons={state.settings.navigationIcons || {}}
           onAdd={addCustomNavPage}
           onDelete={deleteCustomNavPage}
+          onUpdateCustom={updateCustomNavPage}
+          onMoveCustom={moveCustomNavPage}
+          onUpdateSystem={updateSystemNavPage}
+          onMoveSystem={moveSystemNavPage}
           onToggleSystem={toggleSystemNavPage}
           onOpenPage={(page) => { goToCustomPage(page); setDialog(null); }}
           onClose={() => setDialog(null)}
@@ -3752,6 +3909,7 @@ export default function App() {
           onRestoreMigrationBackup={restoreMigrationBackup}
           onCheckUpdate={() => runUpdateCheck(true)}
           onOpenTimeZone={() => setDialog("timezone")}
+          onOpenPageManager={() => setDialog("pages")}
           onWeatherUseLocationChange={async (enabled) => {
             if (enabled) {
               const granted = await requestDeviceLocationPermission().catch(() => false);
@@ -4157,6 +4315,282 @@ function StarterSites() {
   );
 }
 
+function SearchWorkspace({ query, onQueryChange, onWebSearch, onToggleEngine, engineLabel, shortcuts, notes, todos, onOpenNotes, onOpenTasks }: {
+  query: string;
+  onQueryChange: (value: string) => void;
+  onWebSearch: () => void;
+  onToggleEngine: () => void;
+  engineLabel: string;
+  shortcuts: Shortcut[];
+  notes: Note[];
+  todos: Todo[];
+  onOpenNotes: () => void;
+  onOpenTasks: () => void;
+}) {
+  const normalizedQuery = query.trim().toLowerCase();
+  const matchedShortcuts = shortcuts
+    .filter((shortcut) => !normalizedQuery || `${shortcut.title} ${shortcut.url}`.toLowerCase().includes(normalizedQuery))
+    .slice(0, normalizedQuery ? 12 : 8);
+  const matchedNotes = notes
+    .filter((note) => !note.deletedAt)
+    .filter((note) => !normalizedQuery || `${note.title} ${note.body}`.toLowerCase().includes(normalizedQuery))
+    .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt))
+    .slice(0, normalizedQuery ? 8 : 3);
+  const matchedTodos = todos
+    .filter((todo) => !todo.deletedAt)
+    .filter((todo) => !normalizedQuery || todo.text.toLowerCase().includes(normalizedQuery))
+    .sort((left, right) => Number(left.done) - Number(right.done) || left.order - right.order)
+    .slice(0, normalizedQuery ? 8 : 5);
+  const resultCount = matchedShortcuts.length + matchedNotes.length + matchedTodos.length;
+
+  return (
+    <section className="lucid-search-workspace">
+      <form className="lucid-search-command" onSubmit={(event) => { event.preventDefault(); onWebSearch(); }}>
+        <Search size={23} aria-hidden="true" />
+        <input
+          autoFocus
+          value={query}
+          onChange={(event) => onQueryChange(event.target.value)}
+          placeholder="查找网站、笔记、任务，或直接搜索网络"
+          aria-label="搜索 WhyNavo 内容"
+        />
+        <button type="button" className="lucid-search-engine" onClick={onToggleEngine} title="切换网络搜索引擎">{engineLabel}</button>
+        <button type="submit" className="lucid-search-web" title="搜索网络" aria-label="搜索网络"><Navigation size={17} /></button>
+      </form>
+
+      <div className="lucid-search-summary">
+        <span>{normalizedQuery ? `${resultCount} 个本地结果` : "Recently used"}</span>
+        <p>{normalizedQuery ? "本地结果即时显示；按回车可继续搜索网络。" : "先从设备本地内容开始，不上传搜索词。"}</p>
+      </div>
+
+      <div className="lucid-search-results">
+        <section className="lucid-result-group">
+          <header><span><Globe2 size={16} />Sites</span><small>{matchedShortcuts.length}</small></header>
+          <div className="lucid-site-results">
+            {matchedShortcuts.map((shortcut, index) => (
+              <a href={safeHttpHref(shortcut.url)} target="_blank" rel="noreferrer" key={shortcut.id}>
+                <span className="lucid-result-icon">
+                  <ShortcutIconContent url={shortcut.url} iconUrl={shortcut.iconUrl} title={shortcut.title} fallback={shortcut.title.slice(0, 1)} priority={index < 8} />
+                </span>
+                <span><strong>{shortcut.title}</strong><small>{shortcut.url}</small></span>
+              </a>
+            ))}
+            {!matchedShortcuts.length && <p className="lucid-result-empty">没有匹配的网站</p>}
+          </div>
+        </section>
+
+        <section className="lucid-result-group">
+          <header><span><StickyNote size={16} />Notes</span><button type="button" onClick={onOpenNotes}>打开</button></header>
+          <div className="lucid-text-results">
+            {matchedNotes.map((note) => (
+              <button type="button" onClick={onOpenNotes} key={note.id}>
+                <span><strong>{note.title || "未命名笔记"}</strong><small>{note.body || "空白笔记"}</small></span>
+                <FileText size={15} />
+              </button>
+            ))}
+            {!matchedNotes.length && <p className="lucid-result-empty">没有匹配的笔记</p>}
+          </div>
+        </section>
+
+        <section className="lucid-result-group">
+          <header><span><ListTodo size={16} />Tasks</span><button type="button" onClick={onOpenTasks}>打开</button></header>
+          <div className="lucid-text-results">
+            {matchedTodos.map((todo) => (
+              <button type="button" className={todo.done ? "is-done" : ""} onClick={onOpenTasks} key={todo.id}>
+                <span><strong>{todo.text}</strong><small>{todo.done ? "已完成" : "待处理"}</small></span>
+                <Check size={15} />
+              </button>
+            ))}
+            {!matchedTodos.length && <p className="lucid-result-empty">没有匹配的任务</p>}
+          </div>
+        </section>
+      </div>
+    </section>
+  );
+}
+
+function NotesWorkspace({ state, updateState }: {
+  state: AppState;
+  updateState: (updater: (state: AppState) => AppState) => void;
+}) {
+  const notes = state.notes
+    .filter((note) => !note.deletedAt)
+    .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt));
+  const [selectedId, setSelectedId] = useState<string | undefined>(() => notes[0]?.id);
+  const selected = notes.find((note) => note.id === selectedId) || notes[0];
+
+  useEffect(() => {
+    if (selected && selected.id !== selectedId) setSelectedId(selected.id);
+    if (!selected && selectedId) setSelectedId(undefined);
+  }, [selected, selectedId]);
+
+  const addNote = () => {
+    if (state.notes.length >= MAX_ENTITY_RECORDS) {
+      window.alert("笔记已达到 5000 条安全上限，请先导出备份并整理旧内容");
+      return;
+    }
+    const updatedAt = nowIso();
+    const note: Note = { id: uid(), title: "未命名笔记", body: "", updatedAt };
+    updateState((current) => ({ ...current, notes: [...current.notes, note] }));
+    setSelectedId(note.id);
+  };
+  const updateNote = (patch: Partial<Pick<Note, "title" | "body">>) => {
+    if (!selected) return;
+    updateState((current) => ({
+      ...current,
+      notes: current.notes.map((note) => (
+        note.id === selected.id ? { ...note, ...patch, updatedAt: nowIso() } : note
+      ))
+    }));
+  };
+  const deleteNote = () => {
+    if (!selected || !window.confirm(`删除“${selected.title || "未命名笔记"}”？`)) return;
+    const deletedAt = nowIso();
+    updateState((current) => ({
+      ...current,
+      notes: current.notes.map((note) => (
+        note.id === selected.id ? { ...note, deletedAt, updatedAt: deletedAt } : note
+      ))
+    }));
+    setSelectedId(notes.find((note) => note.id !== selected.id)?.id);
+  };
+
+  return (
+    <section className="lucid-notes-workspace">
+      <aside className="lucid-notes-index">
+        <header>
+          <div><span>Library</span><strong>{notes.length} notes</strong></div>
+          <button type="button" onClick={addNote} title="新建笔记" aria-label="新建笔记"><Plus size={17} /></button>
+        </header>
+        <div className="lucid-note-list">
+          {notes.map((note) => (
+            <button type="button" className={note.id === selected?.id ? "active" : ""} onClick={() => setSelectedId(note.id)} key={note.id}>
+              <strong>{note.title || "未命名笔记"}</strong>
+              <span>{note.body || "空白笔记"}</span>
+              <small>{new Date(note.updatedAt).toLocaleDateString("zh-CN", { month: "short", day: "numeric" })}</small>
+            </button>
+          ))}
+          {!notes.length && <p>从一张空白纸开始。</p>}
+        </div>
+      </aside>
+
+      <article className="lucid-note-editor">
+        {selected ? (
+          <>
+            <header>
+              <span>{new Date(selected.updatedAt).toLocaleString("zh-CN", { month: "long", day: "numeric", hour: "2-digit", minute: "2-digit" })}</span>
+              <button type="button" onClick={deleteNote} title="删除笔记" aria-label="删除笔记"><Trash2 size={16} /></button>
+            </header>
+            <input
+              className="lucid-note-title"
+              maxLength={MAX_ENTITY_NAME_CHARS}
+              value={selected.title}
+              onChange={(event) => updateNote({ title: event.target.value })}
+              placeholder="标题"
+              aria-label="笔记标题"
+            />
+            <textarea
+              className="lucid-note-body"
+              maxLength={MAX_QUICK_NOTE_CHARS}
+              value={selected.body}
+              onChange={(event) => updateNote({ body: event.target.value })}
+              placeholder="写下想法、链接或下一步..."
+              aria-label="笔记内容"
+            />
+            <footer><ShieldCheck size={14} /><span>自动保存在本机，登录后可安全同步。</span></footer>
+          </>
+        ) : (
+          <button type="button" className="lucid-note-empty" onClick={addNote}><StickyNote size={24} /><span>新建第一条笔记</span></button>
+        )}
+      </article>
+    </section>
+  );
+}
+
+function TasksWorkspace({ state, updateState }: {
+  state: AppState;
+  updateState: (updater: (state: AppState) => AppState) => void;
+}) {
+  const [text, setText] = useState("");
+  const [filter, setFilter] = useState<"open" | "all" | "done">("open");
+  const todos = state.todos.filter((todo) => !todo.deletedAt).sort((left, right) => left.order - right.order);
+  const visibleTodos = todos.filter((todo) => filter === "all" || (filter === "done" ? todo.done : !todo.done));
+  const doneCount = todos.filter((todo) => todo.done).length;
+  const progress = todos.length ? Math.round(doneCount / todos.length * 100) : 0;
+
+  const addTodo = () => {
+    const value = text.trim();
+    if (!value) return;
+    if (value.length > MAX_TODO_TEXT_CHARS || state.todos.length >= MAX_ENTITY_RECORDS) {
+      window.alert("任务内容过长或已达到安全上限");
+      return;
+    }
+    const todo: Todo = { id: uid(), text: value, done: false, order: todos.length, updatedAt: nowIso() };
+    updateState((current) => ({ ...current, todos: [...current.todos, todo] }));
+    setText("");
+    setFilter("open");
+  };
+  const toggleTodo = (id: string) => updateState((current) => ({
+    ...current,
+    todos: current.todos.map((todo) => todo.id === id ? { ...todo, done: !todo.done, updatedAt: nowIso() } : todo)
+  }));
+  const deleteTodo = (id: string) => {
+    const deletedAt = nowIso();
+    updateState((current) => ({
+      ...current,
+      todos: current.todos.map((todo) => todo.id === id ? { ...todo, deletedAt, updatedAt: deletedAt } : todo)
+    }));
+  };
+
+  return (
+    <section className="lucid-tasks-workspace">
+      <header className="lucid-task-overview">
+        <div className="lucid-task-progress" style={{ "--task-progress": `${progress * 3.6}deg` } as React.CSSProperties}>
+          <span><strong>{progress}</strong><small>%</small></span>
+        </div>
+        <div>
+          <span>Today</span>
+          <h2>{todos.length - doneCount ? `${todos.length - doneCount} 件事等待完成` : "今天的任务已完成"}</h2>
+          <p>{doneCount} of {todos.length} completed</p>
+        </div>
+      </header>
+
+      <form className="lucid-task-composer" onSubmit={(event) => { event.preventDefault(); addTodo(); }}>
+        <Plus size={18} aria-hidden="true" />
+        <input value={text} maxLength={MAX_TODO_TEXT_CHARS} onChange={(event) => setText(event.target.value)} placeholder="添加下一件要做的事" aria-label="新任务" />
+        <button type="submit" disabled={!text.trim()}>添加</button>
+      </form>
+
+      <div className="lucid-task-toolbar">
+        <div role="tablist" aria-label="任务筛选">
+          {(["open", "all", "done"] as const).map((value) => (
+            <button type="button" role="tab" aria-selected={filter === value} className={filter === value ? "active" : ""} onClick={() => setFilter(value)} key={value}>
+              {value === "open" ? "待处理" : value === "all" ? "全部" : "已完成"}
+            </button>
+          ))}
+        </div>
+        <span>{visibleTodos.length} items</span>
+      </div>
+
+      <div className="lucid-task-list">
+        {visibleTodos.map((todo) => (
+          <div className={todo.done ? "is-done" : ""} key={todo.id}>
+            <label>
+              <input type="checkbox" checked={todo.done} onChange={() => toggleTodo(todo.id)} />
+              <span>{todo.text}</span>
+            </label>
+            <small>{todo.done ? "Completed" : "Open"}</small>
+            <button type="button" title="删除任务" aria-label="删除任务" onClick={() => deleteTodo(todo.id)}><X size={15} /></button>
+          </div>
+        ))}
+        {!visibleTodos.length && (
+          <p className="lucid-task-empty">{filter === "done" ? "还没有已完成任务。" : "这里很安静，可以专注下一件事。"}</p>
+        )}
+      </div>
+    </section>
+  );
+}
+
 function Dock({ shortcuts }: { shortcuts: Shortcut[] }) {
   if (!shortcuts.length) return null;
   return (
@@ -4440,7 +4874,6 @@ function WeatherWidget({ widgetKey, size, weather, city, useLocation, refreshing
   const source = safeHttpHref(weather?.sourceUrl || "https://open-meteo.com/");
   const dayLimit = size === "small" ? 0 : size === "medium" ? 4 : 6;
   const days = weather?.forecast?.slice(0, dayLimit) || [];
-  const weatherTone = weatherToneForCode(weather?.weatherCode);
   const placeLabel = weather ? weather.city : city;
   const compactPlace = placeLabel
     .replace(/\s*,\s*(China|中国)$/i, "")
@@ -4451,52 +4884,53 @@ function WeatherWidget({ widgetKey, size, weather, city, useLocation, refreshing
     .join(" · ") || placeLabel;
   const precipitation = weather?.forecast?.[0]?.precipitationProbability;
   return (
-    <Widget title="Weather" meta={compactPlace || "Shanghai"} widgetKey={widgetKey} tone={`weather weather-${weatherTone}`} size={size} action={<button title={refreshing ? "正在刷新" : "刷新天气"} disabled={refreshing} onClick={() => void onRefresh()}><RefreshCcw size={14} className={refreshing ? "spin" : undefined} /></button>}>
-      <div className="weather-scene" aria-hidden="true">
-        <span className="weather-sun" />
-        <span className="weather-cloud one" />
-        <span className="weather-cloud two" />
-        <span className="weather-rain-lines" />
-        <span className="weather-snow-dots" />
-        <span className="weather-bolt" />
-        <span className="weather-fog-lines" />
-      </div>
-      <a className={`weather-card ${weather ? "" : "is-loading"}`} href={source} target="_blank" rel="noreferrer" title="打开天气数据来源">
+    <Widget
+      title="Weather"
+      meta={<><MapPin size={10} />{compactPlace || "Shanghai"}</>}
+      widgetKey={widgetKey}
+      tone={`weather weather-${weatherToneForCode(weather?.weatherCode)}`}
+      size={size}
+      action={<button className="weather-unit" title={refreshing ? "正在刷新" : "刷新天气"} disabled={refreshing} onClick={() => void onRefresh()}>°C<ChevronRight size={12} className={refreshing ? "spin" : undefined} /></button>}
+    >
+      <a className={`sample-weather ${weather ? "" : "is-loading"}`} href={source} target="_blank" rel="noreferrer" title="打开天气数据来源">
         {weather ? (
           <>
-            <div className="weather-primary">
-              <div className="weather-line">
+            <div className="sample-weather-current">
+              <div className="sample-weather-copy">
                 <strong>{Math.round(weather.temperature)}°</strong>
                 <span>{weatherLabel(weather.weatherCode)}</span>
+                <small>Feels like {Math.round(weather.temperature + Math.min(3, weather.windSpeed / 12))}°</small>
               </div>
-              <p>{`${useLocation ? "定位" : "城市"} · ${compactPlace}`}</p>
+              <div className="sample-weather-orbit" aria-hidden="true">
+                <span><CloudSun size={34} /></span>
+              </div>
             </div>
             {size !== "small" && (
-              <div className="weather-facts" aria-label="当前天气详情">
-                <span><small>风速</small><strong>{Math.round(weather.windSpeed)}<i>km/h</i></strong></span>
-                <span><small>降水</small><strong>{precipitation ?? 0}<i>%</i></strong></span>
+              <div className="sample-weather-facts" aria-label="当前天气详情">
+                <span><Wind size={13} /><strong>{Math.round(weather.windSpeed)} km/h</strong></span>
+                <span><Droplets size={13} /><strong>{precipitation ?? 0}%</strong></span>
+                <span><CloudSun size={13} /><strong>{useLocation ? "Live" : "City"}</strong></span>
               </div>
             )}
           </>
         ) : (
-          <div className="weather-loading-state">
-            <span><Globe2 size={22} /></span>
+          <div className="sample-weather-loading">
+            <span><CloudSun size={25} /></span>
             <strong>正在准备天气</strong>
             <small>{useLocation ? "读取设备位置" : `查询 ${city}`}</small>
           </div>
         )}
       </a>
       {days.length > 0 && (
-        <div className="forecast-strip" aria-label={`${days.length} 天天气预报`}>
+        <div className="sample-weather-forecast" aria-label={`${days.length} 天天气预报`}>
           {days.map((day) => {
             const date = new Date(`${day.date}T00:00:00`);
             const dayTone = weatherToneForCode(day.weatherCode);
             return (
               <a className={`forecast-${dayTone}`} href={source} target="_blank" rel="noreferrer" key={day.date} title={`${day.date} ${weatherLabel(day.weatherCode)}`}>
-                <span>{date.toLocaleDateString("zh-CN", { month: "numeric", day: "numeric" })}</span>
+                <span>{date.toLocaleDateString("en-US", { weekday: "short" })}</span>
                 <i className="forecast-mark" aria-hidden="true" />
-                <strong>{Math.round(day.temperatureMax)}°</strong>
-                <small>{Math.round(day.temperatureMin)}°</small>
+                <strong>{Math.round(day.temperatureMax)}° <small>{Math.round(day.temperatureMin)}°</small></strong>
               </a>
             );
           })}
@@ -4509,18 +4943,23 @@ function WeatherWidget({ widgetKey, size, weather, city, useLocation, refreshing
 function CalendarWidget({ widgetKey, size, date, state, updateState }: { widgetKey: WidgetKey; size: WidgetSize; date: Date; state: AppState; updateState: (updater: (state: AppState) => AppState) => void }) {
   const [editingDate, setEditingDate] = useState<string | undefined>();
   const [draft, setDraft] = useState("");
+  const [monthOffset, setMonthOffset] = useState(0);
   const records = state.settings.calendarRecords || {};
+  const viewDate = useMemo(
+    () => new Date(date.getFullYear(), date.getMonth() + monthOffset, Math.min(date.getDate(), 28)),
+    [date, monthOffset]
+  );
   const days = useMemo(() => {
-    const first = new Date(date.getFullYear(), date.getMonth(), 1);
+    const first = new Date(viewDate.getFullYear(), viewDate.getMonth(), 1);
     const start = first.getDay();
-    const count = new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
+    const count = new Date(viewDate.getFullYear(), viewDate.getMonth() + 1, 0).getDate();
     return Array.from({ length: start + count }, (_, index) => {
       if (index < start) return undefined;
       const day = index - start + 1;
-      const value = new Date(date.getFullYear(), date.getMonth(), day);
+      const value = new Date(viewDate.getFullYear(), viewDate.getMonth(), day);
       return { day, key: calendarDateKey(value) };
     });
-  }, [date]);
+  }, [viewDate]);
 
   const openDate = (key: string) => {
     setEditingDate(key);
@@ -4564,11 +5003,11 @@ function CalendarWidget({ widgetKey, size, date, state, updateState }: { widgetK
 
   const todayKey = calendarDateKey(date);
   const weekdayLabel = date.toLocaleDateString("zh-CN", { weekday: "long" });
-  const monthPrefix = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+  const monthPrefix = `${viewDate.getFullYear()}-${String(viewDate.getMonth() + 1).padStart(2, "0")}`;
   const monthRecordCount = Object.keys(records).filter((key) => key.startsWith(monthPrefix)).length;
   const sampleWeekDays = useMemo(() => {
-    const mondayOffset = (date.getDay() + 6) % 7;
-    const monday = new Date(date.getFullYear(), date.getMonth(), date.getDate() - mondayOffset);
+    const mondayOffset = (viewDate.getDay() + 6) % 7;
+    const monday = new Date(viewDate.getFullYear(), viewDate.getMonth(), viewDate.getDate() - mondayOffset);
     return Array.from({ length: 7 }, (_, index) => {
       const value = new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() + index);
       return {
@@ -4577,7 +5016,7 @@ function CalendarWidget({ widgetKey, size, date, state, updateState }: { widgetK
         label: value.toLocaleDateString("en-US", { weekday: "short" }).toUpperCase()
       };
     });
-  }, [date]);
+  }, [viewDate]);
   const agendaEntries = Object.entries(records)
     .filter(([, text]) => Boolean(text.trim()))
     .sort(([left], [right]) => left.localeCompare(right))
@@ -4586,7 +5025,7 @@ function CalendarWidget({ widgetKey, size, date, state, updateState }: { widgetK
 
   if (size === "small") {
     return (
-      <Widget title={(date.getMonth() + 1) + " 月"} meta={date.getFullYear()} widgetKey={widgetKey} tone="calendar" size={size} action={<button type="button" title="记录今天" onClick={() => openDate(todayKey)}><CalendarDays size={16} /></button>}>
+      <Widget title={(viewDate.getMonth() + 1) + " 月"} meta={viewDate.getFullYear()} widgetKey={widgetKey} tone="calendar" size={size} action={<button type="button" title="记录今天" onClick={() => openDate(todayKey)}><CalendarDays size={16} /></button>}>
         <button type="button" className="calendar-mini-card" onClick={() => openDate(todayKey)} title={records[todayKey] || "点击记录今天"}>
           <span className="calendar-mini-month">{date.toLocaleDateString("zh-CN", { month: "short" })}</span>
           <strong>{date.getDate()}</strong>
@@ -4610,9 +5049,21 @@ function CalendarWidget({ widgetKey, size, date, state, updateState }: { widgetK
 
   if (size === "wide") {
     return (
-      <Widget title="Calendar" meta={`${monthRecordCount} events`} widgetKey={widgetKey} tone="calendar" size={size} action={<button type="button" title="记录今天" onClick={() => openDate(todayKey)}>Today</button>}>
+      <Widget
+        title="Calendar"
+        widgetKey={widgetKey}
+        tone="calendar"
+        size={size}
+        action={(
+          <div className="sample-calendar-controls">
+            <button type="button" title="回到今天" onClick={() => setMonthOffset(0)}>Today</button>
+            <button type="button" title="上个月" aria-label="上个月" onClick={() => setMonthOffset((value) => value - 1)}><ChevronLeft size={13} /></button>
+            <button type="button" title="下个月" aria-label="下个月" onClick={() => setMonthOffset((value) => value + 1)}><ChevronRight size={13} /></button>
+          </div>
+        )}
+      >
         <div className="sample-calendar">
-          <strong className="sample-calendar-month">{date.toLocaleDateString("en-US", { month: "long", year: "numeric" })}</strong>
+          <strong className="sample-calendar-month">{viewDate.toLocaleDateString("en-US", { month: "long", year: "numeric" })}</strong>
           <div className="sample-calendar-week" aria-label="本周日期">
             {sampleWeekDays.map((item) => (
               <button
@@ -4663,7 +5114,7 @@ function CalendarWidget({ widgetKey, size, date, state, updateState }: { widgetK
   }
 
   return (
-    <Widget title={(date.getMonth() + 1) + " 月"} meta={`${monthRecordCount} 条记录`} widgetKey={widgetKey} tone="calendar" size={size} action={<button type="button" title="记录今天" onClick={() => openDate(todayKey)}><CalendarDays size={16} /></button>}>
+    <Widget title={(viewDate.getMonth() + 1) + " 月"} meta={`${monthRecordCount} 条记录`} widgetKey={widgetKey} tone="calendar" size={size} action={<button type="button" title="记录今天" onClick={() => openDate(todayKey)}><CalendarDays size={16} /></button>}>
       <div className={`calendar-layout calendar-layout-${size}`}>
         <div className="calendar-grid calendar-clickable">
           {["日", "一", "二", "三", "四", "五", "六"].map((day) => <span key={day} className="muted calendar-weekday">{day}</span>)}
@@ -4672,7 +5123,7 @@ function CalendarWidget({ widgetKey, size, date, state, updateState }: { widgetK
               type="button"
               key={item.key}
               className={[
-                item.day === date.getDate() ? "today" : "",
+                item.key === todayKey ? "today" : "",
                 records[item.key] ? "has-record" : ""
               ].filter(Boolean).join(" ")}
               onClick={() => openDate(item.key)}
@@ -4963,11 +5414,12 @@ function QuoteWidget({ widgetKey, size, date }: { widgetKey: WidgetKey; size: Wi
   );
 }
 
-function FocusWidget({ widgetKey, size, state, updateState }: {
+function FocusWidget({ widgetKey, size, state, updateState, onOpenTasks }: {
   widgetKey: WidgetKey;
   size: WidgetSize;
   state: AppState;
   updateState: (updater: (state: AppState) => AppState) => void;
+  onOpenTasks: () => void;
 }) {
   const [seconds, setSeconds] = useState(25 * 60);
   const [running, setRunning] = useState(false);
@@ -4975,8 +5427,12 @@ function FocusWidget({ widgetKey, size, state, updateState }: {
     .filter((item) => !item.deletedAt)
     .sort((a, b) => a.order - b.order);
   const activeTodos = todos.filter((item) => !item.done);
-  const featuredTodo = activeTodos[0];
-  const detailTodos = todos.filter((item) => item.id !== featuredTodo?.id).slice(0, 3);
+  const detailTodos = todos.slice(0, 3);
+  const focusHeadline = state.settings.quickNote
+    ?.split(/\r?\n/)
+    .map((line) => line.trim())
+    .find(Boolean)
+    ?.slice(0, 90) || "Make today count.";
   useEffect(() => {
     if (!running) return;
     const timer = window.setInterval(() => {
@@ -4999,42 +5455,47 @@ function FocusWidget({ widgetKey, size, state, updateState }: {
     todos: current.todos.map((item) => item.id === id ? { ...item, done: !item.done, updatedAt: nowIso() } : item)
   }));
   return (
-    <Widget title="Focus" meta={running ? "In progress" : `${activeTodos.length} tasks`} widgetKey={widgetKey} tone="focus" size={size}>
-      <div className="focus-command">
-        <div className="focus-command-hero">
-          <span>当前重点</span>
-          <strong>{featuredTodo?.text || "开始一段不被打扰的时间"}</strong>
-          <button
-            type="button"
-            className="focus-command-timer"
-            style={{ "--progress": `${progress * 360}deg` } as React.CSSProperties}
-            onClick={() => setRunning((value) => !value)}
-            title={running ? "暂停专注" : "开始专注"}
-          >
-            <b>{minutes}:{rest}</b>
-            <small>{running ? "暂停" : "开始"}</small>
-          </button>
+    <Widget
+      title="Focus"
+      meta={running ? "In progress" : undefined}
+      widgetKey={widgetKey}
+      tone="focus"
+      size={size}
+      action={(
+        <button type="button" title="打开任务工作区" aria-label="打开任务工作区" onClick={onOpenTasks}>
+          <MoreHorizontal size={15} />
+        </button>
+      )}
+    >
+      <div className="sample-focus-paper">
+        <div className="sample-focus-headline">
+          <Target size={16} aria-hidden="true" />
+          <strong>{focusHeadline}</strong>
         </div>
-        <div className="focus-command-list">
+        <div className="sample-focus-list">
           {detailTodos.map((todo) => (
             <label key={todo.id}>
               <input type="checkbox" checked={todo.done} onChange={() => toggleTodo(todo.id)} />
               <span>{todo.text}</span>
-              <small>{todo.done ? "完成" : "待办"}</small>
             </label>
           ))}
           {!detailTodos.length && (
-            <button type="button" className="focus-command-empty" onClick={() => document.querySelector('[data-widget-key="todos"]')?.scrollIntoView({ behavior: "smooth", block: "center" })}>
-              <Plus size={14} /> Add a task
-            </button>
+            <p>写下一件值得专注完成的事。</p>
           )}
-          {Array.from({ length: Math.max(0, 3 - detailTodos.length - (detailTodos.length ? 0 : 1)) }, (_, index) => (
-            <span className="focus-command-placeholder" aria-hidden="true" key={`focus-placeholder-${index}`}><i /><b /></span>
-          ))}
         </div>
-        <div className="focus-command-footer">
-          <span>{running ? "保持专注，完成当前重点" : "25 分钟专注周期"}</span>
-          <button type="button" onClick={() => { setRunning(false); setSeconds(25 * 60); }}><TimerReset size={14} /> 重置</button>
+        <div className="sample-focus-footer">
+          <span>Today · {todos.length} items</span>
+          <button
+            type="button"
+            className={running ? "is-running" : ""}
+            style={{ "--progress": `${progress * 360}deg` } as React.CSSProperties}
+            onClick={() => setRunning((value) => !value)}
+            onDoubleClick={() => { setRunning(false); setSeconds(25 * 60); }}
+            title={running ? "暂停专注；双击重置" : "开始 25 分钟专注"}
+          >
+            <b>{minutes}:{rest}</b>
+            <small>{running ? "Pause" : "Start"}</small>
+          </button>
         </div>
       </div>
     </Widget>
@@ -5848,59 +6309,127 @@ function ResourceCenterDialog({ state, shortcuts, updateState, onEditShortcut, o
   );
 }
 
-function PageManagerDialog({ customPages, hiddenPages, onAdd, onDelete, onToggleSystem, onOpenPage, onClose }: {
+function PageManagerDialog({
+  customPages,
+  hiddenPages,
+  systemOrder,
+  systemLabels,
+  systemIcons,
+  onAdd,
+  onDelete,
+  onUpdateCustom,
+  onMoveCustom,
+  onUpdateSystem,
+  onMoveSystem,
+  onToggleSystem,
+  onOpenPage,
+  onClose
+}: {
   customPages: CustomNavPage[];
-  hiddenPages: Set<"shortcuts" | "tools">;
+  hiddenPages: Set<Exclude<SystemNavPage, "widgets">>;
+  systemOrder: SystemNavPage[];
+  systemLabels: NonNullable<AppState["settings"]["navigationLabels"]>;
+  systemIcons: NonNullable<AppState["settings"]["navigationIcons"]>;
   onAdd: (name: string, icon: CustomNavPageIcon) => void;
   onDelete: (page: CustomNavPage) => void;
-  onToggleSystem: (page: "shortcuts" | "tools") => void;
+  onUpdateCustom: (page: CustomNavPage, name: string, icon: CustomNavPageIcon) => void;
+  onMoveCustom: (page: CustomNavPage, direction: -1 | 1) => void;
+  onUpdateSystem: (page: SystemNavPage, name: string, icon: CustomNavPageIcon) => void;
+  onMoveSystem: (page: SystemNavPage, direction: -1 | 1) => void;
+  onToggleSystem: (page: Exclude<SystemNavPage, "widgets">) => void;
   onOpenPage: (page: CustomNavPage) => void;
   onClose: () => void;
 }) {
   const [name, setName] = useState("");
   const [icon, setIcon] = useState<CustomNavPageIcon>("star");
+  const [systemDrafts, setSystemDrafts] = useState(() => Object.fromEntries(
+    systemOrder.map((page) => [page, {
+      name: systemLabels[page] || systemNavDefaults[page].label,
+      icon: systemIcons[page] || systemNavDefaults[page].icon
+    }])
+  ) as Record<SystemNavPage, { name: string; icon: CustomNavPageIcon }>);
+  const [customDrafts, setCustomDrafts] = useState(() => Object.fromEntries(
+    customPages.map((page) => [page.id, { name: page.name, icon: page.icon }])
+  ) as Record<string, { name: string; icon: CustomNavPageIcon }>);
   const createPage = () => {
     if (!name.trim()) return;
     onAdd(name, icon);
   };
-  const systemPages = [
-    { id: "widgets" as const, name: "主页", Icon: CalendarDays, locked: true },
-    { id: "shortcuts" as const, name: "网站", Icon: Layers, locked: false },
-    { id: "tools" as const, name: "工具", Icon: BookOpen, locked: false }
-  ];
 
   return (
-    <DialogShell title="页面管理" onClose={onClose} className="page-manager-dialog">
+    <DialogShell title="导航与页面" onClose={onClose} className="page-manager-dialog lucid-page-manager">
+      <div className="lucid-dialog-intro">
+        <SlidersHorizontal size={19} />
+        <div><strong>让左侧导航只保留真正需要的入口</strong><span>名称、图标、顺序和显示状态都会同步到你的其他设备。</span></div>
+      </div>
       <section className="page-manager-list" aria-label="系统页面">
-        <div className="page-manager-section-title">系统页面</div>
-        {systemPages.map((page) => {
-          const hidden = page.id !== "widgets" && hiddenPages.has(page.id);
-          const SystemPageIcon = page.Icon;
+        <div className="page-manager-section-title"><span>系统页面</span><small>{systemOrder.length} 个</small></div>
+        {systemOrder.map((page, index) => {
+          const draft = systemDrafts[page] || { name: systemNavDefaults[page].label, icon: systemNavDefaults[page].icon };
+          const hidden = page !== "widgets" && hiddenPages.has(page);
+          const SystemPageIcon = customNavPageIcons[draft.icon]?.Icon || House;
           return (
-            <div className={`page-manager-row ${hidden ? "is-hidden" : ""}`} key={page.id}>
+            <div className={`page-manager-row lucid-page-row ${hidden ? "is-hidden" : ""}`} key={page}>
               <span className="page-manager-icon"><SystemPageIcon size={18} /></span>
-              <span className="page-manager-name"><strong>{page.name}</strong><small>{page.locked ? "固定" : hidden ? "已隐藏" : "显示中"}</small></span>
-              {page.id === "widgets" ? <span className="page-manager-locked"><Pin size={14} /></span> : (
-                <button type="button" title={hidden ? `显示${page.name}` : `隐藏${page.name}`} onClick={() => onToggleSystem(page.id)}>
+              <input
+                aria-label={`${systemNavDefaults[page].title}导航名称`}
+                maxLength={24}
+                value={draft.name}
+                onChange={(event) => setSystemDrafts((current) => ({ ...current, [page]: { ...draft, name: event.target.value } }))}
+              />
+              <select
+                aria-label={`${systemNavDefaults[page].title}导航图标`}
+                value={draft.icon}
+                onChange={(event) => setSystemDrafts((current) => ({ ...current, [page]: { ...draft, icon: event.target.value as CustomNavPageIcon } }))}
+              >
+                {(Object.entries(customNavPageIcons) as Array<[CustomNavPageIcon, (typeof customNavPageIcons)[CustomNavPageIcon]]>).map(([key, meta]) => (
+                  <option value={key} key={key}>{meta.label}</option>
+                ))}
+              </select>
+              <div className="lucid-page-row-actions">
+                <button type="button" disabled={index === 0} title="向上移动" aria-label="向上移动" onClick={() => onMoveSystem(page, -1)}><ArrowUp size={15} /></button>
+                <button type="button" disabled={index === systemOrder.length - 1} title="向下移动" aria-label="向下移动" onClick={() => onMoveSystem(page, 1)}><ArrowDown size={15} /></button>
+                <button type="button" title="保存入口" aria-label="保存入口" onClick={() => onUpdateSystem(page, draft.name, draft.icon)}><Save size={15} /></button>
+                {page === "widgets" ? <span className="page-manager-locked" title="主页固定显示"><Pin size={14} /></span> : (
+                  <button type="button" title={hidden ? `显示${draft.name}` : `隐藏${draft.name}`} onClick={() => onToggleSystem(page)}>
                   {hidden ? <Plus size={16} /> : <EyeOff size={16} />}
-                </button>
-              )}
+                  </button>
+                )}
+              </div>
             </div>
           );
         })}
       </section>
 
       <section className="page-manager-list" aria-label="自定义页面">
-        <div className="page-manager-section-title">我的页面</div>
-        {customPages.map((page) => {
-          const PageIcon = customNavPageIcons[page.icon]?.Icon || Star;
+        <div className="page-manager-section-title"><span>我的页面</span><small>{customPages.length} 个</small></div>
+        {customPages.map((page, index) => {
+          const draft = customDrafts[page.id] || { name: page.name, icon: page.icon };
+          const PageIcon = customNavPageIcons[draft.icon]?.Icon || Star;
           return (
-            <div className="page-manager-row" key={page.id}>
-              <button type="button" className="page-manager-main" onClick={() => onOpenPage(page)}>
-                <span className="page-manager-icon"><PageIcon size={18} /></span>
-                <span className="page-manager-name"><strong>{page.name}</strong><small>打开页面</small></span>
-              </button>
-              <button type="button" className="page-manager-delete" title={`删除${page.name}页面`} onClick={() => onDelete(page)}><Trash2 size={16} /></button>
+            <div className="page-manager-row lucid-page-row" key={page.id}>
+              <button type="button" className="page-manager-icon" title="打开页面" aria-label={`打开${page.name}`} onClick={() => onOpenPage(page)}><PageIcon size={18} /></button>
+              <input
+                aria-label={`${page.name}页面名称`}
+                maxLength={24}
+                value={draft.name}
+                onChange={(event) => setCustomDrafts((current) => ({ ...current, [page.id]: { ...draft, name: event.target.value } }))}
+              />
+              <select
+                aria-label={`${page.name}页面图标`}
+                value={draft.icon}
+                onChange={(event) => setCustomDrafts((current) => ({ ...current, [page.id]: { ...draft, icon: event.target.value as CustomNavPageIcon } }))}
+              >
+                {(Object.entries(customNavPageIcons) as Array<[CustomNavPageIcon, (typeof customNavPageIcons)[CustomNavPageIcon]]>).map(([key, meta]) => (
+                  <option value={key} key={key}>{meta.label}</option>
+                ))}
+              </select>
+              <div className="lucid-page-row-actions">
+                <button type="button" disabled={index === 0} title="向上移动" aria-label="向上移动" onClick={() => onMoveCustom(page, -1)}><ArrowUp size={15} /></button>
+                <button type="button" disabled={index === customPages.length - 1} title="向下移动" aria-label="向下移动" onClick={() => onMoveCustom(page, 1)}><ArrowDown size={15} /></button>
+                <button type="button" title="保存页面" aria-label="保存页面" onClick={() => onUpdateCustom(page, draft.name, draft.icon)}><Save size={15} /></button>
+                <button type="button" className="page-manager-delete" title={`删除${page.name}页面`} onClick={() => onDelete(page)}><Trash2 size={16} /></button>
+              </div>
             </div>
           );
         })}
@@ -5910,7 +6439,7 @@ function PageManagerDialog({ customPages, hiddenPages, onAdd, onDelete, onToggle
       <form className="page-create-form" onSubmit={(event) => { event.preventDefault(); createPage(); }}>
         <label>
           <span>新页面名称</span>
-          <input value={name} maxLength={12} onChange={(event) => setName(event.target.value)} placeholder="例如：工作" autoFocus />
+          <input value={name} maxLength={24} onChange={(event) => setName(event.target.value)} placeholder="例如：工作" />
         </label>
         <div className="page-icon-picker" role="radiogroup" aria-label="页面图标">
           {(Object.entries(customNavPageIcons) as Array<[CustomNavPageIcon, (typeof customNavPageIcons)[CustomNavPageIcon]]>).map(([key, meta]) => {
@@ -5924,12 +6453,12 @@ function PageManagerDialog({ customPages, hiddenPages, onAdd, onDelete, onToggle
         </div>
         <button type="submit" className="primary" disabled={!name.trim()}><Plus size={16} /> 新建页面</button>
       </form>
-      <p className="page-manager-safety">删除页面只会移除导航入口，页面内的网站仍保留在“网站”分类中。</p>
+      <p className="page-manager-safety"><ShieldCheck size={14} /> 删除自定义页面只移除导航入口，页面内的网站仍保留在“空间”分类中。</p>
     </DialogShell>
   );
 }
 
-function SettingsDialog({ state, updateCheck, migrationBackupAvailable, updateState, onImport, onImportBackup, onExport, onRestoreMigrationBackup, onCheckUpdate, onOpenTimeZone, onWeatherUseLocationChange, onClose }: {
+function SettingsDialog({ state, updateCheck, migrationBackupAvailable, updateState, onImport, onImportBackup, onExport, onRestoreMigrationBackup, onCheckUpdate, onOpenTimeZone, onOpenPageManager, onWeatherUseLocationChange, onClose }: {
   state: AppState;
   updateCheck: UpdateCheckResult;
   migrationBackupAvailable: boolean;
@@ -5940,9 +6469,11 @@ function SettingsDialog({ state, updateCheck, migrationBackupAvailable, updateSt
   onRestoreMigrationBackup: () => void;
   onCheckUpdate: () => void;
   onOpenTimeZone: () => void;
+  onOpenPageManager: () => void;
   onWeatherUseLocationChange: (enabled: boolean) => Promise<void>;
   onClose: () => void;
 }) {
+  const [section, setSection] = useState<"appearance" | "navigation" | "data" | "about">("appearance");
   const settings = state.settings;
   const noteConflicts = state.notes.filter((note) => !note.deletedAt && note.conflictBody);
   const setSetting = <K extends keyof AppState["settings"]>(key: K, value: AppState["settings"][K]) => {
@@ -5962,106 +6493,127 @@ function SettingsDialog({ state, updateCheck, migrationBackupAvailable, updateSt
   const updateTarget = updateCheck.status === "available" || updateCheck.status === "unsupported"
     ? updateCheck.manifest.updateUrl || updateCheck.manifest.releaseNotesUrl || UPDATE_TARGET_URL
     : UPDATE_TARGET_URL;
+  const sections = [
+    { id: "appearance" as const, label: "外观", Icon: Palette },
+    { id: "navigation" as const, label: "导航", Icon: SlidersHorizontal },
+    { id: "data" as const, label: "数据", Icon: Database },
+    { id: "about" as const, label: "版本", Icon: RefreshCcw }
+  ];
   return (
-    <DialogShell title="设置" onClose={onClose} className="settings-dialog-overlay">
-      <label>主题<select value={settings.theme} onChange={(event) => setSetting("theme", event.target.value as "light" | "dark")}><option value="dark">深色</option><option value="light">浅色</option></select></label>
-      <div className="settings-choice-group">
-        <span className="settings-choice-label">桌面导航位置</span>
-        <div className="settings-segments" role="radiogroup" aria-label="桌面导航位置">
-          <button type="button" role="radio" aria-checked={(settings.navigationSide || "left") === "left"} className={(settings.navigationSide || "left") === "left" ? "active" : ""} onClick={() => setSetting("navigationSide", "left")}><PanelLeft size={16} />左侧</button>
-          <button type="button" role="radio" aria-checked={settings.navigationSide === "right"} className={settings.navigationSide === "right" ? "active" : ""} onClick={() => setSetting("navigationSide", "right")}><PanelRight size={16} />右侧</button>
+    <DialogShell title="设置" onClose={onClose} className="settings-dialog-overlay lucid-settings-overlay">
+      <div className="lucid-settings-layout">
+        <nav className="lucid-settings-nav" aria-label="设置分类">
+          {sections.map((item) => (
+            <button type="button" className={section === item.id ? "active" : ""} onClick={() => setSection(item.id)} key={item.id}>
+              <item.Icon size={17} /><span>{item.label}</span>
+            </button>
+          ))}
+        </nav>
+
+        <div className="lucid-settings-content">
+          {section === "appearance" && (
+            <section className="lucid-settings-section">
+              <header><span>Appearance</span><h3>克制、清晰，并与你的壁纸协调</h3></header>
+              <div className="lucid-setting-row">
+                <div><strong>主题</strong><span>切换浅色或深色界面</span></div>
+                <div className="settings-segments" role="radiogroup" aria-label="主题">
+                  <button type="button" role="radio" aria-checked={settings.theme === "light"} className={settings.theme === "light" ? "active" : ""} onClick={() => setSetting("theme", "light")}><Sun size={15} />浅色</button>
+                  <button type="button" role="radio" aria-checked={settings.theme === "dark"} className={settings.theme === "dark" ? "active" : ""} onClick={() => setSetting("theme", "dark")}><Moon size={15} />深色</button>
+                </div>
+              </div>
+              <label className="lucid-setting-row lucid-range-row">
+                <div><strong>图标尺寸</strong><span>主页与空间统一为 {settings.iconSize}px</span></div>
+                <input type="range" min="48" max="80" value={settings.iconSize} onChange={(event) => setSetting("iconSize", Number(event.target.value))} />
+              </label>
+              <label className="lucid-setting-row lucid-range-row">
+                <div><strong>界面通透度</strong><span>控制组件表面的透明程度</span></div>
+                <input type="range" min="28" max="88" value={settings.glass} onChange={(event) => setSetting("glass", Number(event.target.value))} />
+              </label>
+              <div className="lucid-setting-row">
+                <div><strong>网站图标</strong><span>高清结果会缓存在本机，不会每次重新加载</span></div>
+                <label className="lucid-switch"><input type="checkbox" checked={settings.remoteIconLookup ?? true} onChange={(event) => setSetting("remoteIconLookup", event.target.checked)} /><span /></label>
+              </div>
+              <label className="lucid-setting-row">
+                <div><strong>城市</strong><span>天气小组件显示的位置</span></div>
+                <input className="lucid-compact-input" maxLength={500} value={settings.city} onChange={(event) => setSetting("city", event.target.value)} />
+              </label>
+              <div className="lucid-setting-row">
+                <div><strong>设备定位</strong><span>只在获取天气时读取当前位置</span></div>
+                <label className="lucid-switch"><input type="checkbox" checked={settings.weatherUseLocation ?? false} onChange={(event) => void onWeatherUseLocationChange(event.target.checked)} /><span /></label>
+              </div>
+              <div className="lucid-setting-row">
+                <div><strong>时间显示</strong><span>{settings.timeZone || "Asia/Shanghai"}</span></div>
+                <button type="button" className="lucid-inline-button" onClick={onOpenTimeZone}><Clock3 size={15} />{timeZoneLabels[settings.timeZone || "Asia/Shanghai"] || "选择时区"}</button>
+              </div>
+            </section>
+          )}
+
+          {section === "navigation" && (
+            <section className="lucid-settings-section">
+              <header><span>Navigation</span><h3>导航固定在边缘，不改变内容中心</h3></header>
+              <div className="lucid-setting-row">
+                <div><strong>位置</strong><span>桌面端固定到屏幕左侧或右侧</span></div>
+                <div className="settings-segments" role="radiogroup" aria-label="桌面导航位置">
+                  <button type="button" role="radio" aria-checked={(settings.navigationSide || "left") === "left"} className={(settings.navigationSide || "left") === "left" ? "active" : ""} onClick={() => setSetting("navigationSide", "left")}><PanelLeft size={15} />左侧</button>
+                  <button type="button" role="radio" aria-checked={settings.navigationSide === "right"} className={settings.navigationSide === "right" ? "active" : ""} onClick={() => setSetting("navigationSide", "right")}><PanelRight size={15} />右侧</button>
+                </div>
+              </div>
+              <div className="lucid-setting-row lucid-setting-stack">
+                <div><strong>显示方式</strong><span>自动隐藏使用稳定延迟，不会跟随鼠标抖动</span></div>
+                <div className="settings-segments settings-segments-three" role="radiogroup" aria-label="桌面导航显示方式">
+                  <button type="button" role="radio" aria-checked={(settings.navigationDisplay || "always") === "always"} className={(settings.navigationDisplay || "always") === "always" ? "active" : ""} onClick={() => setSetting("navigationDisplay", "always")}><Pin size={15} />始终</button>
+                  <button type="button" role="radio" aria-checked={settings.navigationDisplay === "auto"} className={settings.navigationDisplay === "auto" ? "active" : ""} onClick={() => setSetting("navigationDisplay", "auto")}><Eye size={15} />自动</button>
+                  <button type="button" role="radio" aria-checked={settings.navigationDisplay === "hidden"} className={settings.navigationDisplay === "hidden" ? "active" : ""} onClick={() => setSetting("navigationDisplay", "hidden")}><EyeOff size={15} />隐藏</button>
+                </div>
+              </div>
+              <button type="button" className="lucid-settings-callout" onClick={onOpenPageManager}>
+                <LayoutGrid size={18} />
+                <span><strong>编辑页面与导航图标</strong><small>修改名称、图标、顺序，或添加自己的页面</small></span>
+                <ChevronRight size={17} />
+              </button>
+            </section>
+          )}
+
+          {section === "data" && (
+            <section className="lucid-settings-section">
+              <header><span>Local-first data</span><h3>备份、恢复和迁移都由你控制</h3></header>
+              <div className="lucid-data-actions">
+                <button type="button" onClick={onImport}><Import size={17} /><span><strong>导入网站</strong><small>支持浏览器书签与文本</small></span></button>
+                <button type="button" onClick={onExport}><Download size={17} /><span><strong>导出完整备份</strong><small>包含网站、笔记、任务和设置</small></span></button>
+                <label className="lucid-data-action"><Upload size={17} /><span><strong>恢复完整备份</strong><small>从 WhyNavo JSON 文件恢复</small></span><input type="file" accept="application/json,.json" onChange={(event) => { const file = event.target.files?.[0]; if (file) void onImportBackup(file).catch((error) => window.alert(error instanceof Error ? error.message : "备份恢复失败")); event.currentTarget.value = ""; }} /></label>
+                <button type="button" disabled={!migrationBackupAvailable} onClick={onRestoreMigrationBackup}><TimerReset size={17} /><span><strong>回到更新前数据</strong><small>{migrationBackupAvailable ? "恢复本设备最近迁移点" : "当前没有迁移恢复点"}</small></span></button>
+              </div>
+              <p className="lucid-data-notice"><ShieldCheck size={15} /> 备份可能包含私人便签、待办、照片和壁纸，请像保护私人文件一样保管。</p>
+              {noteConflicts.length > 0 && (
+                <div className="lucid-conflict-panel">
+                  <strong>{noteConflicts.length} 条笔记包含同步冲突副本</strong>
+                  <div>
+                    <button type="button" onClick={() => downloadJson(`whynavo-note-conflicts-${new Date().toISOString().slice(0, 10)}.json`, noteConflicts)}><Download size={15} />导出</button>
+                    <button type="button" onClick={() => updateState((current) => ({ ...current, notes: current.notes.map((note) => note.conflictBody ? { ...note, conflictBody: undefined, updatedAt: nowIso() } : note) }))}><Check size={15} />保留当前</button>
+                  </div>
+                </div>
+              )}
+            </section>
+          )}
+
+          {section === "about" && (
+            <section className="lucid-settings-section">
+              <header><span>WhyNavo</span><h3>版本与兼容状态</h3></header>
+              <div className="lucid-version-mark"><Compass size={30} /><div><strong>WhyNavo {APP_VERSION}</strong><span>Local-first new tab workspace</span></div></div>
+              <dl className="lucid-version-list">
+                <div><dt>应用版本</dt><dd>{APP_VERSION}</dd></div>
+                <div><dt>数据版本</dt><dd>{state.dataSchemaVersion || DATA_SCHEMA_VERSION}</dd></div>
+                <div><dt>更新状态</dt><dd className={updateCheck.status}>{updateMessage}</dd></div>
+              </dl>
+              <div className="lucid-version-actions">
+                <button type="button" disabled={updateCheck.status === "checking"} onClick={onCheckUpdate}><RefreshCcw size={16} />检查更新</button>
+                <button type="button" onClick={() => window.open(updateTarget, "_blank", "noopener,noreferrer")}><Globe2 size={16} />发布页面</button>
+              </div>
+            </section>
+          )}
         </div>
       </div>
-      <div className="settings-choice-group">
-        <span className="settings-choice-label">桌面导航显示</span>
-        <div className="settings-segments settings-segments-three" role="radiogroup" aria-label="桌面导航显示方式">
-          <button type="button" role="radio" aria-checked={(settings.navigationDisplay || "always") === "always"} className={(settings.navigationDisplay || "always") === "always" ? "active" : ""} onClick={() => setSetting("navigationDisplay", "always")}><Pin size={16} />始终显示</button>
-          <button type="button" role="radio" aria-checked={settings.navigationDisplay === "auto"} className={settings.navigationDisplay === "auto" ? "active" : ""} onClick={() => setSetting("navigationDisplay", "auto")}><Eye size={16} />自动隐藏</button>
-          <button type="button" role="radio" aria-checked={settings.navigationDisplay === "hidden"} className={settings.navigationDisplay === "hidden" ? "active" : ""} onClick={() => setSetting("navigationDisplay", "hidden")}><EyeOff size={16} />隐藏</button>
-        </div>
-      </div>
-      <label>城市<input maxLength={500} value={settings.city} onChange={(event) => setSetting("city", event.target.value)} /></label>
-      <div className="settings-choice-group">
-        <span className="settings-choice-label">时间显示</span>
-        <button type="button" className="settings-value-button" onClick={onOpenTimeZone}>
-          <Clock3 size={17} />
-          <span>
-            <strong>{timeZoneLabels[settings.timeZone || "Asia/Shanghai"] || (settings.timeZone || "Asia/Shanghai").replace(/_/g, " ")}</strong>
-            <small>{settings.timeZone || "Asia/Shanghai"}</small>
-          </span>
-        </button>
-      </div>
-      <label>日期时间颜色<input type="color" value={settings.dateTimeColor || "#ffffff"} onChange={(event) => setSetting("dateTimeColor", event.target.value)} /></label>
-      <label className="check-row">
-        <input type="checkbox" checked={settings.weatherUseLocation ?? false} onChange={(event) => void onWeatherUseLocationChange(event.target.checked)} />
-        天气跟随设备位置
-      </label>
-      <label>卡片透明度<input type="range" min="28" max="88" value={settings.glass} onChange={(event) => setSetting("glass", Number(event.target.value))} /></label>
-      <label>图标尺寸<input type="range" min="48" max="80" value={settings.iconSize} onChange={(event) => setSetting("iconSize", Number(event.target.value))} /></label>
-      <label>网格密度<select value={settings.gridDensity} onChange={(event) => setSetting("gridDensity", event.target.value as "comfortable" | "compact")}><option value="comfortable">舒适</option><option value="compact">紧凑</option></select></label>
-      <label>Dock 位置<select value={settings.dockPosition} onChange={(event) => setSetting("dockPosition", event.target.value as "top" | "bottom")}><option value="bottom">底部</option><option value="top">顶部</option></select></label>
-      <label className="check-row">
-        <input type="checkbox" checked={settings.remoteIconLookup ?? true} onChange={(event) => setSetting("remoteIconLookup", event.target.checked)} />
-        自动查找网站高清图标
-      </label>
-      <p className="settings-helper">关闭后只显示手动设置的图片或文字图标。开启时，已解析的图标会缓存，避免每次打开重复查找。</p>
-      <div className="settings-block data-settings">
-        <div className="section-title compact-title">
-          <div>
-            <h3>数据</h3>
-            <p>内容备份包含小组件、便签、壁纸、网站和可迁移设置</p>
-          </div>
-        </div>
-        <div className="button-row split-row">
-          <button type="button" onClick={onImport}><Import size={16} /> 导入网站</button>
-          <button type="button" onClick={onExport}><Download size={16} /> 导出备份</button>
-        </div>
-        <p className="settings-helper">备份不包含登录会话、同步密钥、天气城市或设备位置偏好；文件可能包含便签、待办、照片和自定义壁纸，请像保护私人文件一样妥善保管。</p>
-        <label className="file-pick backup-file-pick">
-          <Upload size={16} /> 恢复完整备份
-          <input
-            type="file"
-            accept="application/json,.json"
-            onChange={(event) => {
-              const file = event.target.files?.[0];
-              if (file) void onImportBackup(file).catch((error) => window.alert(error instanceof Error ? error.message : "备份恢复失败"));
-              event.currentTarget.value = "";
-            }}
-          />
-        </label>
-        <button type="button" disabled={!migrationBackupAvailable} onClick={onRestoreMigrationBackup}><TimerReset size={16} /> 回到更新前数据</button>
-      </div>
-      {noteConflicts.length > 0 && (
-        <div className="settings-block conflict-settings">
-          <div className="section-title compact-title"><div><h3>同步冲突</h3><p>{noteConflicts.length} 条旧版笔记有另一份内容</p></div></div>
-          <div className="button-row split-row">
-            <button type="button" onClick={() => downloadJson(`whynavo-note-conflicts-${new Date().toISOString().slice(0, 10)}.json`, noteConflicts)}><Download size={16} /> 导出冲突内容</button>
-            <button type="button" onClick={() => updateState((current) => ({ ...current, notes: current.notes.map((note) => note.conflictBody ? { ...note, conflictBody: undefined, updatedAt: nowIso() } : note) }))}><Check size={16} /> 保留当前内容</button>
-          </div>
-        </div>
-      )}
-      <div className="settings-block version-settings">
-        <div className="section-title compact-title">
-          <div>
-            <h3>版本</h3>
-            <p>更新检查和数据兼容</p>
-          </div>
-        </div>
-        <div className="version-row">
-          <span>当前版本</span>
-          <strong>{APP_VERSION}</strong>
-        </div>
-        <div className="version-row">
-          <span>数据版本</span>
-          <strong>{state.dataSchemaVersion || DATA_SCHEMA_VERSION}</strong>
-        </div>
-        <p className={`version-status ${updateCheck.status}`}>{updateMessage}</p>
-        <div className="button-row split-row">
-          <button type="button" disabled={updateCheck.status === "checking"} onClick={onCheckUpdate}><RefreshCcw size={16} /> 检查更新</button>
-          <button type="button" onClick={() => window.open(updateTarget, "_blank", "noopener,noreferrer")}><Globe2 size={16} /> 发布页面</button>
-        </div>
-      </div>
-      <button className="primary" onClick={onClose}><Palette size={16} /> 完成</button>
+      <div className="lucid-settings-footer"><span>所有界面设置会自动保存</span><button type="button" className="primary" onClick={onClose}>完成</button></div>
     </DialogShell>
   );
 }

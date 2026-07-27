@@ -1,4 +1,4 @@
-import type { AppState, WidgetKey, WidgetSize } from "./types";
+import type { AppState, SystemNavPage, WidgetKey, WidgetSize } from "./types";
 import { DEFAULT_SUPABASE_ANON_KEY, DEFAULT_SUPABASE_URL } from "./projectConfig";
 
 let logicalNow = Date.now();
@@ -30,6 +30,7 @@ export const uid = () => {
 };
 
 export const defaultWidgetOrder: WidgetKey[] = ["weather", "focus", "calendar", "todos", "countdowns", "notes", "rates", "quote", "clock", "memo", "year", "calculator"];
+export const defaultNavigationOrder: SystemNavPage[] = ["widgets", "shortcuts", "search", "notes", "tasks", "tools"];
 
 export const defaultWidgetSizes: Record<WidgetKey, WidgetSize> = {
   weather: "wide",
@@ -87,7 +88,7 @@ export const defaultState = (): AppState => {
       customWallpapers: [],
       wallpaperCollection: ["lucid-room", "coastal-glass", "neon-rain", "aurora-lake"],
       quickNote: "",
-      visualRefreshVersion: 13,
+      visualRefreshVersion: 14,
       dateTimeColor: "#ffffff",
       widgetAccentColor: "#2dd4bf",
       glass: 42,
@@ -101,7 +102,10 @@ export const defaultState = (): AppState => {
       widgetOrder: defaultWidgetOrder,
       widgetSizes: defaultWidgetSizes,
       customNavPages: [],
-      hiddenNavPages: [],
+      navigationOrder: defaultNavigationOrder,
+      navigationLabels: {},
+      navigationIcons: {},
+      hiddenNavPages: ["tools"],
       navigationDisplay: "always",
       navigationSide: "left",
       remoteIconLookup: true,

@@ -433,6 +433,9 @@ const SETTINGS_KEYS = new Set([
   "widgetOrder",
   "widgetSizes",
   "customNavPages",
+  "navigationOrder",
+  "navigationLabels",
+  "navigationIcons",
   "hiddenNavPages",
   "navigationDisplay",
   "navigationSide",
@@ -445,7 +448,25 @@ const SETTINGS_KEYS = new Set([
 ]);
 const SETTINGS_METADATA_KEYS = new Set(["fieldUpdatedAt", "updatedAt"]);
 const SETTINGS_VALUE_KEYS = new Set([...SETTINGS_KEYS].filter((key) => !SETTINGS_METADATA_KEYS.has(key)));
-const CUSTOM_NAV_PAGE_ICONS = new Set(["star", "briefcase", "book", "code", "heart", "plane"]);
+const NAV_PAGE_IDS = new Set(["widgets", "shortcuts", "search", "notes", "tasks", "tools"]);
+const HIDEABLE_NAV_PAGE_IDS = new Set(["shortcuts", "search", "notes", "tasks", "tools"]);
+const CUSTOM_NAV_PAGE_ICONS = new Set([
+  "star",
+  "briefcase",
+  "book",
+  "code",
+  "heart",
+  "plane",
+  "home",
+  "grid",
+  "search",
+  "file",
+  "check",
+  "compass",
+  "calendar",
+  "sparkles",
+  "globe"
+]);
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -747,9 +768,28 @@ export function validateAppStatePayload(value: unknown, label = "数据"): asser
   );
   if (
     !validUniqueStringArray(settings.widgetOrder, WIDGET_KEYS, WIDGET_KEYS.size)
-    || !validUniqueStringArray(settings.hiddenNavPages, new Set(["shortcuts", "tools"]), 2)
+    || !validUniqueStringArray(settings.navigationOrder, NAV_PAGE_IDS, NAV_PAGE_IDS.size)
+    || !validUniqueStringArray(settings.hiddenNavPages, HIDEABLE_NAV_PAGE_IDS, HIDEABLE_NAV_PAGE_IDS.size)
     || !validUniqueStringArray(settings.wallpaperCollection, undefined, 500)
   ) throw new Error(`${label}格式无效：设置列表异常`);
+
+  if (
+    settings.navigationLabels !== undefined
+    && (
+      !validateStringRecord(settings.navigationLabels, NAV_PAGE_IDS.size, 24)
+      || Object.keys(settings.navigationLabels as UnknownRecord).some((key) => !NAV_PAGE_IDS.has(key))
+      || Object.values(settings.navigationLabels as UnknownRecord).some((value) => typeof value !== "string" || !value.trim())
+    )
+  ) throw new Error(`${label}格式无效：导航名称异常`);
+
+  if (
+    settings.navigationIcons !== undefined
+    && (
+      !validateStringRecord(settings.navigationIcons, NAV_PAGE_IDS.size, 24)
+      || Object.keys(settings.navigationIcons as UnknownRecord).some((key) => !NAV_PAGE_IDS.has(key))
+      || Object.values(settings.navigationIcons as UnknownRecord).some((value) => !CUSTOM_NAV_PAGE_ICONS.has(String(value)))
+    )
+  ) throw new Error(`${label}格式无效：导航图标异常`);
 
   const widgetSettings = isRecord(settings.widgets) ? settings.widgets : undefined;
   if (
@@ -776,6 +816,7 @@ export function validateAppStatePayload(value: unknown, label = "数据"): asser
       const [parent, child, ...rest] = key.split(".");
       if (rest.length || !child) return false;
       if (parent === "widgets" || parent === "widgetSizes") return WIDGET_KEYS.has(child as WidgetKey);
+      if (parent === "navigationLabels" || parent === "navigationIcons") return NAV_PAGE_IDS.has(child);
       return parent === "calendarRecords" && validDateKey(child);
     };
     if (
@@ -1078,7 +1119,7 @@ const shouldUseRemote = (localClock: string, remoteClock: string, localValue: un
   return stableValue(remoteValue) >= stableValue(localValue);
 };
 const settingsMetadataKeys = new Set(["fieldUpdatedAt", "updatedAt"]);
-const nestedRecordSettingKeys = new Set(["widgets", "widgetSizes", "calendarRecords"]);
+const nestedRecordSettingKeys = new Set(["widgets", "widgetSizes", "calendarRecords", "navigationLabels", "navigationIcons"]);
 const settingsKeys = (settings: Settings) => Object.keys(settings).filter((key) => !settingsMetadataKeys.has(key));
 const settingRecord = (value: unknown) => value && typeof value === "object" && !Array.isArray(value)
   ? value as Record<string, unknown>
@@ -1413,7 +1454,7 @@ export function normalizeState(state: AppState): AppState {
         ? "aurora-lake"
         : state.settings.wallpaperPreset || "lucid-room",
     wallpaperRotation: visualVersion < 5 ? false : state.settings.wallpaperRotation ?? false,
-    visualRefreshVersion: 13,
+    visualRefreshVersion: 14,
     iconSize: Math.min(80, Math.max(48, visualVersion < 8 && state.settings.iconSize === 64 ? 58 : state.settings.iconSize || 58)),
     glass: Math.min(88, Math.max(28, state.settings.glass || 42)),
     customWallpapers: state.settings.customWallpapers || [],
@@ -1430,7 +1471,23 @@ export function normalizeState(state: AppState): AppState {
       Boolean(page?.id && page.name?.trim() && page.groupId)
       && pages.findIndex((candidate) => candidate.id === page.id) === index
     )),
-    hiddenNavPages: Array.from(new Set((state.settings.hiddenNavPages || []).filter((page) => page === "shortcuts" || page === "tools"))),
+    navigationOrder: [
+      ...Array.from(new Set((state.settings.navigationOrder || []).filter((page) => NAV_PAGE_IDS.has(page)))),
+      ...["widgets", "shortcuts", "search", "notes", "tasks", "tools"].filter((page) => !(state.settings.navigationOrder || []).includes(page as never))
+    ] as Settings["navigationOrder"],
+    navigationLabels: Object.fromEntries(
+      Object.entries(state.settings.navigationLabels || {})
+        .filter(([page, label]) => NAV_PAGE_IDS.has(page) && typeof label === "string" && Boolean(label.trim()))
+        .map(([page, label]) => [page, label.trim().slice(0, 24)])
+    ),
+    navigationIcons: Object.fromEntries(
+      Object.entries(state.settings.navigationIcons || {})
+        .filter(([page, icon]) => NAV_PAGE_IDS.has(page) && CUSTOM_NAV_PAGE_ICONS.has(String(icon)))
+    ),
+    hiddenNavPages: Array.from(new Set([
+      ...(state.settings.hiddenNavPages || []).filter((page) => HIDEABLE_NAV_PAGE_IDS.has(page)),
+      ...(visualVersion < 14 ? ["tools" as const] : [])
+    ])),
     navigationDisplay: state.settings.navigationDisplay === "auto" || state.settings.navigationDisplay === "hidden"
       ? state.settings.navigationDisplay
       : "always",

@@ -1,7 +1,7 @@
-export const APP_VERSION = "0.8.1";
+export const APP_VERSION = "0.9.0";
 export const DATA_SCHEMA_VERSION = 1;
 export const MIN_SUPPORTED_DATA_SCHEMA_VERSION = 1;
-export const MIN_SUPPORTED_APP_VERSION = "0.8.1";
+export const MIN_SUPPORTED_APP_VERSION = "0.9.0";
 
 export const UPDATE_CHECK_URL = "https://whynavo.pages.dev/latest-version.json";
 export const UPDATE_TARGET_URL = "https://github.com/Muggler77/whynavo/releases/latest";

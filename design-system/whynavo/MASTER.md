@@ -2,7 +2,7 @@
 
 **Direction:** Lucid Canvas / Sample A
 **Product:** local-first new tab workspace
-**Version:** 0.8
+**Version:** 0.9
 **Design dials:** variance 7/10, motion 3/10, density 5/10
 
 ## Product Principles
@@ -85,7 +85,8 @@
 - Active item uses surface contrast plus a 3px edge indicator.
 - Auto-hide trigger becomes non-interactive after the rail opens.
 - Hidden and auto modes animate only with transform and opacity.
-- Mobile bottom navigation contains three primary destinations and two secondary actions.
+- Mobile bottom navigation contains the five primary Sample A destinations.
+- Tools remains functional but is hidden by default and can be restored from navigation settings.
 
 ### Shortcuts
 
