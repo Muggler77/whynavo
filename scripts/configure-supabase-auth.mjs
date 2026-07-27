@@ -9,7 +9,6 @@ const officialOrigin = "https://whynavo.pages.dev/";
 const desired = {
   site_url: officialOrigin,
   uri_allow_list: officialOrigin,
-  rate_limit_email_sent: 60,
   rate_limit_verify: 360,
   rate_limit_token_refresh: 1800
 };

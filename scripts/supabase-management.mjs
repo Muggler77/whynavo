@@ -12,7 +12,6 @@ const READ_ONLY_PROJECT_ENDPOINTS = new Set([
 const WRITABLE_AUTH_CONFIG_FIELDS = new Set([
   "site_url",
   "uri_allow_list",
-  "rate_limit_email_sent",
   "rate_limit_verify",
   "rate_limit_token_refresh",
   "mailer_subjects_confirmation",
