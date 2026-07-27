@@ -144,7 +144,7 @@ const RATES_CACHE_MAX_AGE_MS = 6 * 60 * 60 * 1000;
 const ICON_LOAD_TIMEOUT_MS = 5000;
 const ICON_FAILURE_RETRY_MS = 6 * 60 * 60 * 1000;
 const MIN_SHARP_ICON_SIZE = 96;
-const SHORTCUT_RENDER_BATCH = 80;
+const SHORTCUT_RENDER_BATCH = 48;
 const ICON_MANAGER_RENDER_BATCH = 80;
 const MAX_CUSTOM_WALLPAPERS = 12;
 const MAX_IMAGE_UPLOAD_BYTES = 12 * 1024 * 1024;
@@ -6079,59 +6079,63 @@ function SyncDialog({ state, sync, updateState, legacyStateAvailable, onAdoptLeg
         </div>
       </div>
 
-      <div className="sync-status-grid">
-        <div>
-          <small>账号</small>
-          <strong>{sync.user?.email || "未登录"}</strong>
-        </div>
-        <div>
-          <small>同步状态</small>
-          <strong>{sync.message}</strong>
-        </div>
-        <div>
-          <small>最近同步</small>
-          <strong>{sync.lastSyncedAt ? new Date(sync.lastSyncedAt).toLocaleString("zh-CN") : "暂无记录"}</strong>
-        </div>
-      </div>
+      {sync.user && (
+        <>
+          <div className="sync-status-grid">
+            <div>
+              <small>账号</small>
+              <strong>{sync.user.email}</strong>
+            </div>
+            <div>
+              <small>同步状态</small>
+              <strong>{sync.message}</strong>
+            </div>
+            <div>
+              <small>最近同步</small>
+              <strong>{sync.lastSyncedAt ? new Date(sync.lastSyncedAt).toLocaleString("zh-CN") : "暂无记录"}</strong>
+            </div>
+          </div>
 
-      <div className="sync-settings-panel">
-        <label className="sync-toggle-row">
-          <span>
-            <strong>自动同步</strong>
-            <small>打开新标签页和数据变化后自动更新云端。</small>
-          </span>
-          <input
-            type="checkbox"
-            checked={state.sync?.autoSync ?? true}
-            onChange={(event) => updateState((current) => ({
-              ...current,
-              sync: {
-                ...current.sync,
-                autoSync: event.target.checked
-              }
-            }))}
-          />
-        </label>
-        <label className="sync-interval-row">
-          <span>
-            <strong>同步间隔</strong>
-            <small>最低 30 秒</small>
-          </span>
-          <input
-            type="number"
-            min="30"
-            max="3600"
-            value={state.sync?.intervalSeconds || 60}
-            onChange={(event) => updateState((current) => ({
-              ...current,
-              sync: {
-                ...current.sync,
-                intervalSeconds: Math.min(3600, Math.max(30, Math.floor(Number(event.target.value) || 60)))
-              }
-            }))}
-          />
-        </label>
-      </div>
+          <div className="sync-settings-panel">
+            <label className="sync-toggle-row">
+              <span>
+                <strong>自动同步</strong>
+                <small>打开新标签页和数据变化后自动更新云端。</small>
+              </span>
+              <input
+                type="checkbox"
+                checked={state.sync?.autoSync ?? true}
+                onChange={(event) => updateState((current) => ({
+                  ...current,
+                  sync: {
+                    ...current.sync,
+                    autoSync: event.target.checked
+                  }
+                }))}
+              />
+            </label>
+            <label className="sync-interval-row">
+              <span>
+                <strong>同步间隔</strong>
+                <small>最低 30 秒</small>
+              </span>
+              <input
+                type="number"
+                min="30"
+                max="3600"
+                value={state.sync?.intervalSeconds || 60}
+                onChange={(event) => updateState((current) => ({
+                  ...current,
+                  sync: {
+                    ...current.sync,
+                    intervalSeconds: Math.min(3600, Math.max(30, Math.floor(Number(event.target.value) || 60)))
+                  }
+                }))}
+              />
+            </label>
+          </div>
+        </>
+      )}
 
       {legacyStateAvailable && (
         <div className="sync-legacy-import">

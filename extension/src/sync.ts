@@ -1406,7 +1406,7 @@ export function normalizeState(state: AppState): AppState {
     wallpaper: visualVersion < 5 ? undefined : normalizeStoredImageReference(state.settings.wallpaper),
     wallpaperPreset: visualVersion < 5 ? "aurora-lake" : state.settings.wallpaperPreset || "aurora-lake",
     wallpaperRotation: visualVersion < 5 ? false : state.settings.wallpaperRotation ?? false,
-    visualRefreshVersion: 10,
+    visualRefreshVersion: 11,
     iconSize: Math.min(80, Math.max(48, visualVersion < 8 && state.settings.iconSize === 64 ? 58 : state.settings.iconSize || 58)),
     glass: Math.min(88, Math.max(28, state.settings.glass || 42)),
     customWallpapers: state.settings.customWallpapers || [],

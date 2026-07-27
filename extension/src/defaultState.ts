@@ -81,13 +81,13 @@ export const defaultState = (): AppState => {
       { id: uid(), title: "重要日期", date: updatedAt.slice(0, 10), updatedAt }
     ],
     settings: {
-      theme: "dark",
-      wallpaperPreset: "aurora-lake",
+      theme: "light",
+      wallpaperPreset: "coastal-glass",
       wallpaperRotation: false,
       customWallpapers: [],
       wallpaperCollection: ["coastal-glass", "neon-rain", "aurora-lake", "ocean-cliff"],
       quickNote: "",
-      visualRefreshVersion: 10,
+      visualRefreshVersion: 11,
       dateTimeColor: "#ffffff",
       widgetAccentColor: "#2dd4bf",
       glass: 42,

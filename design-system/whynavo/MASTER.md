@@ -1,227 +1,173 @@
-# Design System Master File
+# WhyNavo Design System
 
-> **LOGIC:** When building a specific page, first check `design-system/pages/[page-name].md`.
-> If that file exists, its rules **override** this Master file.
-> If not, strictly follow the rules below.
+**Direction:** Lucid Canvas / Sample A
+**Product:** local-first new tab workspace
+**Version:** 0.8
+**Design dials:** variance 7/10, motion 3/10, density 5/10
 
----
+## Product Principles
 
-**Project:** WhyNavo
-**Generated:** 2026-07-27 11:07:47
-**Category:** Spatial Computing OS / App
-**Design Dials:** Variance 6/10 (Balanced / Modern) | Motion 4/10 (Standard) | Density 5/10 (Standard)
+1. The first screen is the working product, never a marketing hero.
+2. Wallpaper creates emotion; controls and data stay quiet, crisp, and readable.
+3. Search is centered on the viewport, independent of navigation placement.
+4. Desktop navigation is fixed at the extreme left or right and vertically centered.
+5. Navigation placement must not shift or cover the personal canvas.
+6. Website artwork fills its icon mask; there is no decorative outer icon card.
+7. Widgets are recognized by their information shape, not only by title or color.
+8. Local data remains usable without an account. Login adds sync rather than unlocking the product.
 
----
+## Semantic Tokens
 
-## Global Rules
+### Light
 
-### Color Palette
+| Role | Value |
+|---|---|
+| Canvas | `#E9F0F2` |
+| Surface | `rgba(250, 253, 253, 0.78)` |
+| Soft surface | `rgba(255, 255, 255, 0.56)` |
+| Primary text | `#142127` |
+| Secondary text | `#42545C` |
+| Muted text | `#687B83` |
+| Border | `rgba(49, 72, 80, 0.14)` |
+| Strong border | `rgba(38, 62, 70, 0.23)` |
+| Brand | `#176B65` |
+| Brand strong | `#0C514D` |
+| Focus | `#0B67D1` |
+| Danger | `#B42318` |
 
-| Role | Hex | CSS Variable |
-|------|-----|--------------|
-| Primary | `#18181B` | `--color-primary` |
-| On Primary | `#FFFFFF` | `--color-on-primary` |
-| Secondary | `#3F3F46` | `--color-secondary` |
-| Accent/CTA | `#2563EB` | `--color-accent` |
-| Background | `#FAFAFA` | `--color-background` |
-| Foreground | `#09090B` | `--color-foreground` |
-| Muted | `#E8ECF0` | `--color-muted` |
-| Border | `#E4E4E7` | `--color-border` |
-| Destructive | `#DC2626` | `--color-destructive` |
-| Ring | `#18181B` | `--color-ring` |
+### Dark
 
-**Color Notes:** Monochrome + blue accent
+| Role | Value |
+|---|---|
+| Canvas | `#111719` |
+| Surface | `rgba(25, 34, 37, 0.74)` |
+| Soft surface | `rgba(255, 255, 255, 0.08)` |
+| Primary text | `#F5FAF9` |
+| Secondary text | `#D1DCDA` |
+| Muted text | `#A4B3B1` |
+| Border | `rgba(255, 255, 255, 0.13)` |
+| Brand | `#DFF7F1` |
+| Focus | `#85B8FF` |
+| Danger | `#FF9B93` |
 
-### Typography
+## Typography
 
-- **Heading Font:** Inter
-- **Body Font:** Inter
-- **Mood:** spatial, legible, glass, system, clean, neutral
-- **Google Fonts:** [Inter + Inter](https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap)
+- System stack: `Inter`, `-apple-system`, `BlinkMacSystemFont`, `SF Pro Text`, `PingFang SC`, `Microsoft YaHei`, sans-serif.
+- No network font is required for first paint.
+- Scale: 10, 11, 12, 13, 15, 17, 19, 24, 31.
+- Body text uses normal letter spacing and at least 1.5 line height.
+- Timers and changing numbers use tabular figures.
+- Widget titles remain compact; hero-scale type is reserved for the date/time.
 
-**CSS Import:**
-```css
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap');
-```
+## Layout
 
-### Spacing Variables
+- Spacing follows a 4px base: 4, 8, 12, 16, 24, 32, 48.
+- Cards and framed tools use an 8px maximum radius.
+- Desktop canvas uses 12 columns and 16px gaps.
+- Standard bento rows use `6 + 6`, `6 + 3 + 3`, or `3 + 3 + 3 + 3`.
+- The desktop canvas begins at least 8px beyond the fixed navigation rail.
+- Mobile uses one flowing column and a five-item bottom navigation surface.
+- Fixed mobile surfaces respect top and bottom safe-area insets.
+- Dialog content owns one vertical scroll region and must expose its final action.
 
-*Density: 5/10 — Standard*
+## Components
 
-| Token | Value | Usage |
-|-------|-------|-------|
-| `--space-xs` | `4px` / `0.25rem` | Tight gaps |
-| `--space-sm` | `8px` / `0.5rem` | Icon gaps, inline spacing |
-| `--space-md` | `16px` / `1rem` | Standard padding |
-| `--space-lg` | `24px` / `1.5rem` | Section padding |
-| `--space-xl` | `32px` / `2rem` | Large gaps |
-| `--space-2xl` | `48px` / `3rem` | Section margins |
-| `--space-3xl` | `64px` / `4rem` | Hero padding |
+### Search
 
-### Shadow Depths
+- Viewport-centered, 640px maximum width.
+- 56px desktop height and at least 54px mobile height.
+- High-opacity light surface for predictable contrast over every wallpaper.
+- Search engine is a compact segmented control, not explanatory copy.
 
-| Level | Value | Usage |
-|-------|-------|-------|
-| `--shadow-sm` | `0 1px 2px rgba(0,0,0,0.05)` | Subtle lift |
-| `--shadow-md` | `0 4px 6px rgba(0,0,0,0.1)` | Cards, buttons |
-| `--shadow-lg` | `0 10px 15px rgba(0,0,0,0.1)` | Modals, dropdowns |
-| `--shadow-xl` | `0 20px 25px rgba(0,0,0,0.15)` | Hero images, featured cards |
+### Navigation
 
----
+- 68px desktop rail, vertically centered, fixed to the screen edge.
+- Active item uses surface contrast plus a 3px edge indicator.
+- Auto-hide trigger becomes non-interactive after the rail opens.
+- Hidden and auto modes animate only with transform and opacity.
+- Mobile bottom navigation contains three primary destinations and two secondary actions.
 
-## Component Specs
+### Shortcuts
 
-### Buttons
+- 48-80px user-controlled icon size.
+- Original artwork uses a 24% rounded-square mask and fills the available image area.
+- Brand marks that need clear space use an 84% contained image.
+- Low-resolution raster candidates below 96px are rejected.
+- Images reserve dimensions before loading and use a crisp monogram fallback.
 
-```css
-/* Primary Button */
-.btn-primary {
-  background: #2563EB;
-  color: white;
-  padding: 12px 24px;
-  border-radius: 8px;
-  font-weight: 600;
-  transition: all 200ms ease;
-  cursor: pointer;
-}
+### Widgets
 
-.btn-primary:hover {
-  opacity: 0.9;
-  transform: translateY(-1px);
-}
+- Shared framing is restrained: one border, one elevation, no nested card stacks.
+- Weather: sky surface and horizontal forecast.
+- Calendar: paper surface and date block.
+- Todo: mint work surface and progress dial.
+- Countdown: rose event surface and orbit.
+- Focus: cool neutral surface and timer dial.
+- Photo: image-first edge-to-edge frame.
+- Quote: warm editorial surface and serif quotation.
+- Clock, memo, year, calculator, and rates retain distinct content structures.
 
-/* Secondary Button */
-.btn-secondary {
-  background: transparent;
-  color: #18181B;
-  border: 2px solid #18181B;
-  padding: 12px 24px;
-  border-radius: 8px;
-  font-weight: 600;
-  transition: all 200ms ease;
-  cursor: pointer;
-}
-```
+### Dialogs
 
-### Cards
-
-```css
-.card {
-  background: #FAFAFA;
-  border-radius: 12px;
-  padding: 24px;
-  box-shadow: var(--shadow-md);
-  transition: all 200ms ease;
-  cursor: pointer;
-}
-
-.card:hover {
-  box-shadow: var(--shadow-lg);
-  transform: translateY(-2px);
-}
-```
-
-### Inputs
-
-```css
-.input {
-  padding: 12px 16px;
-  border: 1px solid #E2E8F0;
-  border-radius: 8px;
-  font-size: 16px;
-  transition: border-color 200ms ease;
-}
-
-.input:focus {
-  border-color: #18181B;
-  outline: none;
-  box-shadow: 0 0 0 3px #18181B20;
-}
-```
-
-### Modals
-
-```css
-.modal-overlay {
-  background: rgba(0, 0, 0, 0.5);
-  backdrop-filter: blur(4px);
-}
-
-.modal {
-  background: white;
-  border-radius: 16px;
-  padding: 32px;
-  box-shadow: var(--shadow-xl);
-  max-width: 500px;
-  width: 90%;
-}
-```
-
----
-
-## Style Guidelines
-
-**Style:** Modern Dark (Cinema Mobile)
-
-**Keywords:** dark mode, cinematic, ambient light, glassmorphism, deep black, indigo, glow, blur, atmospheric, reanimated, haptic, premium, layered, frosted glass, linear gradient
-
-**Best For:** Developer tools, pro productivity apps, fintech/trading dashboards, media/streaming platforms, AI tool interfaces, high-end gaming companion apps
-
-**Key Effects:** Expo.out Bezier(0.16,1,0.3,1) easing; spring modals (damping:20 stiffness:90); haptic-linked press (Impact Light/Medium); animated ambient light blobs (Reanimated translateX/Y slow oscillation); BlurView glassmorphism headers/nav (intensity 20); scale press 0.97 → 1.0; avoid pure #000000 (OLED smear)
-
-### Page Pattern
-
-**Pattern Name:** AI Personalization Landing
-
-- **Conversion Strategy:** 20%+ conversion with personalization. Requires analytics integration. Fallback for new users.
-- **CTA Placement:** Context-aware placement based on user segment
-- **Section Order:** 1. Dynamic hero (personalized), 2. Relevant features, 3. Tailored testimonials, 4. Smart CTA
-
----
+- Desktop width follows task complexity, 520-760px.
+- Mobile uses a bottom sheet occupying the available dynamic viewport.
+- Header remains visible while body content scrolls.
+- Inputs are at least 44px high and always have visible labels.
+- Login and registration only show account creation fields when signed out.
+- Connected account status and sync controls appear only after authentication.
 
 ## Motion
 
-**Stagger List** (Standard) — Trigger: load or scroll | Duration: 300-450ms | Easing: `back.out(1.4)`
+- Micro-interactions: 150-240ms.
+- Use transform and opacity; do not animate layout dimensions.
+- Hover lift is at most 2px and never changes surrounding geometry.
+- Drag starts after a 6px mouse movement or a 180ms touch hold.
+- All motion is effectively removed under `prefers-reduced-motion`.
+- Continuous animation is limited to active loading indicators.
 
-```js
-gsap.from('.grid-item', { opacity: 0, scale: 0.92, y: 16, duration: 0.4, stagger: { each: 0.06, from: 'start', grid: 'auto' }, ease: 'back.out(1.4)' });
-```
+## Performance
 
-**Framework notes:** grid: 'auto' lets GSAP infer rows/columns from a CSS grid layout for a natural wave stagger
+- First eight home icons may load eagerly; remaining icons use intersection-based loading.
+- Shortcut pages render in bounded batches of 48.
+- Off-screen widgets use `content-visibility: auto` outside layout editing.
+- Resolved icon candidates are stored per account and bounded.
+- Web icon response cache is capped at 200 entries.
+- Mobile uses dedicated smaller wallpaper assets.
+- Every fixed-format image and icon has stable dimensions to avoid layout shift.
 
-- ✅ Combine with from: 'center' for a bento-grid layout to draw the eye inward first
-- ❌ Don't use back.out on dense data tables; the overshoot reads as sloppy on informational UI
-- ⚡ Group DOM writes; avoid interleaving layout reads (getBoundingClientRect) between staggered tweens
+## Accessibility
 
----
+- Normal text contrast is at least 4.5:1 and large UI contrast is at least 3:1.
+- Every icon-only control has an accessible name and visible focus ring.
+- Touch targets are at least 44x44px.
+- Keyboard users can reorder sortable content with the DnD keyboard sensor.
+- Context menus focus on open, close with Escape, and remain inside the viewport.
+- Color is never the only indication of active, error, or success state.
+- High contrast and reduced transparency preferences receive explicit fallbacks.
 
-## Anti-Patterns (Do NOT Use)
+## Forbidden Patterns
 
-- ❌ 2D design
-- ❌ No spatial depth
+- No marketing landing page in place of the app.
+- No giant decorative hero clock.
+- No gradient or blurred decoration objects.
+- No nested cards or card-wrapped page sections.
+- No purple-dominant or single-hue interface.
+- No emoji used as structural icons.
+- No hover-only critical action.
+- No desktop rail that moves or covers the canvas.
+- No unbounded icon, image, or service-worker cache.
+- No user-visible service URL, anonymous key, or advanced connection field.
 
-### Additional Forbidden Patterns
+## Release Checklist
 
-- ❌ **Emojis as icons** — Use SVG icons (Heroicons, Lucide, Simple Icons)
-- ❌ **Missing cursor:pointer** — All clickable elements must have cursor:pointer
-- ❌ **Layout-shifting hovers** — Avoid scale transforms that shift layout
-- ❌ **Low contrast text** — Maintain 4.5:1 minimum contrast ratio
-- ❌ **Instant state changes** — Always use transitions (150-300ms)
-- ❌ **Invisible focus states** — Focus states must be visible for a11y
-
----
-
-## Pre-Delivery Checklist
-
-Before delivering any UI code, verify:
-
-- [ ] No emojis used as icons (use SVG instead)
-- [ ] All icons from consistent icon set (Heroicons/Lucide)
-- [ ] `cursor-pointer` on all clickable elements
-- [ ] Hover states with smooth transitions (150-300ms)
-- [ ] Light mode: text contrast 4.5:1 minimum
-- [ ] Focus states visible for keyboard navigation
-- [ ] `prefers-reduced-motion` respected
-- [ ] Responsive: 375px, 768px, 1024px, 1440px
-- [ ] No content hidden behind fixed navbars
-- [ ] No horizontal scroll on mobile
+- [ ] 375, 768, 1024, and 1440px layouts verified.
+- [ ] Phone portrait and short landscape verified.
+- [ ] No horizontal document overflow.
+- [ ] Desktop rail clears the canvas in left and right modes.
+- [ ] Auto-hide rail remains open while the pointer enters it.
+- [ ] Right-click menus open at the pointer and fit the viewport.
+- [ ] Shortcut and widget drag ordering persists.
+- [ ] Settings and account dialogs scroll to their final action.
+- [ ] Login, registration, verification notice, and connected states checked.
+- [ ] Light, dark, reduced motion, reduced transparency, and high contrast checked.
+- [ ] Typecheck, build, migration safety, package safety, and repository scans pass.

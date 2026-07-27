@@ -311,7 +311,7 @@ try {
     settings: { ...legacyState.settings, iconSize: 64, visualRefreshVersion: 7 }
   });
   assert.equal(oldDefaultVisual.settings.iconSize, 58, "old default icon size should migrate to the new unified default");
-  assert.equal(oldDefaultVisual.settings.visualRefreshVersion, 10, "visual refresh version should advance");
+  assert.equal(oldDefaultVisual.settings.visualRefreshVersion, 11, "visual refresh version should advance");
   assert.deepEqual(oldDefaultVisual.settings.customNavPages, [], "legacy state should receive an empty custom page list");
   assert.deepEqual(oldDefaultVisual.settings.hiddenNavPages, [], "legacy state should keep all built-in pages visible");
   assert.equal(oldDefaultVisual.settings.navigationDisplay, "always", "legacy state should receive a visible desktop navigation");
@@ -1060,7 +1060,7 @@ try {
   assert.match(appSource, /sharedIconObserver/, "shortcut icons must share one visibility observer instead of allocating one per icon");
   assert.match(appSource, /RESOLVED_ICON_CACHE_KEY_PREFIX[\s\S]*user:\$\{userId\}/, "resolved icon choices must be stored in an account-scoped cache");
   assert.match(appSource, /cleanupDeletedAccountData[\s\S]*deleteResolvedIconCacheForAccount\(userId\)/, "permanent account deletion must remove that account's resolved icon cache");
-  assert.match(appSource, /SHORTCUT_RENDER_BATCH = 80/, "large shortcut collections must render in mobile-safe batches instead of mounting every image at startup");
+  assert.match(appSource, /SHORTCUT_RENDER_BATCH = 48/, "large shortcut collections must render in mobile-safe batches instead of mounting every image at startup");
   assert.match(appSource, /ICON_LOAD_TIMEOUT_MS = 5000/, "slow mobile networks must have enough time to load a sharp icon before trying the fallback chain");
   assert.match(appSource, /ICON_FAILURE_RETRY_MS = 6 \* 60 \* 60 \* 1000/, "failed icon chains must be cached temporarily instead of refetched on every launch");
   assert.match(appSource, /FAILED_ICON_CACHE_PREFIX[\s\S]*isFreshFailedIconCache/, "failed icon chains must expire and retry instead of becoming permanent");
