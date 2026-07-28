@@ -9,6 +9,7 @@ import "./ui-v091.css";
 import "./ui-v092.css";
 import "./ui-v094.css";
 import "./ui-v095.css";
+import "./ui-v096.css";
 
 type ErrorBoundaryState = { error?: Error };
 

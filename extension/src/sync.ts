@@ -1089,7 +1089,7 @@ type SyncRecord = {
 const legacyDefaultWidgetOrder: WidgetKey[] = ["weather", "calendar", "todos", "countdowns", "focus", "notes", "rates", "quote", "clock", "memo", "year", "calculator"];
 const defaultWidgetOrder: WidgetKey[] = ["weather", "focus", "calendar", "todos", "countdowns", "notes", "rates", "quote", "clock", "memo", "year", "calculator"];
 
-const defaultWidgets: Record<WidgetKey, boolean> = {
+const legacyExpandedDefaultWidgets: Record<WidgetKey, boolean> = {
   weather: true,
   calendar: true,
   countdowns: true,
@@ -1102,6 +1102,22 @@ const defaultWidgets: Record<WidgetKey, boolean> = {
   memo: false,
   year: false,
   calculator: false
+};
+
+const defaultWidgets: Record<WidgetKey, boolean> = {
+  ...legacyExpandedDefaultWidgets,
+  countdowns: false,
+  todos: false,
+  notes: false,
+  rates: false,
+  quote: false
+};
+
+const isLegacyExpandedWidgetDefault = (widgets?: Partial<Record<WidgetKey, boolean>>) => {
+  if (!widgets) return false;
+  return (Object.keys(legacyExpandedDefaultWidgets) as WidgetKey[]).every((key) => (
+    widgets[key] === legacyExpandedDefaultWidgets[key]
+  ));
 };
 
 const normalizeWidgetOrder = (order?: WidgetKey[]) => {
@@ -1461,7 +1477,9 @@ export function normalizeState(state: AppState): AppState {
 
   const updatedAt = state.updatedAt || new Date().toISOString();
   const visualVersion = state.settings.visualRefreshVersion || 0;
-  const normalizedWidgets = { ...defaultWidgets, ...(state.settings.widgets || {}) };
+  const normalizedWidgets = visualVersion < 17 && isLegacyExpandedWidgetDefault(state.settings.widgets)
+    ? { ...defaultWidgets }
+    : { ...defaultWidgets, ...(state.settings.widgets || {}) };
   const normalizedWidgetSizes = { ...defaultWidgetSizes, ...(state.settings.widgetSizes || {}) };
   if (visualVersion < 15) {
     if (normalizedWidgetSizes.weather === "wide") normalizedWidgetSizes.weather = "medium";
@@ -1484,7 +1502,7 @@ export function normalizeState(state: AppState): AppState {
         ? "aurora-lake"
         : state.settings.wallpaperPreset || "lucid-room",
     wallpaperRotation: visualVersion < 5 ? false : state.settings.wallpaperRotation ?? false,
-    visualRefreshVersion: 16,
+    visualRefreshVersion: 17,
     iconSize: Math.min(80, Math.max(48, visualVersion < 8 && state.settings.iconSize === 64 ? 58 : state.settings.iconSize || 58)),
     glass: Math.min(88, Math.max(28, state.settings.glass || 42)),
     customWallpapers: state.settings.customWallpapers || [],

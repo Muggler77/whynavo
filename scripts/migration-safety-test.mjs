@@ -344,7 +344,7 @@ try {
     settings: { ...legacyState.settings, iconSize: 64, visualRefreshVersion: 7 }
   });
   assert.equal(oldDefaultVisual.settings.iconSize, 58, "old default icon size should migrate to the new unified default");
-  assert.equal(oldDefaultVisual.settings.visualRefreshVersion, 16, "visual refresh version should advance");
+  assert.equal(oldDefaultVisual.settings.visualRefreshVersion, 17, "visual refresh version should advance");
   assert.deepEqual(oldDefaultVisual.settings.customNavPages, [], "legacy state should receive an empty custom page list");
   assert.deepEqual(oldDefaultVisual.settings.hiddenNavPages, ["tools"], "legacy state should adopt the restrained Sample A navigation");
   assert.equal(oldDefaultVisual.settings.navigationDisplay, "always", "legacy state should receive a visible desktop navigation");
@@ -363,6 +363,40 @@ try {
     ["weather", "focus", "calendar"],
     "untouched legacy widget order should adopt the Sample A primary row"
   );
+
+  const legacyExpandedWidgets = {
+    weather: true,
+    calendar: true,
+    countdowns: true,
+    todos: true,
+    notes: true,
+    rates: true,
+    quote: true,
+    focus: true,
+    clock: false,
+    memo: false,
+    year: false,
+    calculator: false
+  };
+  const collapsedLegacyWidgets = normalizeState({
+    ...legacyState,
+    settings: { ...legacyState.settings, widgets: legacyExpandedWidgets, visualRefreshVersion: 16 }
+  });
+  assert.deepEqual(
+    Object.entries(collapsedLegacyWidgets.settings.widgets).filter(([, enabled]) => enabled).map(([key]) => key).sort(),
+    ["calendar", "focus", "weather"],
+    "the previously hidden expanded default must become the intentional three-widget Home layout"
+  );
+  const customizedLegacyWidgets = normalizeState({
+    ...legacyState,
+    settings: {
+      ...legacyState.settings,
+      widgets: { ...legacyExpandedWidgets, quote: false, memo: true },
+      visualRefreshVersion: 16
+    }
+  });
+  assert.equal(customizedLegacyWidgets.settings.widgets.memo, true, "explicitly enabled widgets must survive the visual migration");
+  assert.equal(customizedLegacyWidgets.settings.widgets.quote, false, "explicitly disabled widgets must survive the visual migration");
 
   const customIconSize = normalizeState({
     ...legacyState,
@@ -1480,6 +1514,14 @@ try {
   assert.match(appSource, /previouslyFocused\?\.focus\(\)/, "closing a dialog must restore the user's prior keyboard focus");
   assert.match(appSource, /bodyRef\.current\.scrollTop = 0/, "every dialog must open at the beginning instead of inheriting a previous mobile scroll position");
   assert.match(appSource, /initial\?\.focus\(\{ preventScroll: true \}\)/, "dialog focus management must not scroll form content away from its heading");
+  assert.match(appSource, /const primaryWidgetItems = widgetGridItems;/, "Home must render every enabled widget instead of truncating the list");
+  assert.doesNotMatch(appSource, /const primaryWidgetItems = widgetGridItems\.slice/, "Home must never silently hide enabled widgets behind a fixed slice");
+  assert.match(appSource, /编辑主页布局[\s\S]*Edit Home layout/, "Home right-click must expose layout editing without a fixed corner control");
+  assert.match(appSource, /lucid-wallpaper-button[\s\S]*onOpenWallpapers/, "Settings must expose a direct wallpaper-library entry");
+  assert.match(appSource, /initialTab=\{dialog === "wallpapers" \? "wallpapers" : "widgets"\}/, "the Settings wallpaper action must open the wallpaper tab directly");
+  assert.match(appSource, /搜索引擎[\s\S]*Search engine[\s\S]*<select className="lucid-compact-input"/, "Settings must use a persistent search-engine select");
+  assert.match(appSource, /城市[\s\S]*City[\s\S]*weatherCityOptions\.map/, "weather city selection must use the bounded bilingual city list");
+  assert.match(appSource, /shrinkImage\(file, 1600, 0\.86, language\)/, "image-upload errors must follow the active interface language");
   assert.match(
     appSource,
     /\.page-nav:hover, \.page-nav:focus-within, \.page-nav-auto-trigger:hover, \.page-nav-auto-trigger:focus-visible/,
@@ -1487,6 +1529,11 @@ try {
   );
   const uiSource = await readFile(join(repoRoot, "extension/src/ui-v040.css"), "utf8");
   assert.match(uiSource, /\.dialog-body\s*\{[\s\S]*overflow-anchor: none/, "asynchronous dialog content must not move the mobile scroll position");
+  const uiV096Source = await readFile(join(repoRoot, "extension/src/ui-v096.css"), "utf8");
+  assert.match(uiV096Source, /\.widget-size-small[\s\S]*grid-row: span 9/, "compact widgets must have a deliberate compact height");
+  assert.match(uiV096Source, /\.widget-size-medium[\s\S]*grid-row: span 12/, "standard widgets must have a deliberate standard height");
+  assert.match(uiV096Source, /\.widget-size-wide[\s\S]*grid-row: span 15/, "expanded widgets must have a deliberate expanded height");
+  assert.match(uiV096Source, /\.sample-a-local-note\s*\{[\s\S]*position: static/, "the local-first note must not cover scrolling widget rows");
   const sortableWidgetSource = await readFile(join(repoRoot, "extension/src/SortableWidgetGrid.tsx"), "utf8");
   assert.match(sortableWidgetSource, /widget-sortable-settings/, "layout editing must expose a touch-accessible widget settings control");
   assert.match(sortableWidgetSource, /onConfigure\(item\.id/, "the widget settings control must open the same bounded configuration surface as right-click");

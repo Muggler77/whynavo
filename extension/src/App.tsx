@@ -136,7 +136,7 @@ import {
 import type { AppState, Countdown, CustomNavPage, CustomNavPageIcon, Note, RatesState, SearchEngine, Shortcut, ShortcutFolder, SystemNavPage, Todo, UiLanguage, WeatherState, WidgetKey, WidgetSize } from "./types";
 import { normalizeHttpUrl, safeHttpHref } from "./urls";
 
-type Dialog = "shortcut" | "folder" | "import" | "library" | "pages" | "settings" | "sync" | "timezone" | null;
+type Dialog = "shortcut" | "folder" | "import" | "library" | "wallpapers" | "pages" | "settings" | "sync" | "timezone" | null;
 type ShortcutMenuState = { x: number; y: number; shortcutId: string } | null;
 type FolderMenuState = { x: number; y: number; folderId: string } | null;
 type PageMenuState = { x: number; y: number } | null;
@@ -168,7 +168,6 @@ const friendlyAuthError = (error: unknown, fallback: string) => {
 const SYNC_RESTORE_KEY = "sync-restore-point";
 const PUBLIC_AUTH_REDIRECT_URL = "https://whynavo.pages.dev/";
 const HOSTED_APP_ORIGIN = "https://whynavo.pages.dev";
-const USE_BROWSER_DEFAULT_SEARCH = window.location.protocol === "chrome-extension:" && Boolean(globalThis.chrome?.search?.query);
 const homePageOrder: HomePage[] = defaultNavigationOrder;
 const WEATHER_CACHE_MAX_AGE_MS = 60 * 60 * 1000;
 const RATES_CACHE_MAX_AGE_MS = 6 * 60 * 60 * 1000;
@@ -878,6 +877,29 @@ const searchEngineLabelFor = (language: UiLanguage, engine: SearchEngine) => (
   engine === "baidu" ? localized(language, "百度", "Baidu") : searchEngines[engine].label
 );
 
+const weatherCityOptions = [
+  { value: "Shanghai", zh: "上海", en: "Shanghai" },
+  { value: "Beijing", zh: "北京", en: "Beijing" },
+  { value: "Shenzhen", zh: "深圳", en: "Shenzhen" },
+  { value: "Guangzhou", zh: "广州", en: "Guangzhou" },
+  { value: "Hangzhou", zh: "杭州", en: "Hangzhou" },
+  { value: "Chengdu", zh: "成都", en: "Chengdu" },
+  { value: "Chongqing", zh: "重庆", en: "Chongqing" },
+  { value: "Wuhan", zh: "武汉", en: "Wuhan" },
+  { value: "Xi'an", zh: "西安", en: "Xi'an" },
+  { value: "Nanjing", zh: "南京", en: "Nanjing" },
+  { value: "Suzhou", zh: "苏州", en: "Suzhou" },
+  { value: "Hong Kong", zh: "香港", en: "Hong Kong" },
+  { value: "Taipei", zh: "台北", en: "Taipei" },
+  { value: "Tokyo", zh: "东京", en: "Tokyo" },
+  { value: "Singapore", zh: "新加坡", en: "Singapore" },
+  { value: "London", zh: "伦敦", en: "London" },
+  { value: "Paris", zh: "巴黎", en: "Paris" },
+  { value: "New York", zh: "纽约", en: "New York" },
+  { value: "Los Angeles", zh: "洛杉矶", en: "Los Angeles" },
+  { value: "Sydney", zh: "悉尼", en: "Sydney" }
+] as const;
+
 type CurrencyCode = "CNY" | "USD" | "JPY";
 
 const currencyNames: Record<CurrencyCode, string> = {
@@ -887,11 +909,11 @@ const currencyNames: Record<CurrencyCode, string> = {
 };
 
 const dailyQuotes = [
-  { text: "先把桌面变成愿意打开的地方，再把事情慢慢放进去。", source: "WhyNavo" },
-  { text: "好的工具不抢注意力，只把下一步放到手边。", source: "WhyNavo" },
-  { text: "今天只要推进一件真正重要的小事，就已经很赚。", source: "WhyNavo" },
-  { text: "主页不是展示柜，是每天第一个工作台。", source: "WhyNavo" },
-  { text: "少一点入口焦虑，多一点顺手抵达。", source: "WhyNavo" }
+  { text: "先把桌面变成愿意打开的地方，再把事情慢慢放进去。", en: "Make your workspace inviting first, then add what matters." },
+  { text: "好的工具不抢注意力，只把下一步放到手边。", en: "A good tool protects your attention and keeps the next step close." },
+  { text: "今天只要推进一件真正重要的小事，就已经很赚。", en: "Moving one meaningful thing forward is enough for today." },
+  { text: "主页不是展示柜，是每天第一个工作台。", en: "Your home page is a workspace, not a display case." },
+  { text: "少一点入口焦虑，多一点顺手抵达。", en: "Fewer distracting entrances, more effortless arrivals." }
 ];
 
 type WallpaperCategory = "精选" | "日系" | "动漫" | "猫咪" | "酷感";
@@ -1903,6 +1925,21 @@ export default function App() {
   }, [pageMotion, activePage]);
 
   useEffect(() => {
+    if (activePage !== "widgets" && layoutEditing) setLayoutEditing(false);
+  }, [activePage, layoutEditing]);
+
+  useEffect(() => {
+    if (!layoutEditing) return;
+    const finishEditing = (event: globalThis.KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      setLayoutEditing(false);
+      showToast(text("主页布局已保存", "Home layout saved"));
+    };
+    window.addEventListener("keydown", finishEditing);
+    return () => window.removeEventListener("keydown", finishEditing);
+  }, [layoutEditing, uiLanguage]);
+
+  useEffect(() => {
     let timer = 0;
     const schedule = () => {
       setClock(new Date());
@@ -2237,6 +2274,18 @@ export default function App() {
   const homeGreeting = uiLanguage === "en-US"
     ? `${greetingLead}${accountName ? `, ${accountName}` : ""}.`
     : `${greetingLead}${accountName ? `，${accountName}` : ""}。`;
+  const homeTime = new Intl.DateTimeFormat(uiLanguage, {
+    timeZone: selectedTimeZone,
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false
+  }).format(clock);
+  const homeDate = new Intl.DateTimeFormat(uiLanguage, {
+    timeZone: selectedTimeZone,
+    month: "long",
+    day: "numeric",
+    weekday: "short"
+  }).format(clock);
 
   const saveSyncRestorePoint = async (
     label: string,
@@ -3032,24 +3081,7 @@ export default function App() {
   const runSearch = () => {
     const text = searchText.trim();
     if (!text) return;
-    if (USE_BROWSER_DEFAULT_SEARCH) {
-      void chrome.search.query({ text, disposition: "NEW_TAB" });
-      return;
-    }
     window.open(searchEngines[currentSearchEngine].url(text), "_blank", "noopener,noreferrer");
-  };
-  const toggleSearchEngine = () => {
-    updateState((current) => {
-      const nextEngine: SearchEngine = (current.settings.searchEngine || "baidu") === "baidu" ? "google" : "baidu";
-      return {
-        ...current,
-        settings: {
-          ...current.settings,
-          searchEngine: nextEngine,
-          updatedAt: nowIso()
-        }
-      };
-    });
   };
 
   const chooseTimeZone = (timeZone: string) => {
@@ -3517,7 +3549,7 @@ export default function App() {
       content: widgetRenderers[key]
     };
   });
-  const primaryWidgetItems = widgetGridItems.slice(0, 3);
+  const primaryWidgetItems = widgetGridItems;
 
   const leaveAccount = async (everywhere = false) => {
     const signOutEpoch = accountEpochRef.current + 1;
@@ -3645,14 +3677,14 @@ export default function App() {
           {activePage === "widgets" ? (
             <>
               <div className="home-greeting">
+                <div className="home-time" aria-label={text(`当前时间 ${homeTime}`, `Current time ${homeTime}`)}>
+                  <time>{homeTime}</time>
+                  <span>{homeDate}</span>
+                </div>
                 <h2>{homeGreeting}</h2>
                 <p>{text("把注意力留给真正重要的事。", "Focus on what matters. You’re in control.")}</p>
               </div>
               <div className="search hero-search">
-                {USE_BROWSER_DEFAULT_SEARCH
-                  ? <span className="engine-toggle engine-default">{text("默认", "Default")}</span>
-                  : <button type="button" className="engine-toggle" title={text("切换搜索引擎", "Switch search engine")} onClick={toggleSearchEngine}>{searchEngineLabelFor(uiLanguage, currentSearchEngine)}</button>}
-                <Search size={20} />
                 <input
                   ref={searchInputRef}
                   value={searchText}
@@ -3755,20 +3787,6 @@ export default function App() {
             )}
           </div>
         </nav>
-        <button
-          type="button"
-          className={`page-nav-edit ${layoutEditing ? "active" : ""}`}
-          onClick={() => {
-            if (activePage !== "widgets") goToPage("widgets");
-            const next = !layoutEditing;
-            setLayoutEditing(next);
-            showToast(next ? text("布局编辑已开启", "Layout editing enabled") : text("主页布局已保存", "Home layout saved"));
-          }}
-        >
-          {layoutEditing ? <Check size={17} /> : <GripVertical size={17} />}
-          <span>{layoutEditing ? text("完成", "Done") : text("编辑布局", "Edit layout")}</span>
-        </button>
-
         {activePage === "shortcuts" && state.settings.dockPosition === "top" && <Dock shortcuts={pinned} />}
 
         <section
@@ -3839,8 +3857,7 @@ export default function App() {
               query={searchText}
               onQueryChange={setSearchText}
               onWebSearch={runSearch}
-              onToggleEngine={toggleSearchEngine}
-              engineLabel={USE_BROWSER_DEFAULT_SEARCH ? text("浏览器", "Browser") : searchEngineLabelFor(uiLanguage, currentSearchEngine)}
+              engineLabel={searchEngineLabelFor(uiLanguage, currentSearchEngine)}
               shortcuts={allShortcuts}
               notes={state.notes}
               todos={state.todos}
@@ -3975,7 +3992,14 @@ export default function App() {
           menu={widgetMenu}
           size={widgetMenu.widgetKey ? widgetSizes[widgetMenu.widgetKey] : undefined}
           siteFloating={state.settings.homeSiteFloating !== false}
+          layoutEditing={layoutEditing}
           onClose={() => setWidgetMenu(null)}
+          onToggleLayout={() => {
+            const next = !layoutEditing;
+            setLayoutEditing(next);
+            setWidgetMenu(null);
+            showToast(next ? text("布局编辑已开启；单击图标编辑，拖动调整位置", "Layout editing enabled. Click icons to edit or drag to move.") : text("主页布局已保存", "Home layout saved"));
+          }}
           onResize={(key, size) => {
             setWidgetSize(key, size);
             showToast(text(
@@ -4105,11 +4129,12 @@ export default function App() {
           }}
         />
       )}
-      {dialog === "library" && (
+      {(dialog === "library" || dialog === "wallpapers") && (
         <ResourceCenterDialog
           state={state}
           updateState={updateState}
           shortcuts={allShortcuts}
+          initialTab={dialog === "wallpapers" ? "wallpapers" : "widgets"}
           onEditShortcut={(shortcut) => {
             setEditingShortcut(shortcut);
             setDialog("shortcut");
@@ -4138,6 +4163,7 @@ export default function App() {
       {dialog === "settings" && (
         <SettingsDialog
           state={state}
+          clock={clock}
           updateCheck={updateCheck}
           migrationBackupAvailable={migrationBackupAvailable}
           updateState={updateState}
@@ -4147,6 +4173,7 @@ export default function App() {
           onRestoreMigrationBackup={restoreMigrationBackup}
           onCheckUpdate={() => runUpdateCheck(true)}
           onOpenTimeZone={() => setDialog("timezone")}
+          onOpenWallpapers={() => setDialog("wallpapers")}
           onWeatherUseLocationChange={async (enabled) => {
             if (enabled) {
               const granted = await requestDeviceLocationPermission().catch(() => false);
@@ -4599,11 +4626,10 @@ function HomeShortcuts({ tiles, iconSize, editing, floating, onOpenFolder, onEdi
   );
 }
 
-function SearchWorkspace({ query, onQueryChange, onWebSearch, onToggleEngine, engineLabel, shortcuts, notes, todos, onAddShortcut, onOpenNotes, onOpenTasks }: {
+function SearchWorkspace({ query, onQueryChange, onWebSearch, engineLabel, shortcuts, notes, todos, onAddShortcut, onOpenNotes, onOpenTasks }: {
   query: string;
   onQueryChange: (value: string) => void;
   onWebSearch: () => void;
-  onToggleEngine: () => void;
   engineLabel: string;
   shortcuts: Shortcut[];
   notes: Note[];
@@ -4641,7 +4667,7 @@ function SearchWorkspace({ query, onQueryChange, onWebSearch, onToggleEngine, en
           placeholder={text("查找网站、笔记、任务，或直接搜索网络", "Find sites, notes, tasks, or search the web")}
           aria-label={text("搜索 WhyNavo 内容", "Search WhyNavo content")}
         />
-        <button type="button" className="lucid-search-engine" onClick={onToggleEngine} title={text("切换网络搜索引擎", "Switch web search engine")}>{engineLabel}</button>
+        <span className="lucid-search-engine" title={text("可在设置中更改搜索引擎", "Change the search engine in Settings")}>{engineLabel}</span>
         <button type="submit" className="lucid-search-web" title={text("搜索网络", "Search the web")} aria-label={text("搜索网络", "Search the web")}><Navigation size={17} /></button>
       </form>
 
@@ -5158,11 +5184,13 @@ function WidgetSizePicker({ widgetKey, value, onChange, disabled = false, compac
   );
 }
 
-function WidgetContextMenu({ menu, size, siteFloating, onClose, onResize, onOpenLibrary, onRefresh, onRotateWallpaper, onToggleSiteFloating, onHide }: {
+function WidgetContextMenu({ menu, size, siteFloating, layoutEditing, onClose, onToggleLayout, onResize, onOpenLibrary, onRefresh, onRotateWallpaper, onToggleSiteFloating, onHide }: {
   menu: Exclude<WidgetMenuState, null>;
   size?: WidgetSize;
   siteFloating: boolean;
+  layoutEditing: boolean;
   onClose: () => void;
+  onToggleLayout: () => void;
   onResize: (key: WidgetKey, size: WidgetSize) => void;
   onOpenLibrary: () => void;
   onRefresh: () => void;
@@ -5187,6 +5215,7 @@ function WidgetContextMenu({ menu, size, siteFloating, onClose, onResize, onOpen
         <WidgetSizePicker widgetKey={menu.widgetKey} value={size} onChange={(nextSize) => onResize(menu.widgetKey!, nextSize)} />
       )}
       <div className="widget-menu-actions">
+        <button onClick={onToggleLayout}>{layoutEditing ? <Check size={14} /> : <LayoutGrid size={14} />} {layoutEditing ? text("完成布局编辑", "Finish layout editing") : text("编辑主页布局", "Edit Home layout")}</button>
         {!menu.widgetKey && <button onClick={onToggleSiteFloating}>{siteFloating ? <EyeOff size={14} /> : <Sparkles size={14} />} {siteFloating ? text("关闭图标浮动", "Turn off icon motion") : text("开启图标浮动", "Turn on icon motion")}</button>}
         <button onClick={onOpenLibrary}><Palette size={14} /> {text("更多小组件", "More widgets")}</button>
         <button onClick={onRefresh}><RefreshCcw size={14} /> {text("刷新数据", "Refresh data")}</button>
@@ -5298,7 +5327,7 @@ function WeatherWidget({ widgetKey, size, weather, city, useLocation, refreshing
       widgetKey={widgetKey}
       tone={`weather weather-${weatherToneForCode(weather?.weatherCode)}`}
       size={size}
-      action={<button className="weather-unit" title={refreshing ? text("正在刷新", "Refreshing") : text("刷新天气", "Refresh weather")} disabled={refreshing} onClick={() => void onRefresh()}>°C<RefreshCcw size={11} className={refreshing ? "spin" : undefined} /></button>}
+      action={<button className="weather-unit" aria-label={refreshing ? text("正在刷新天气", "Refreshing weather") : text("刷新天气", "Refresh weather")} title={refreshing ? text("正在刷新", "Refreshing") : text("刷新天气", "Refresh weather")} disabled={refreshing} onClick={() => void onRefresh()}><RefreshCcw size={14} className={refreshing ? "spin" : undefined} /></button>}
     >
       <a className={`sample-weather ${weather ? "" : "is-loading"}`} href={source} target="_blank" rel="noreferrer" title={text("打开天气数据来源", "Open weather data source")}>
         {weather ? (
@@ -5314,7 +5343,12 @@ function WeatherWidget({ widgetKey, size, weather, city, useLocation, refreshing
                 <span>{weatherLabelFor(weather.weatherCode, language)}</span>
               </div>
             </div>
-            {size !== "small" && (
+            {size === "small" ? (
+              <div className="sample-weather-compact-facts">
+                <span><Wind size={12} />{Math.round(weather.windSpeed)} km/h</span>
+                <span><Droplets size={12} />{precipitation ?? 0}%</span>
+              </div>
+            ) : (
               <div className="sample-weather-facts" aria-label={text("当前天气详情", "Current weather details")}>
                 <span><Wind size={13} /><small>{text("风速", "Wind")}</small><strong>{Math.round(weather.windSpeed)} km/h</strong></span>
                 <span><Droplets size={13} /><small>{text("降水", "Rain")}</small><strong>{precipitation ?? 0}%</strong></span>
@@ -5564,6 +5598,8 @@ function CalendarWidget({ widgetKey, size, date, state, updateState }: { widgetK
 }
 
 function CountdownWidget({ widgetKey, size, state, updateState }: { widgetKey: WidgetKey; size: WidgetSize; state: AppState; updateState: (updater: (state: AppState) => AppState) => void }) {
+  const language = useUiLanguage();
+  const text = (zh: string, en: string) => localized(language, zh, en);
   const defaultDate = calendarDateKey(new Date(Date.now() + 7 * 86400000));
   const [editorOpen, setEditorOpen] = useState(false);
   const [draftTitle, setDraftTitle] = useState("");
@@ -5572,11 +5608,11 @@ function CountdownWidget({ widgetKey, size, state, updateState }: { widgetKey: W
     const title = draftTitle.trim();
     if (!title || !draftDate) return;
     if (title.length > MAX_ENTITY_NAME_CHARS) {
-      window.alert("倒计时名称不能超过 1000 个字符");
+      window.alert(text("倒计时名称不能超过 1000 个字符", "A countdown name cannot exceed 1,000 characters."));
       return;
     }
     if (state.countdowns.length >= MAX_ENTITY_RECORDS) {
-      window.alert("倒计时记录已达到 5000 条安全上限，请先删除不再需要的记录");
+      window.alert(text("倒计时记录已达到 5000 条安全上限，请先删除不再需要的记录", "Countdowns reached the 5,000 item safety limit. Remove entries you no longer need."));
       return;
     }
     const item: Countdown = { id: uid(), title, date: draftDate, updatedAt: nowIso() };
@@ -5596,52 +5632,52 @@ function CountdownWidget({ widgetKey, size, state, updateState }: { widgetKey: W
   };
   const featured = items[0];
   return (
-    <Widget title="倒计时" meta={`${items.length} 个日期`} widgetKey={widgetKey} tone="countdown" size={size} action={<button title="添加" onClick={() => setEditorOpen(true)}><Plus size={14} /></button>}>
+    <Widget title={text("倒计时", "Countdowns")} meta={text(`${items.length} 个日期`, `${items.length} dates`)} widgetKey={widgetKey} tone="countdown" size={size} action={<button title={text("添加", "Add")} onClick={() => setEditorOpen(true)}><Plus size={14} /></button>}>
       {featured ? (() => {
         const days = countdownDays(featured);
         return (
           <div className="countdown-feature">
-            <div className="countdown-orbit" aria-label={`${Math.abs(days)} 天`}>
+            <div className="countdown-orbit" aria-label={text(`${Math.abs(days)} 天`, `${Math.abs(days)} days`)}>
               <span className="countdown-orbit-marker" aria-hidden="true" />
-              <div className="countdown-value"><strong>{Math.abs(days)}</strong><span>天</span></div>
+              <div className="countdown-value"><strong>{Math.abs(days)}</strong><span>{text("天", "days")}</span></div>
             </div>
             <div className="countdown-copy">
-              <span className="countdown-status">{days >= 0 ? "即将到来" : "已经发生"}</span>
+              <span className="countdown-status">{days >= 0 ? text("即将到来", "Upcoming") : text("已经发生", "Elapsed")}</span>
               <strong>{featured.title}</strong>
-              <time dateTime={featured.date}><CalendarDays size={13} />{new Date(`${featured.date}T00:00:00`).toLocaleDateString("zh-CN", { year: "numeric", month: "long", day: "numeric" })}</time>
+              <time dateTime={featured.date}><CalendarDays size={13} />{new Date(`${featured.date}T00:00:00`).toLocaleDateString(language, { year: "numeric", month: "long", day: "numeric" })}</time>
             </div>
-            <button type="button" title="删除倒计时" onClick={() => removeCountdown(featured.id)}><X size={13} /></button>
+            <button type="button" title={text("删除倒计时", "Delete countdown")} onClick={() => removeCountdown(featured.id)}><X size={13} /></button>
           </div>
         );
-      })() : <button type="button" className="countdown-empty" onClick={() => setEditorOpen(true)}><Plus size={18} /><span>添加一个重要日期</span></button>}
-      {items.length > 1 && (
+      })() : <button type="button" className="countdown-empty" onClick={() => setEditorOpen(true)}><Plus size={18} /><span>{text("添加一个重要日期", "Add an important date")}</span></button>}
+      {items.length > 1 && size !== "small" && (
         <div className="countdown-list">
-          {items.slice(1).map((item) => {
+          {items.slice(1, size === "wide" ? 4 : 2).map((item) => {
             const days = countdownDays(item);
             return (
               <div className="list-row" key={item.id}>
                 <span>{item.title}</span>
-                <strong>{days >= 0 ? `${days} 天` : `已过 ${Math.abs(days)} 天`}</strong>
-                <button type="button" title="删除倒计时" onClick={() => removeCountdown(item.id)}><X size={13} /></button>
+                <strong>{days >= 0 ? text(`${days} 天`, `${days} days`) : text(`已过 ${Math.abs(days)} 天`, `${Math.abs(days)} days ago`)}</strong>
+                <button type="button" title={text("删除倒计时", "Delete countdown")} onClick={() => removeCountdown(item.id)}><X size={13} /></button>
               </div>
             );
           })}
         </div>
       )}
       {editorOpen && (
-        <DialogShell title="添加倒计时" onClose={() => setEditorOpen(false)} className="widget-popover countdown-popover">
+        <DialogShell title={text("添加倒计时", "Add countdown")} onClose={() => setEditorOpen(false)} className="widget-popover countdown-popover">
           <form className="countdown-editor" onSubmit={(event) => { event.preventDefault(); addCountdown(); }}>
             <label>
-              <span>名称</span>
-              <input maxLength={MAX_ENTITY_NAME_CHARS} value={draftTitle} onChange={(event) => setDraftTitle(event.target.value)} placeholder="例如：旅行出发" autoFocus />
+              <span>{text("名称", "Name")}</span>
+              <input maxLength={MAX_ENTITY_NAME_CHARS} value={draftTitle} onChange={(event) => setDraftTitle(event.target.value)} placeholder={text("例如：旅行出发", "For example: Trip departure")} autoFocus />
             </label>
             <label>
-              <span>日期</span>
+              <span>{text("日期", "Date")}</span>
               <input type="date" value={draftDate} onChange={(event) => setDraftDate(event.target.value)} />
             </label>
             <div className="countdown-editor-actions">
-              <button type="button" onClick={() => setEditorOpen(false)}>取消</button>
-              <button type="submit" className="primary-mini" disabled={!draftTitle.trim() || !draftDate}>添加</button>
+              <button type="button" onClick={() => setEditorOpen(false)}>{text("取消", "Cancel")}</button>
+              <button type="submit" className="primary-mini" disabled={!draftTitle.trim() || !draftDate}>{text("添加", "Add")}</button>
             </div>
           </form>
         </DialogShell>
@@ -5660,7 +5696,7 @@ function TodoWidget({ widgetKey, size, state, updateState }: { widgetKey: Widget
   const activeCount = dueTodos.filter((todo) => !isTodoCompletedForDate(todo)).length;
   const doneCount = dueTodos.length - activeCount;
   const completionPercent = dueTodos.length ? Math.round((doneCount / dueTodos.length) * 100) : 0;
-  const visibleTodos = dueTodos.slice(0, 3);
+  const visibleTodos = dueTodos.slice(0, size === "small" ? 1 : size === "medium" ? 2 : 3);
   const add = () => {
     if (!text.trim()) return;
     if (text.trim().length > MAX_TODO_TEXT_CHARS) {
@@ -5716,7 +5752,7 @@ function TodoWidget({ widgetKey, size, state, updateState }: { widgetKey: Widget
   ));
   return (
     <Widget
-      title="To Do"
+      title={textFor("任务", "Tasks")}
       meta={textFor(`${activeCount} 待处理`, `${activeCount} open`)}
       widgetKey={widgetKey}
       tone="todo"
@@ -5770,23 +5806,25 @@ function TodoWidget({ widgetKey, size, state, updateState }: { widgetKey: Widget
 }
 
 function PhotoWidget({ widgetKey, size, state, updateState }: { widgetKey: WidgetKey; size: WidgetSize; state: AppState; updateState: (updater: (state: AppState) => AppState) => void }) {
+  const language = useUiLanguage();
+  const text = (zh: string, en: string) => localized(language, zh, en);
   const image = state.settings.photoFrameImage;
-  const title = state.settings.photoFrameTitle || "我的照片";
+  const title = state.settings.photoFrameTitle || text("我的照片", "My photo");
   const savePhoto = async (file?: File) => {
     if (!file) return;
     try {
-      const dataUrl = await shrinkImage(file);
+      const dataUrl = await shrinkImage(file, 1600, 0.86, language);
       updateState((current) => ({
         ...current,
         settings: {
           ...current.settings,
           photoFrameImage: dataUrl,
-          photoFrameTitle: (file.name.replace(/\.[^.]+$/, "") || "我的照片").slice(0, 500),
+          photoFrameTitle: (file.name.replace(/\.[^.]+$/, "") || text("我的照片", "My photo")).slice(0, 500),
           updatedAt: nowIso()
         }
       }));
     } catch (error) {
-      window.alert(error instanceof Error ? error.message : "照片处理失败");
+      window.alert(error instanceof Error ? error.message : text("照片处理失败", "Photo processing failed"));
     }
   };
   const clearPhoto = () => {
@@ -5801,18 +5839,18 @@ function PhotoWidget({ widgetKey, size, state, updateState }: { widgetKey: Widge
     }));
   };
   return (
-    <Widget title="照片" meta={image ? title : "未设置"} widgetKey={widgetKey} tone={image ? "photo photo-filled" : "photo"} size={size} action={image ? <button title="清除照片" onClick={clearPhoto}><X size={14} /></button> : undefined}>
+    <Widget title={text("照片", "Photo")} meta={image ? title : text("未设置", "Not set")} widgetKey={widgetKey} tone={image ? "photo photo-filled" : "photo"} size={size} action={image ? <button title={text("清除照片", "Clear photo")} onClick={clearPhoto}><X size={14} /></button> : undefined}>
       <div className={`photo-frame ${image ? "has-photo" : ""}`} style={image ? { "--photo-image": cssImageUrl(image) } as React.CSSProperties : undefined}>
         {image ? (
           <>
             <img src={image} alt={title} />
-            <div className="photo-caption"><span>我的相册</span><strong>{title}</strong></div>
+            <div className="photo-caption"><span>{text("我的相册", "My album")}</span><strong>{title}</strong></div>
           </>
         ) : (
           <label className="photo-upload">
             <span className="photo-stack" aria-hidden="true"><i /><i /></span>
             <ImageIcon size={28} />
-            <span>上传照片</span>
+            <span>{text("上传照片", "Upload photo")}</span>
             <input type="file" accept="image/*" onChange={(event) => void savePhoto(event.target.files?.[0])} />
           </label>
         )}
@@ -5822,16 +5860,18 @@ function PhotoWidget({ widgetKey, size, state, updateState }: { widgetKey: Widge
 }
 
 function QuoteWidget({ widgetKey, size, date }: { widgetKey: WidgetKey; size: WidgetSize; date: Date }) {
+  const language = useUiLanguage();
+  const text = (zh: string, en: string) => localized(language, zh, en);
   const [offset, setOffset] = useState(0);
   const quoteIndex = (Math.floor(date.getTime() / 86400000) + offset) % dailyQuotes.length;
   const quote = dailyQuotes[quoteIndex];
   const nextQuote = () => setOffset((value) => (value + 1) % dailyQuotes.length);
   return (
-    <Widget title="每日灵感" meta={`第 ${quoteIndex + 1} 则`} widgetKey={widgetKey} tone="quote" size={size} action={<button type="button" title="换一句" onClick={nextQuote}><Shuffle size={16} /></button>}>
-      <button type="button" className="quote-card" onClick={nextQuote} title="点击换一句">
+    <Widget title={text("每日灵感", "Daily inspiration")} meta={text(`第 ${quoteIndex + 1} 则`, `Quote ${quoteIndex + 1}`)} widgetKey={widgetKey} tone="quote" size={size} action={<button type="button" title={text("换一句", "Next quote")} onClick={nextQuote}><Shuffle size={16} /></button>}>
+      <button type="button" className="quote-card" onClick={nextQuote} title={text("点击换一句", "Show another quote")}>
         <span className="quote-mark" aria-hidden="true">“</span>
-        <strong>{quote.text}</strong>
-        <span className="quote-source"><i />{quote.source}</span>
+        <strong>{localized(language, quote.text, quote.en)}</strong>
+        <span className="quote-source"><i />WhyNavo</span>
       </button>
     </Widget>
   );
@@ -5852,7 +5892,7 @@ function FocusWidget({ widgetKey, size, state, updateState, onOpenTasks }: {
     .filter((item) => !item.deletedAt)
     .sort((a, b) => a.order - b.order);
   const dueTodos = todos.filter((item) => !item.recurrence || isRecurringTodoDueOn(item));
-  const detailTodos = dueTodos.slice(0, 3);
+  const detailTodos = dueTodos.slice(0, size === "small" ? 1 : size === "medium" ? 2 : 3);
   const focusHeadline = state.settings.quickNote
     ?.split(/\r?\n/)
     .map((line) => line.trim())
@@ -5928,21 +5968,23 @@ function FocusWidget({ widgetKey, size, state, updateState, onOpenTasks }: {
 }
 
 function WorldClockWidget({ widgetKey, size, date, timeZone }: { widgetKey: WidgetKey; size: WidgetSize; date: Date; timeZone: string }) {
+  const language = useUiLanguage();
+  const text = (zh: string, en: string) => localized(language, zh, en);
   const primaryZone = timeZone || Intl.DateTimeFormat().resolvedOptions().timeZone || "Asia/Shanghai";
   const zones = [
-    { city: timeZoneLabels[primaryZone] || primaryZone.replace(/_/g, " "), zone: primaryZone },
-    { city: "东京", zone: "Asia/Tokyo" },
-    { city: "伦敦", zone: "Europe/London" },
-    { city: "纽约", zone: "America/New_York" }
+    { city: language === "zh-CN" ? (timeZoneLabels[primaryZone] || primaryZone.replace(/_/g, " ")) : primaryZone.split("/").pop()?.replace(/_/g, " ") || primaryZone, zone: primaryZone },
+    { city: text("东京", "Tokyo"), zone: "Asia/Tokyo" },
+    { city: text("伦敦", "London"), zone: "Europe/London" },
+    { city: text("纽约", "New York"), zone: "America/New_York" }
   ].filter((item, index, list) => list.findIndex((zone) => zone.zone === item.zone) === index);
-  const timeFor = (zone: string, withSeconds = false) => new Intl.DateTimeFormat("zh-CN", {
+  const timeFor = (zone: string, withSeconds = false) => new Intl.DateTimeFormat(language, {
     timeZone: zone,
     hour: "2-digit",
     minute: "2-digit",
     second: withSeconds ? "2-digit" : undefined,
     hour12: false
   }).format(date);
-  const dayFor = (zone: string) => new Intl.DateTimeFormat("zh-CN", {
+  const dayFor = (zone: string) => new Intl.DateTimeFormat(language, {
     timeZone: zone,
     weekday: "short",
     month: "numeric",
@@ -5962,7 +6004,7 @@ function WorldClockWidget({ widgetKey, size, date, timeZone }: { widgetKey: Widg
   } as React.CSSProperties;
 
   return (
-    <Widget title="世界时钟" meta={`${zones.length} 个城市`} widgetKey={widgetKey} tone="clock" size={size} action={<Clock3 size={16} />}>
+    <Widget title={text("世界时钟", "World clock")} meta={text(`${zones.length} 个城市`, `${zones.length} cities`)} widgetKey={widgetKey} tone="clock" size={size} action={<Clock3 size={16} />}>
       <div className="world-clock-hero">
         <div className="world-clock-dial" style={dialStyle} aria-hidden="true">
           <i className="clock-hand clock-hand-hour" />
@@ -5976,7 +6018,7 @@ function WorldClockWidget({ widgetKey, size, date, timeZone }: { widgetKey: Widg
         </div>
       </div>
       <div className="world-clock-list">
-        {zones.slice(1).map((item) => (
+        {zones.slice(1, size === "small" ? 1 : size === "medium" ? 3 : 4).map((item) => (
           <div key={item.zone}>
             <span><strong>{item.city}</strong><small>{dayFor(item.zone)}</small></span>
             <time>{timeFor(item.zone)}</time>
@@ -5993,9 +6035,11 @@ function MemoWidget({ widgetKey, size, state, updateState }: {
   state: AppState;
   updateState: (updater: (state: AppState) => AppState) => void;
 }) {
+  const language = useUiLanguage();
+  const text = (zh: string, en: string) => localized(language, zh, en);
   const note = state.settings.quickNote || "";
   return (
-    <Widget title="便签" meta={`${note.length} 字`} widgetKey={widgetKey} tone="memo" size={size} action={<FileText size={16} />}>
+    <Widget title={text("便签", "Memo")} meta={text(`${note.length} 字`, `${note.length} characters`)} widgetKey={widgetKey} tone="memo" size={size} action={<FileText size={16} />}>
       <div className="memo-paper">
         <span className="memo-pin" aria-hidden="true" />
         <textarea
@@ -6009,41 +6053,47 @@ function MemoWidget({ widgetKey, size, state, updateState }: {
               settings: { ...current.settings, quickNote, updatedAt: nowIso() }
             }));
           }}
-          placeholder="写下此刻最重要的事"
+          placeholder={text("写下此刻最重要的事", "Write down what matters most right now")}
         />
-        <footer><span>{new Date().toLocaleDateString("zh-CN", { month: "short", day: "numeric" })}</span><span>{note.length} 字</span></footer>
+        <footer><span>{new Date().toLocaleDateString(language, { month: "short", day: "numeric" })}</span><span>{text(`${note.length} 字`, `${note.length} chars`)}</span></footer>
       </div>
     </Widget>
   );
 }
 
 function YearProgressWidget({ widgetKey, size, date }: { widgetKey: WidgetKey; size: WidgetSize; date: Date }) {
+  const language = useUiLanguage();
+  const text = (zh: string, en: string) => localized(language, zh, en);
   const start = new Date(date.getFullYear(), 0, 1).getTime();
   const end = new Date(date.getFullYear() + 1, 0, 1).getTime();
   const progress = Math.min(1, Math.max(0, (date.getTime() - start) / (end - start)));
   const elapsedDays = Math.floor((date.getTime() - start) / 86400000) + 1;
   const totalDays = Math.round((end - start) / 86400000);
   const completedWeeks = Math.round(progress * 52);
+  const progressCells = size === "small" ? 12 : 52;
+  const completedCells = Math.round(progress * progressCells);
 
   return (
-    <Widget title={`${date.getFullYear()} 年`} meta={`剩余 ${totalDays - elapsedDays} 天`} widgetKey={widgetKey} tone="year" size={size} action={<TrendingUp size={16} />}>
+    <Widget title={text(`${date.getFullYear()} 年`, `${date.getFullYear()}`)} meta={text(`剩余 ${totalDays - elapsedDays} 天`, `${totalDays - elapsedDays} days left`)} widgetKey={widgetKey} tone="year" size={size} action={<TrendingUp size={16} />}>
       <div className="year-progress-hero">
         <div className="year-progress-value">{(progress * 100).toFixed(1)}<span>%</span></div>
-        <span>本年度已走过<br />第 {elapsedDays} 天</span>
+        <span>{text("本年度已走过", "Year elapsed")}<br />{text(`第 ${elapsedDays} 天`, `Day ${elapsedDays}`)}</span>
       </div>
-      <div className="year-week-grid" aria-label={`已完成约 ${completedWeeks} 周，共 52 周`}>
-        {Array.from({ length: 52 }, (_, index) => <i className={index < completedWeeks ? "complete" : ""} key={index} />)}
+      <div className="year-week-grid" aria-label={text(`已完成约 ${completedWeeks} 周，共 52 周`, `About ${completedWeeks} of 52 weeks complete`)}>
+        {Array.from({ length: progressCells }, (_, index) => <i className={index < completedCells ? "complete" : ""} key={index} />)}
       </div>
       <div className="year-progress-meta">
-        <span>01 月</span>
-        <span>52 周</span>
-        <span>12 月</span>
+        <span>{text("01 月", "Jan")}</span>
+        <span>{text("52 周", "52 weeks")}</span>
+        <span>{text("12 月", "Dec")}</span>
       </div>
     </Widget>
   );
 }
 
 function CalculatorWidget({ widgetKey, size }: { widgetKey: WidgetKey; size: WidgetSize }) {
+  const language = useUiLanguage();
+  const text = (zh: string, en: string) => localized(language, zh, en);
   const [left, setLeft] = useState("64");
   const [right, setRight] = useState("2");
   const [operator, setOperator] = useState<"+" | "-" | "×" | "÷">("×");
@@ -6055,20 +6105,20 @@ function CalculatorWidget({ widgetKey, size }: { widgetKey: WidgetKey; size: Wid
       : operator === "-" ? a - b
         : operator === "×" ? a * b
           : b === 0 ? undefined : a / b;
-  const resultLabel = result === undefined ? "--" : Number(result.toFixed(6)).toLocaleString("zh-CN");
+  const resultLabel = result === undefined ? "--" : Number(result.toFixed(6)).toLocaleString(language);
 
   return (
-    <Widget title="计算器" meta={`${operator} 运算`} widgetKey={widgetKey} tone="calculator" size={size} action={<Calculator size={16} />}>
+    <Widget title={text("计算器", "Calculator")} meta={text(`${operator} 运算`, `${operator} operation`)} widgetKey={widgetKey} tone="calculator" size={size} action={<Calculator size={16} />}>
       <div className="calculator-screen">
         <small>{left || "0"} {operator} {right || "0"}</small>
         <div className="calculator-result" aria-live="polite">{resultLabel}</div>
       </div>
       <div className="calculator-controls">
         <div className="calculator-inputs">
-          <label><span>A</span><input inputMode="decimal" value={left} onChange={(event) => setLeft(event.target.value)} aria-label="第一个数字" /></label>
-          <label><span>B</span><input inputMode="decimal" value={right} onChange={(event) => setRight(event.target.value)} aria-label="第二个数字" /></label>
+          <label><span>A</span><input inputMode="decimal" value={left} onChange={(event) => setLeft(event.target.value)} aria-label={text("第一个数字", "First number")} /></label>
+          <label><span>B</span><input inputMode="decimal" value={right} onChange={(event) => setRight(event.target.value)} aria-label={text("第二个数字", "Second number")} /></label>
         </div>
-        <div className="calculator-operators" role="radiogroup" aria-label="运算符">
+        <div className="calculator-operators" role="radiogroup" aria-label={text("运算符", "Operator")}>
           {["+", "-", "×", "÷"].map((item) => (
             <button
               type="button"
@@ -6085,21 +6135,22 @@ function CalculatorWidget({ widgetKey, size }: { widgetKey: WidgetKey; size: Wid
   );
 }
 
-function shrinkImage(file: File, maxSide = 1600, quality = 0.86): Promise<string> {
+function shrinkImage(file: File, maxSide = 1600, quality = 0.86, language: UiLanguage = "zh-CN"): Promise<string> {
+  const text = (zh: string, en: string) => localized(language, zh, en);
   return new Promise((resolve, reject) => {
     if (!["image/avif", "image/gif", "image/jpeg", "image/png", "image/webp"].includes(file.type.toLowerCase())) {
-      reject(new Error("请选择 JPEG、PNG、WebP、AVIF 或 GIF 图片"));
+      reject(new Error(text("请选择 JPEG、PNG、WebP、AVIF 或 GIF 图片", "Choose a JPEG, PNG, WebP, AVIF, or GIF image.")));
       return;
     }
     if (file.size > MAX_IMAGE_UPLOAD_BYTES) {
-      reject(new Error("单张图片不能超过 12 MB"));
+      reject(new Error(text("单张图片不能超过 12 MB", "An image cannot exceed 12 MB.")));
       return;
     }
     const reader = new FileReader();
-    reader.onerror = () => reject(new Error("照片读取失败"));
+    reader.onerror = () => reject(new Error(text("照片读取失败", "The image could not be read.")));
     reader.onload = () => {
       const img = new window.Image();
-      img.onerror = () => reject(new Error("照片解析失败"));
+      img.onerror = () => reject(new Error(text("照片解析失败", "The image could not be decoded.")));
       img.onload = () => {
         const scale = Math.min(1, maxSide / Math.max(img.width, img.height));
         const canvas = document.createElement("canvas");
@@ -6107,13 +6158,13 @@ function shrinkImage(file: File, maxSide = 1600, quality = 0.86): Promise<string
         canvas.height = Math.max(1, Math.round(img.height * scale));
         const context = canvas.getContext("2d");
         if (!context) {
-          reject(new Error("当前浏览器无法安全处理这张图片，请更换 JPEG、PNG 或 WebP 图片"));
+          reject(new Error(text("当前浏览器无法安全处理这张图片，请更换 JPEG、PNG 或 WebP 图片", "This browser cannot process the image safely. Try a JPEG, PNG, or WebP image.")));
           return;
         }
         context.drawImage(img, 0, 0, canvas.width, canvas.height);
         const dataUrl = canvas.toDataURL("image/jpeg", quality);
         if (dataUrl.length > MAX_IMAGE_DATA_URL_LENGTH) {
-          reject(new Error("压缩后的图片仍然过大，请选择尺寸更小的图片"));
+          reject(new Error(text("压缩后的图片仍然过大，请选择尺寸更小的图片", "The compressed image is still too large. Choose a smaller image.")));
           return;
         }
         resolve(dataUrl);
@@ -6125,6 +6176,9 @@ function shrinkImage(file: File, maxSide = 1600, quality = 0.86): Promise<string
 }
 
 function RatesWidget({ widgetKey, size, rates, message, refreshing, onRefresh }: { widgetKey: WidgetKey; size: WidgetSize; rates?: RatesState; message: string; refreshing: boolean; onRefresh: () => Promise<void> }) {
+  const language = useUiLanguage();
+  const text = (zh: string, en: string) => localized(language, zh, en);
+  const currencyName = (currency: CurrencyCode) => language === "en-US" ? currency : currencyNames[currency];
   const [amount, setAmount] = useState("1000");
   const [fromCurrency, setFromCurrency] = useState<CurrencyCode>("CNY");
   const currencies: CurrencyCode[] = ["CNY", "USD", "JPY"];
@@ -6149,29 +6203,29 @@ function RatesWidget({ widgetKey, size, rates, message, refreshing, onRefresh }:
     return cny / cnyPerUnit[target];
   };
   const updatedLabel = rates?.updatedAt
-    ? new Date(rates.updatedAt).toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit", hour12: false })
-    : "等待数据";
+    ? new Date(rates.updatedAt).toLocaleTimeString(language, { hour: "2-digit", minute: "2-digit", hour12: false })
+    : text("等待数据", "Waiting for data");
 
   return (
-    <Widget title="中行汇率" meta={updatedLabel} widgetKey={widgetKey} tone="rates" size={size} action={<button type="button" title="刷新汇率" disabled={refreshing} onClick={() => void onRefresh()}><RefreshCcw size={14} className={refreshing ? "spin" : undefined} /></button>}>
+    <Widget title={text("中行汇率", "Exchange rates")} meta={updatedLabel} widgetKey={widgetKey} tone="rates" size={size} action={<button type="button" title={text("刷新汇率", "Refresh rates")} disabled={refreshing} onClick={() => void onRefresh()}><RefreshCcw size={14} className={refreshing ? "spin" : undefined} /></button>}>
       {visibleRows.length ? (
         <div className="rate-table">
-          <div className="rate-head"><span>币种</span><span>现汇买入</span><span>现汇卖出</span></div>
+          <div className="rate-head"><span>{text("币种", "Currency")}</span><span>{text("现汇买入", "Buy")}</span><span>{text("现汇卖出", "Sell")}</span></div>
           {visibleRows.map((row) => (
-            <div className="rate-row" key={row.currency} title={`${row.name} 买入 ${row.buyingRate || "--"}，卖出 ${row.sellingRate || "--"}`}>
-              <strong><i>{row.currency.slice(0, 1)}</i><span>{row.currency}<small>{row.name}</small></span></strong>
+            <div className="rate-row" key={row.currency} title={text(`${row.name} 买入 ${row.buyingRate || "--"}，卖出 ${row.sellingRate || "--"}`, `${row.currency} buy ${row.buyingRate || "--"}, sell ${row.sellingRate || "--"}`)}>
+              <strong><i>{row.currency.slice(0, 1)}</i><span>{row.currency}<small>{currencyName(row.currency)}</small></span></strong>
               <span>{row.buyingRate || "--"}</span>
               <span>{row.sellingRate || "--"}</span>
             </div>
           ))}
         </div>
-      ) : <p className="rate-empty">{message || "汇率暂时不可用"}</p>}
+      ) : <p className="rate-empty">{message || text("汇率暂时不可用", "Rates are temporarily unavailable")}</p>}
       {size === "wide" && (
         <div className="converter">
           <div className="converter-input">
-            <input aria-label="换算金额" inputMode="decimal" value={amount} onChange={(event) => setAmount(event.target.value)} />
-            <select aria-label="换算币种" value={fromCurrency} onChange={(event) => setFromCurrency(event.target.value as CurrencyCode)}>
-              {currencies.map((currency) => <option key={currency} value={currency}>{currencyNames[currency]}</option>)}
+            <input aria-label={text("换算金额", "Amount to convert")} inputMode="decimal" value={amount} onChange={(event) => setAmount(event.target.value)} />
+            <select aria-label={text("换算币种", "Source currency")} value={fromCurrency} onChange={(event) => setFromCurrency(event.target.value as CurrencyCode)}>
+              {currencies.map((currency) => <option key={currency} value={currency}>{currencyName(currency)}</option>)}
             </select>
           </div>
           <div className="conversion-list">
@@ -6179,8 +6233,8 @@ function RatesWidget({ widgetKey, size, rates, message, refreshing, onRefresh }:
               const value = converted(currency);
               return (
                 <div key={currency}>
-                  <span>{currencyNames[currency]}</span>
-                  <strong>{value === undefined ? "--" : value.toLocaleString("zh-CN", { maximumFractionDigits: currency === "JPY" ? 0 : 2 })}</strong>
+                  <span>{currencyName(currency)}</span>
+                  <strong>{value === undefined ? "--" : value.toLocaleString(language, { maximumFractionDigits: currency === "JPY" ? 0 : 2 })}</strong>
                 </div>
               );
             })}
@@ -6262,7 +6316,7 @@ function FolderDialog({ folder, groups, onClose, onSave, onDelete }: {
             const file = event.target.files?.[0];
             if (!file) return;
             try {
-              const dataUrl = await shrinkImage(file, 384, 0.84);
+              const dataUrl = await shrinkImage(file, 384, 0.84, language);
               setDraft({ ...draft, iconUrl: dataUrl });
             } catch (error) {
               window.alert(error instanceof Error ? error.message : text("图片处理失败", "Image processing failed"));
@@ -6457,16 +6511,17 @@ function ImportDialog({ existingShortcuts, onClose, onImport }: {
   );
 }
 
-function ResourceCenterDialog({ state, shortcuts, updateState, onEditShortcut, onClose }: {
+function ResourceCenterDialog({ state, shortcuts, updateState, initialTab = "widgets", onEditShortcut, onClose }: {
   state: AppState;
   shortcuts: Shortcut[];
   updateState: (updater: (state: AppState) => AppState) => void;
+  initialTab?: "widgets" | "wallpapers" | "icons";
   onEditShortcut: (shortcut: Shortcut) => void;
   onClose: () => void;
 }) {
   const language = useUiLanguage();
   const text = (zh: string, en: string) => localized(language, zh, en);
-  const [tab, setTab] = useState<"widgets" | "wallpapers" | "icons">("widgets");
+  const [tab, setTab] = useState<"widgets" | "wallpapers" | "icons">(initialTab);
   const [category, setCategory] = useState<"全部" | "信息" | "效率" | "生活">("全部");
   const [wallpaperCategory, setWallpaperCategory] = useState<"全部" | WallpaperCategory | "我的">("全部");
   const [query, setQuery] = useState("");
@@ -6569,7 +6624,7 @@ function ResourceCenterDialog({ state, shortcuts, updateState, onEditShortcut, o
       additions = await Promise.all(Array.from(files).slice(0, remaining).map(async (file) => ({
         id: `custom-${uid()}`,
         name: (file.name.replace(/\.[^.]+$/, "") || text("我的壁纸", "My wallpaper")).slice(0, 500),
-        dataUrl: await shrinkImage(file, 1600, 0.82),
+        dataUrl: await shrinkImage(file, 1600, 0.82, language),
         createdAt: nowIso()
       })));
     } catch (error) {
@@ -6915,8 +6970,9 @@ function PageManagerDialog({
   );
 }
 
-function SettingsDialog({ state, updateCheck, migrationBackupAvailable, updateState, onImport, onImportBackup, onExport, onRestoreMigrationBackup, onCheckUpdate, onOpenTimeZone, onWeatherUseLocationChange, onClose }: {
+function SettingsDialog({ state, clock, updateCheck, migrationBackupAvailable, updateState, onImport, onImportBackup, onExport, onRestoreMigrationBackup, onCheckUpdate, onOpenTimeZone, onOpenWallpapers, onWeatherUseLocationChange, onClose }: {
   state: AppState;
+  clock: Date;
   updateCheck: UpdateCheckResult;
   migrationBackupAvailable: boolean;
   updateState: (updater: (state: AppState) => AppState) => void;
@@ -6926,6 +6982,7 @@ function SettingsDialog({ state, updateCheck, migrationBackupAvailable, updateSt
   onRestoreMigrationBackup: () => void;
   onCheckUpdate: () => void;
   onOpenTimeZone: () => void;
+  onOpenWallpapers: () => void;
   onWeatherUseLocationChange: (enabled: boolean) => Promise<void>;
   onClose: () => void;
 }) {
@@ -6933,6 +6990,23 @@ function SettingsDialog({ state, updateCheck, migrationBackupAvailable, updateSt
   const settings = state.settings;
   const language: UiLanguage = settings.language === "en-US" ? "en-US" : "zh-CN";
   const text = (zh: string, en: string) => localized(language, zh, en);
+  const selectedWallpaper = builtInWallpapers.find((wallpaper) => wallpaper.id === settings.wallpaperPreset);
+  const selectedCustomWallpaper = (settings.customWallpapers || []).find((wallpaper) => wallpaper.id === settings.wallpaperPreset);
+  const wallpaperPreviewUrl = settings.wallpaper || selectedWallpaper?.url || selectedCustomWallpaper?.dataUrl || builtInWallpapers[0].url;
+  const wallpaperName = settings.wallpaper
+    ? text("自定义背景", "Custom background")
+    : selectedCustomWallpaper?.name
+      || (language === "zh-CN"
+        ? selectedWallpaper?.name
+        : selectedWallpaper?.id.split("-").map((part) => part.charAt(0).toUpperCase() + part.slice(1)).join(" "))
+      || text("默认壁纸", "Default wallpaper");
+  const settingsTime = new Intl.DateTimeFormat(language, {
+    timeZone: settings.timeZone || "Asia/Shanghai",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false
+  }).format(clock);
   const noteConflicts = state.notes.filter((note) => !note.deletedAt && note.conflictBody);
   const exportNotesMarkdown = () => {
     const notes = state.notes
@@ -6999,6 +7073,21 @@ function SettingsDialog({ state, updateCheck, migrationBackupAvailable, updateSt
                   <button type="button" role="radio" aria-checked={settings.theme === "dark"} className={settings.theme === "dark" ? "active" : ""} onClick={() => setSetting("theme", "dark")}><Moon size={15} />{text("深色", "Dark")}</button>
                 </div>
               </div>
+              <div className="lucid-setting-row lucid-wallpaper-row">
+                <div><strong>{text("壁纸", "Wallpaper")}</strong><span>{wallpaperName}</span></div>
+                <button type="button" className="lucid-wallpaper-button" onClick={onOpenWallpapers}>
+                  <span style={{ "--settings-wallpaper": cssImageUrl(wallpaperPreviewUrl) } as React.CSSProperties} aria-hidden="true" />
+                  <b>{text("选择壁纸", "Choose wallpaper")}</b>
+                  <ChevronRight size={16} />
+                </button>
+              </div>
+              <label className="lucid-setting-row">
+                <div><strong>{text("搜索引擎", "Search engine")}</strong><span>{text("主页和搜索页使用同一个网络搜索引擎", "Home and Search use the same web search engine")}</span></div>
+                <select className="lucid-compact-input" value={settings.searchEngine || "baidu"} onChange={(event) => setSetting("searchEngine", event.target.value as SearchEngine)}>
+                  <option value="baidu">{searchEngineLabelFor(language, "baidu")}</option>
+                  <option value="google">Google</option>
+                </select>
+              </label>
               <label className="lucid-setting-row lucid-range-row">
                 <div><strong>{text("图标尺寸", "Icon size")}</strong><span>{text(`主页与空间统一为 ${settings.iconSize}px`, `Home and Spaces use ${settings.iconSize}px`)}</span></div>
                 <input type="range" min="48" max="80" value={settings.iconSize} onChange={(event) => setSetting("iconSize", Number(event.target.value))} />
@@ -7013,14 +7102,17 @@ function SettingsDialog({ state, updateCheck, migrationBackupAvailable, updateSt
               </div>
               <label className="lucid-setting-row">
                 <div><strong>{text("城市", "City")}</strong><span>{text("天气小组件显示的位置", "Location shown in the weather widget")}</span></div>
-                <input className="lucid-compact-input" maxLength={500} value={settings.city} onChange={(event) => setSetting("city", event.target.value)} />
+                <select className="lucid-compact-input" value={settings.city} onChange={(event) => setSetting("city", event.target.value)}>
+                  {!weatherCityOptions.some((city) => city.value === settings.city) && <option value={settings.city}>{settings.city}</option>}
+                  {weatherCityOptions.map((city) => <option value={city.value} key={city.value}>{localized(language, city.zh, city.en)}</option>)}
+                </select>
               </label>
               <div className="lucid-setting-row">
                 <div><strong>{text("设备定位", "Device location")}</strong><span>{text("只在获取天气时读取当前位置", "Read your location only when fetching weather")}</span></div>
                 <label className="lucid-switch"><input type="checkbox" checked={settings.weatherUseLocation ?? false} onChange={(event) => void onWeatherUseLocationChange(event.target.checked)} /><span /></label>
               </div>
               <div className="lucid-setting-row">
-                <div><strong>{text("时间显示", "Time display")}</strong><span>{settings.timeZone || "Asia/Shanghai"}</span></div>
+                <div><strong>{text("时间显示", "Time display")}</strong><span>{settingsTime} · {settings.timeZone || "Asia/Shanghai"}</span></div>
                 <button type="button" className="lucid-inline-button" onClick={onOpenTimeZone}><Clock3 size={15} />{language === "zh-CN" ? (timeZoneLabels[settings.timeZone || "Asia/Shanghai"] || text("选择时区", "Choose time zone")) : (settings.timeZone || "Choose time zone").replace(/_/g, " ")}</button>
               </div>
             </section>

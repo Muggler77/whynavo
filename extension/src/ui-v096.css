@@ -1,0 +1,764 @@
+/* WhyNavo 0.9.6: responsive widgets, explicit wallpaper controls, and legible themes. */
+
+/* Home header */
+.home-greeting {
+  position: relative;
+  display: grid;
+  justify-items: center;
+}
+
+.home-time {
+  display: inline-flex;
+  min-height: 30px;
+  margin-bottom: 10px;
+  align-items: baseline;
+  gap: 9px;
+  color: var(--sample-soft);
+  font-variant-numeric: tabular-nums;
+}
+
+.home-time time {
+  color: var(--sample-ink);
+  font-size: 17px;
+  font-weight: 680;
+}
+
+.home-time span {
+  font-size: 10px;
+  font-weight: 560;
+}
+
+.sample-a-hero .hero-search {
+  grid-template-columns: minmax(0, 1fr) 44px;
+  padding-left: 18px;
+}
+
+.sample-a-hero .hero-search input {
+  min-width: 0;
+  grid-column: 1;
+}
+
+.sample-a-hero .hero-search .search-submit {
+  grid-column: 2;
+}
+
+.page-nav-edit {
+  display: none !important;
+}
+
+.sample-a-local-note {
+  position: static;
+  top: auto;
+  bottom: auto;
+  left: auto;
+  z-index: auto;
+  width: min(720px, 100%);
+  min-height: 42px;
+  margin: 30px auto 0;
+  transform: none;
+}
+
+/* Every enabled widget renders. Size controls affect both width and information density. */
+.sample-a-primary-widgets,
+.sample-a-primary-widgets.layout-editing {
+  display: grid;
+  height: auto;
+  min-height: 0;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  grid-auto-flow: dense;
+  grid-auto-rows: 8px;
+  align-items: stretch;
+  column-gap: 20px;
+  row-gap: 20px;
+}
+
+.sample-a-primary-widgets > .widget-sortable-shell,
+.sample-a-primary-widgets.layout-editing > .widget-sortable-shell {
+  min-width: 0;
+  height: auto;
+  min-height: 0;
+}
+
+.sample-a-primary-widgets > .widget-sortable-shell.widget-size-small,
+.sample-a-primary-widgets.layout-editing > .widget-sortable-shell.widget-size-small {
+  grid-column: span 3 !important;
+  grid-row: span 9;
+}
+
+.sample-a-primary-widgets > .widget-sortable-shell.widget-size-medium,
+.sample-a-primary-widgets.layout-editing > .widget-sortable-shell.widget-size-medium {
+  grid-column: span 4 !important;
+  grid-row: span 12;
+}
+
+.sample-a-primary-widgets > .widget-sortable-shell.widget-size-wide,
+.sample-a-primary-widgets.layout-editing > .widget-sortable-shell.widget-size-wide {
+  grid-column: span 6 !important;
+  grid-row: span 15;
+}
+
+.sample-a-primary-widgets .widget {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  flex-direction: column;
+  overflow: hidden;
+  container-type: inline-size;
+  background: color-mix(in srgb, var(--lucid-surface-solid) 74%, transparent);
+}
+
+.sample-a-primary-widgets .widget-title {
+  min-height: 56px;
+  padding: 13px 16px 7px;
+  flex: 0 0 auto;
+}
+
+.sample-a-primary-widgets .widget-content {
+  position: relative;
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  padding: 3px 16px 14px;
+  flex: 1;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.sample-a-primary-widgets .widget-actions > button {
+  display: grid;
+  width: 34px;
+  min-width: 34px;
+  height: 34px;
+  padding: 0;
+  place-items: center;
+}
+
+/* Weather: compact is a complete glance card, standard and expanded progressively add detail. */
+.sample-a-primary-widgets .sample-weather {
+  position: relative;
+  display: flex;
+  width: 100%;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+}
+
+.sample-a-primary-widgets .sample-weather-current {
+  height: auto;
+  min-height: 0;
+  flex: 1;
+}
+
+.sample-weather-compact-facts {
+  display: none;
+}
+
+.widget-size-small .sample-weather-current {
+  grid-template-columns: minmax(0, 1fr) 64px !important;
+  gap: 8px;
+}
+
+.widget-size-small .sample-weather-copy > strong {
+  font-size: 42px;
+}
+
+.widget-size-small .sample-weather-copy > span {
+  margin-top: 6px;
+}
+
+.widget-size-small .sample-weather-status,
+.widget-size-small .sample-weather-orbit {
+  width: 62px !important;
+  height: 62px !important;
+}
+
+.widget-size-small .sample-weather-orbit::before {
+  inset: 3px;
+  border-width: 5px;
+}
+
+.widget-size-small .sample-weather-orbit > span {
+  width: 38px;
+  height: 38px;
+}
+
+.widget-size-small .sample-weather-compact-facts {
+  display: grid;
+  min-height: 42px;
+  padding-top: 8px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: center;
+  gap: 8px;
+  color: var(--lucid-soft);
+  border-top: 1px solid var(--lucid-line);
+}
+
+.sample-weather-compact-facts span {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 5px;
+  font-size: 9px;
+  white-space: nowrap;
+}
+
+.widget-size-small .sample-weather-facts,
+.widget-size-small .sample-weather-forecast {
+  display: none;
+}
+
+.widget-size-medium .sample-weather-current {
+  min-height: 112px;
+  grid-template-columns: minmax(0, 1fr) 88px;
+}
+
+.widget-size-medium .sample-weather-orbit,
+.widget-size-medium .sample-weather-status {
+  width: 84px;
+  height: 84px;
+}
+
+.widget-size-medium .sample-weather-facts {
+  min-height: 30px;
+  gap: 10px;
+}
+
+.widget-size-medium .sample-weather-facts small {
+  display: none;
+}
+
+.sample-a-primary-widgets .sample-weather-forecast {
+  position: relative;
+  right: auto;
+  bottom: auto;
+  left: auto;
+  min-height: 96px;
+  margin: 7px -16px -14px;
+  padding: 10px 12px 8px;
+}
+
+.widget-size-wide .sample-weather-forecast {
+  min-height: 104px;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+}
+
+.widget-size-wide .sample-weather-forecast > :nth-child(n) {
+  display: grid;
+}
+
+/* Shared density rules for all remaining widgets. */
+.sample-a-primary-widgets .sample-focus-paper,
+.sample-a-primary-widgets .sample-calendar,
+.sample-a-primary-widgets .memo-paper,
+.sample-a-primary-widgets .photo-frame,
+.sample-a-primary-widgets .quote-card {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+}
+
+.widget-size-small .sample-focus-paper {
+  padding: 12px 14px 8px;
+  grid-template-rows: minmax(48px, auto) 1fr auto;
+}
+
+.widget-size-small .sample-focus-headline strong {
+  font-size: 16px;
+}
+
+.widget-size-small .sample-focus-list label {
+  min-height: 32px;
+}
+
+.widget-size-small .sample-focus-footer {
+  min-height: 36px;
+}
+
+.widget-size-medium .sample-focus-paper,
+.widget-size-wide .sample-focus-paper {
+  min-height: 0;
+  padding: 16px 18px 10px;
+}
+
+.widget-size-small .calendar-mini-card {
+  height: 100%;
+  min-height: 0;
+}
+
+.widget-size-medium .sample-calendar {
+  gap: 8px;
+}
+
+.widget-size-medium .sample-calendar-week button {
+  min-height: 40px;
+}
+
+.widget-size-medium .sample-calendar-agenda > :nth-child(n + 2) {
+  display: none;
+}
+
+.widget-size-small .countdown-feature {
+  min-height: 0;
+  grid-template-columns: 82px minmax(0, 1fr);
+  padding-right: 24px;
+  gap: 10px;
+}
+
+.widget-size-small .countdown-feature > button {
+  position: absolute;
+  top: 0;
+  right: 0;
+}
+
+.widget-size-small .countdown-orbit {
+  width: 78px;
+  height: 78px;
+}
+
+.widget-size-small .countdown-value strong {
+  font-size: 31px;
+}
+
+.widget-size-small .countdown-copy > strong {
+  font-size: 14px;
+}
+
+.widget-size-small .countdown-list {
+  display: none;
+}
+
+.widget-size-medium .countdown-orbit {
+  width: 92px;
+  height: 92px;
+}
+
+.widget-size-medium .countdown-feature {
+  min-height: 108px;
+  grid-template-columns: 96px minmax(0, 1fr) 28px;
+}
+
+.widget-size-small .todo-dashboard,
+.widget-size-medium .todo-dashboard {
+  gap: 8px;
+}
+
+.widget-size-small .todo-overview {
+  justify-content: flex-start;
+}
+
+.widget-size-small .todo-progress-dial {
+  width: 58px;
+  height: 58px;
+  flex-basis: 58px;
+}
+
+.widget-size-small .todo-progress-dial strong {
+  font-size: 18px;
+}
+
+.widget-size-small .todo-workspace .input-row {
+  display: none;
+}
+
+.widget-size-small .todo-preview .todo {
+  min-height: 34px;
+}
+
+.sample-a-primary-widgets .widget-photo .widget-content {
+  padding: 0 8px 8px;
+}
+
+.sample-a-primary-widgets .widget-photo.photo-filled .widget-content {
+  padding: 0;
+}
+
+.sample-a-primary-widgets .photo-filled .photo-frame {
+  min-height: 0;
+}
+
+.widget-size-small .photo-caption {
+  padding: 36px 12px 10px;
+}
+
+.widget-size-small .quote-card {
+  padding: 6px 0 2px 28px;
+  gap: 8px;
+}
+
+.widget-size-small .quote-card strong {
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+.widget-size-small .quote-mark {
+  font-size: 46px;
+}
+
+.widget-size-small .world-clock-hero {
+  height: 100%;
+  grid-template-columns: 56px minmax(0, 1fr);
+  gap: 10px;
+}
+
+.widget-size-small .world-clock-dial {
+  display: block;
+  width: 54px;
+  height: 54px;
+}
+
+.widget-size-small .clock-hand-hour { height: 15px; }
+.widget-size-small .clock-hand-minute { height: 20px; }
+.widget-size-small .world-clock-primary strong { font-size: 26px; }
+.widget-size-small .world-clock-list { display: none; }
+
+.widget-size-small .memo-paper {
+  background-size: auto 24px;
+}
+
+.widget-size-small .memo-editor {
+  min-height: 0;
+  padding: 2px 8px 0 30px;
+  line-height: 24px;
+}
+
+.widget-size-small .memo-paper footer {
+  padding-left: 30px;
+}
+
+.widget-size-small .year-progress-value {
+  font-size: 34px;
+}
+
+.widget-size-small .year-progress-hero > span {
+  font-size: 9px;
+}
+
+.widget-size-small .year-week-grid {
+  grid-template-columns: repeat(6, minmax(5px, 1fr));
+  gap: 5px;
+}
+
+.widget-size-small .calculator-screen {
+  min-height: 64px;
+  padding: 9px;
+}
+
+.widget-size-small .calculator-result {
+  font-size: 26px;
+}
+
+.widget-size-small .calculator-controls {
+  grid-template-columns: 1fr;
+  gap: 6px;
+}
+
+.widget-size-small .calculator-inputs input {
+  min-height: 34px;
+}
+
+.widget-size-small .calculator-operators {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.widget-size-small .calculator-operators button {
+  width: 100%;
+  height: 34px;
+}
+
+.widget-size-wide.widget-calculator .calculator-screen {
+  min-height: 0;
+  flex: 1;
+  justify-content: center;
+}
+
+.widget-size-wide.widget-calculator .calculator-result {
+  margin-top: 12px;
+  font-size: 52px;
+}
+
+.widget-size-wide.widget-calculator .calculator-controls {
+  margin-top: 12px;
+}
+
+.widget-size-wide.widget-year .year-week-grid {
+  margin-block: auto;
+  grid-template-columns: repeat(13, minmax(8px, 1fr));
+  gap: 7px;
+}
+
+.widget-size-wide.widget-quote .quote-card strong {
+  max-width: 34ch;
+  font-size: 22px;
+  line-height: 1.55;
+}
+
+.widget-size-wide.widget-clock .world-clock-hero {
+  grid-template-columns: 108px minmax(0, 1fr);
+}
+
+.widget-size-wide.widget-clock .world-clock-dial {
+  width: 104px;
+  height: 104px;
+}
+
+.widget-size-wide.widget-clock .world-clock-primary strong {
+  font-size: 40px;
+}
+
+.widget-size-small .rate-head,
+.widget-size-small .rate-row {
+  grid-template-columns: minmax(72px, 1fr) minmax(42px, .7fr) minmax(42px, .7fr);
+  gap: 4px;
+}
+
+.widget-size-small .rate-row > strong > i,
+.widget-size-small .rate-row > strong small {
+  display: none;
+}
+
+.widget-size-small .rate-row {
+  min-height: 48px;
+}
+
+.widget-size-medium .converter,
+.widget-size-small .converter {
+  display: none;
+}
+
+/* Settings: stable two-column alignment and a discoverable wallpaper library. */
+.lucid-settings-nav button {
+  display: grid;
+  grid-template-columns: 18px auto;
+  align-items: center;
+  justify-content: center;
+}
+
+.lucid-setting-row {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) minmax(190px, 280px);
+  align-items: center;
+  justify-content: stretch;
+  gap: 24px;
+}
+
+.lucid-setting-row > div:first-child {
+  align-self: center;
+}
+
+.lucid-setting-row > :last-child {
+  width: 100%;
+  justify-self: stretch;
+}
+
+.lucid-setting-row .lucid-switch {
+  width: 42px;
+  justify-self: end;
+}
+
+.lucid-setting-row .settings-segments,
+.lucid-setting-row .lucid-compact-input,
+.lucid-setting-row .lucid-inline-button,
+.lucid-setting-row input[type="range"] {
+  width: 100% !important;
+  max-width: none;
+}
+
+.lucid-compact-input {
+  padding: 0 38px 0 12px;
+  color: var(--lucid-ink);
+  background-color: color-mix(in srgb, var(--lucid-surface-solid) 78%, transparent);
+  border: 1px solid var(--lucid-line-strong);
+  border-radius: 7px;
+}
+
+.lucid-wallpaper-button {
+  display: grid;
+  min-height: 52px;
+  padding: 6px 9px 6px 6px;
+  grid-template-columns: 64px minmax(0, 1fr) 18px;
+  align-items: center;
+  gap: 10px;
+  color: var(--lucid-ink);
+  background: color-mix(in srgb, var(--lucid-surface-solid) 76%, transparent);
+  border: 1px solid var(--lucid-line-strong);
+  border-radius: 8px;
+  text-align: left;
+}
+
+.lucid-wallpaper-button > span {
+  display: block;
+  width: 64px;
+  height: 38px;
+  background-image: var(--settings-wallpaper);
+  background-position: center;
+  background-size: cover;
+  border: 1px solid var(--lucid-line);
+  border-radius: 6px;
+}
+
+.lucid-wallpaper-button b {
+  overflow: hidden;
+  font-size: 10px;
+  font-weight: 620;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lucid-search-engine {
+  display: inline-flex;
+  align-items: center;
+}
+
+/* Dark surfaces are defined on the root because dialogs and menus use portals. */
+:root[data-whynavo-theme="dark"] {
+  --lucid-ink: #f7f9fa;
+  --lucid-soft: #c4cbd1;
+  --lucid-faint: #98a3ad;
+  --lucid-line: rgba(255, 255, 255, 0.13);
+  --lucid-line-strong: rgba(255, 255, 255, 0.22);
+  --lucid-surface: rgba(29, 35, 41, 0.92);
+  --lucid-surface-solid: #1c2228;
+  --lucid-hover: rgba(50, 58, 65, 0.98);
+  --wt-text: rgba(255, 255, 255, 0.97);
+  --wt-text-soft: rgba(255, 255, 255, 0.8);
+  --wt-muted: rgba(255, 255, 255, 0.64);
+  --wt-line: rgba(255, 255, 255, 0.13);
+  --wt-line-strong: rgba(255, 255, 255, 0.22);
+  --wt-surface-soft: rgba(255, 255, 255, 0.08);
+  --wt-widget-base: #1c2228;
+}
+
+:root[data-whynavo-theme="dark"] .overlay,
+:root[data-whynavo-theme="dark"] .resource-center-overlay,
+:root[data-whynavo-theme="dark"] .lucid-settings-overlay {
+  color: var(--lucid-ink);
+}
+
+:root[data-whynavo-theme="dark"] .dialog,
+:root[data-whynavo-theme="dark"] .shortcut-menu,
+:root[data-whynavo-theme="dark"] .widget-menu,
+:root[data-whynavo-theme="dark"] .lucid-settings-content,
+:root[data-whynavo-theme="dark"] .lucid-settings-nav,
+:root[data-whynavo-theme="dark"] .resource-sidebar,
+:root[data-whynavo-theme="dark"] .resource-main {
+  color: var(--lucid-ink);
+  background-color: color-mix(in srgb, var(--lucid-surface-solid) 94%, transparent);
+  border-color: var(--lucid-line-strong);
+}
+
+:root[data-whynavo-theme="dark"] input,
+:root[data-whynavo-theme="dark"] select,
+:root[data-whynavo-theme="dark"] textarea,
+:root[data-whynavo-theme="dark"] .lucid-inline-button,
+:root[data-whynavo-theme="dark"] .lucid-wallpaper-button,
+:root[data-whynavo-theme="dark"] .settings-segments {
+  color: var(--lucid-ink);
+  background-color: #252c32;
+  border-color: var(--lucid-line-strong);
+}
+
+:root[data-whynavo-theme="dark"] input::placeholder,
+:root[data-whynavo-theme="dark"] textarea::placeholder {
+  color: var(--lucid-faint);
+  opacity: 1;
+}
+
+:root[data-whynavo-theme="dark"] .sample-a-primary-widgets .widget,
+:root[data-whynavo-theme="dark"] .sample-a-primary-widgets .widget-weather,
+:root[data-whynavo-theme="dark"] .sample-a-primary-widgets .widget-focus,
+:root[data-whynavo-theme="dark"] .sample-a-primary-widgets .widget-calendar {
+  background: rgba(27, 33, 39, 0.93);
+  border-color: rgba(255, 255, 255, 0.14);
+}
+
+:root[data-whynavo-theme="dark"] .weather-unit,
+:root[data-whynavo-theme="dark"] .sample-weather-orbit > span,
+:root[data-whynavo-theme="dark"] .sample-calendar-week button.today {
+  color: var(--lucid-ink);
+  background: rgba(255, 255, 255, 0.09) !important;
+}
+
+:root[data-whynavo-theme="dark"] .sample-focus-paper {
+  background-color: rgba(255, 255, 255, 0.025);
+}
+
+:root[data-whynavo-theme="dark"] .calculator-screen {
+  background: #0d1215;
+}
+
+@media (max-width: 1180px) {
+  .sample-a-primary-widgets > .widget-sortable-shell.widget-size-small,
+  .sample-a-primary-widgets.layout-editing > .widget-sortable-shell.widget-size-small {
+    grid-column: span 4 !important;
+  }
+
+  .sample-a-primary-widgets > .widget-sortable-shell.widget-size-medium,
+  .sample-a-primary-widgets.layout-editing > .widget-sortable-shell.widget-size-medium,
+  .sample-a-primary-widgets > .widget-sortable-shell.widget-size-wide,
+  .sample-a-primary-widgets.layout-editing > .widget-sortable-shell.widget-size-wide {
+    grid-column: span 6 !important;
+  }
+}
+
+@media (max-width: 760px), (hover: none) and (max-width: 1024px) {
+  .sample-a-primary-widgets,
+  .sample-a-primary-widgets.layout-editing {
+    grid-template-columns: repeat(12, minmax(0, 1fr));
+  }
+
+  .sample-a-primary-widgets > .widget-sortable-shell.widget-size-small,
+  .sample-a-primary-widgets.layout-editing > .widget-sortable-shell.widget-size-small,
+  .sample-a-primary-widgets > .widget-sortable-shell.widget-size-medium,
+  .sample-a-primary-widgets.layout-editing > .widget-sortable-shell.widget-size-medium,
+  .sample-a-primary-widgets > .widget-sortable-shell.widget-size-wide,
+  .sample-a-primary-widgets.layout-editing > .widget-sortable-shell.widget-size-wide {
+    grid-column: 1 / -1 !important;
+  }
+
+  .home-time {
+    margin-bottom: 7px;
+  }
+
+  .sample-a-hero .hero-search {
+    width: min(680px, 100%);
+  }
+
+  .lucid-setting-row {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 10px;
+  }
+
+  .lucid-setting-row .lucid-switch {
+    justify-self: start;
+  }
+}
+
+@media (max-width: 480px) {
+  .home-time time { font-size: 15px; }
+  .home-time span { font-size: 9px; }
+
+  .lucid-settings-nav button {
+    grid-template-columns: 18px;
+  }
+
+  .lucid-settings-nav button span {
+    display: none;
+  }
+
+  .widget-size-wide .sample-weather-forecast {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .widget-size-wide .sample-weather-forecast > :nth-child(n + 5) {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sample-a-primary-widgets .widget,
+  .lucid-setting-row,
+  .lucid-settings-nav button {
+    transition: none;
+  }
+}
