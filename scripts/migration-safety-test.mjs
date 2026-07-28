@@ -196,6 +196,31 @@ try {
     settings: { ...migrated.state.settings, homeSiteFloating: true, homeSelectionInitialized: true }
   };
   assert.doesNotThrow(() => validateAppStatePayload(recurringState, "test state"), "valid home positions and recurring task schedules must survive validation");
+  const textIconState = {
+    ...recurringState,
+    shortcuts: [{
+      ...recurringState.shortcuts[0],
+      iconUrl: undefined,
+      iconText: "OA",
+      iconColor: "#EF4444",
+      iconUpdatedAt: now
+    }]
+  };
+  assert.doesNotThrow(() => validateAppStatePayload(textIconState, "test state"), "one- or two-character text icons must survive validation and synchronization");
+  const normalizedTextIconState = normalizeState(textIconState);
+  assert.equal(normalizedTextIconState.shortcuts[0].iconText, "OA", "text icon content must survive state normalization");
+  assert.equal(normalizedTextIconState.shortcuts[0].iconColor, "#EF4444", "text icon color must survive state normalization");
+  assert.equal(normalizedTextIconState.shortcuts[0].iconUpdatedAt, now, "text icon refresh timestamps must survive state normalization");
+  assert.throws(
+    () => validateAppStatePayload({ ...textIconState, shortcuts: [{ ...textIconState.shortcuts[0], iconText: "ABC" }] }, "test state"),
+    /记录字段/,
+    "text icons longer than two characters must be rejected before synchronization"
+  );
+  assert.throws(
+    () => validateAppStatePayload({ ...textIconState, shortcuts: [{ ...textIconState.shortcuts[0], iconText: "\n" }] }, "test state"),
+    /记录字段/,
+    "empty or control-only text icons must be rejected before synchronization"
+  );
   assert.throws(
     () => validateAppStatePayload({ ...recurringState, todos: [{ ...recurringState.todos[0], reminderTime: "25:90" }] }, "test state"),
     /记录字段/,
@@ -1192,6 +1217,11 @@ try {
   assert.match(appSource, /ICON_FAILURE_RETRY_MS = 6 \* 60 \* 60 \* 1000/, "failed icon chains must be cached temporarily instead of refetched on every launch");
   assert.match(appSource, /FAILED_ICON_CACHE_PREFIX[\s\S]*isFreshFailedIconCache/, "failed icon chains must expire and retry instead of becoming permanent");
   assert.match(appSource, /MIN_SHARP_ICON_SIZE = 96/, "raster icons must be large enough to remain sharp at the maximum rendered shortcut size");
+  assert.match(appSource, /function IconChoicePreview[\s\S]*shortestEdge < MIN_SHARP_ICON_SIZE/, "icon candidates shown as selectable must meet the same sharpness threshold as the final canvas");
+  assert.match(appSource, /invalidateResolvedShortcutIcon[\s\S]*resolvedIconCache\.delete/, "saving an icon must invalidate a stale failure cache for that shortcut");
+  assert.match(appSource, /iconUpdatedAt: iconUrlProvided \|\| iconTextProvided/, "icon edits must carry a dedicated refresh timestamp without tying image reloads to shortcut reordering");
+  assert.match(appSource, /在线图标[\s\S]*纯色图标[\s\S]*本地上传/, "shortcut editing must expose online, text, and local-upload icon modes");
+  assert.match(appSource, /shrinkImage\(file, 512, 0\.9, language\)/, "uploaded shortcut icons must be compressed before local persistence and synchronization");
   assert.match(appSource, /scheduleResolvedIconCachePersist\(\)/, "resolved icon choices must be persisted in batches instead of blocking every image load");
   assert.match(appSource, /window\.addEventListener\("pagehide", persistBeforeExit\)/, "pending resolved icon cache writes must flush before the page is discarded");
   assert.match(appSource, /\.\.\.directCandidates\.map/, "automatic icon discovery must try every supported high-resolution site icon path");

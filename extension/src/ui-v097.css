@@ -1,0 +1,273 @@
+/* WhyNavo 0.9.7: reliable icon selection and user-defined text icons. */
+
+.shortcut-text-icon {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  display: grid;
+  width: 100%;
+  height: 100%;
+  padding: 7%;
+  place-items: center;
+  overflow: hidden;
+  color: var(--text-icon-foreground, #fff);
+  background: var(--text-icon-background, #64748b);
+  border: 1px solid color-mix(in srgb, var(--text-icon-foreground, #fff) 16%, transparent);
+  border-radius: inherit;
+  box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 22%, transparent), 0 9px 20px rgba(35, 43, 50, 0.12);
+  font-size: clamp(15px, calc(var(--icon, 58px) * 0.34), 30px);
+  font-weight: 720;
+  line-height: 1;
+  text-align: center;
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.08);
+}
+
+.shortcut-icon-image {
+  z-index: 1;
+}
+
+.shortcut-icon:has(.shortcut-icon-image.is-loaded) .shortcut-text-icon,
+.lucid-result-icon:has(.shortcut-icon-image.is-loaded) .shortcut-text-icon,
+.dock a:has(.shortcut-icon-image.is-loaded) .shortcut-text-icon {
+  visibility: hidden;
+}
+
+.shortcut-icon-mode-tabs {
+  position: sticky;
+  top: -18px;
+  z-index: 4;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  padding: 4px;
+  gap: 4px;
+  background: color-mix(in srgb, var(--wt-surface) 94%, transparent);
+  border: 1px solid var(--wt-line);
+  border-radius: 8px;
+  box-shadow: 0 8px 28px rgba(35, 43, 50, 0.08);
+  backdrop-filter: blur(24px) saturate(130%);
+}
+
+.shortcut-icon-mode-tabs button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  min-height: 42px;
+  padding: 0 12px;
+  gap: 7px;
+  color: var(--wt-muted);
+  background: transparent;
+  border: 0;
+  border-radius: 6px;
+  font-weight: 620;
+}
+
+.shortcut-icon-mode-tabs button:hover,
+.shortcut-icon-mode-tabs button:focus-visible {
+  color: var(--wt-text);
+  background: var(--wt-surface-hover);
+}
+
+.shortcut-icon-mode-tabs button.active {
+  color: var(--wt-text);
+  background: var(--wt-surface);
+  box-shadow: 0 5px 16px rgba(35, 43, 50, 0.1), inset 0 0 0 1px var(--wt-line);
+}
+
+.shortcut-icon-mode-panel {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  padding: 16px;
+  gap: 14px;
+  background: color-mix(in srgb, var(--wt-surface-soft) 72%, transparent);
+  border: 1px solid var(--wt-line);
+  border-radius: 8px;
+}
+
+.shortcut-icon-mode-panel > label:not(.file-pick) {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  color: var(--wt-text-soft);
+  font-size: 12px;
+  font-weight: 580;
+}
+
+.shortcut-icon-mode-panel > small,
+.upload-icon-panel > small {
+  color: var(--wt-muted);
+  line-height: 1.55;
+}
+
+.shortcut-icon-toolbar,
+.upload-icon-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.shortcut-icon-toolbar button,
+.upload-icon-actions button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 40px;
+  padding: 0 12px;
+  gap: 7px;
+  color: var(--wt-text-soft);
+  background: var(--wt-surface);
+  border: 1px solid var(--wt-line);
+  border-radius: 6px;
+}
+
+.collected-icon-grid button,
+.default-icon-grid button {
+  min-height: 70px;
+  border-radius: 8px;
+}
+
+.collected-icon-grid button.active,
+.default-icon-grid button.active {
+  color: var(--wt-text);
+  background: color-mix(in srgb, var(--wt-brand) 9%, var(--wt-surface));
+  border-color: color-mix(in srgb, var(--wt-brand) 62%, var(--wt-line));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--wt-brand) 22%, transparent);
+}
+
+.text-icon-panel {
+  align-items: center;
+}
+
+.text-icon-editor-preview {
+  position: relative;
+  width: 92px;
+  height: 92px;
+  overflow: hidden;
+  border-radius: 26%;
+  filter: drop-shadow(0 14px 24px rgba(35, 43, 50, 0.18));
+}
+
+.text-icon-palette {
+  display: grid;
+  grid-template-columns: repeat(10, 28px);
+  justify-content: center;
+  gap: 10px;
+}
+
+.text-icon-palette button {
+  position: relative;
+  width: 28px;
+  min-width: 28px;
+  height: 28px;
+  min-height: 28px;
+  padding: 0;
+  background: var(--swatch);
+  border: 2px solid color-mix(in srgb, var(--wt-surface) 82%, transparent);
+  border-radius: 50%;
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--swatch) 50%, var(--wt-line));
+}
+
+.text-icon-palette button.active::after {
+  position: absolute;
+  inset: 6px;
+  content: "";
+  border: 2px solid var(--wt-surface);
+  border-radius: 50%;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.16);
+}
+
+.text-icon-input {
+  width: min(100%, 420px);
+}
+
+.text-icon-input input {
+  text-align: center;
+  font-size: 18px;
+  font-weight: 680;
+}
+
+.upload-icon-preview {
+  display: grid;
+  min-height: 134px;
+  place-items: center;
+  background: color-mix(in srgb, var(--wt-surface) 72%, transparent);
+  border: 1px dashed var(--wt-line-strong);
+  border-radius: 8px;
+}
+
+.upload-icon-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  color: var(--wt-muted);
+}
+
+.upload-icon-panel .file-pick {
+  min-height: 42px;
+}
+
+.field-error {
+  margin: 0;
+  color: var(--wt-danger);
+  font-size: 12px;
+}
+
+.shortcut-dialog-preview > span:last-child {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: 3px;
+}
+
+.shortcut-dialog-preview strong,
+.shortcut-dialog-preview small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.shortcut-dialog-preview strong {
+  color: var(--wt-text);
+  font-size: 14px;
+}
+
+.shortcut-dialog-preview small {
+  color: var(--wt-muted);
+  font-size: 11px;
+}
+
+@media (max-width: 620px) {
+  .shortcut-icon-mode-tabs button {
+    flex-direction: column;
+    min-height: 52px;
+    padding: 5px 4px;
+    gap: 2px;
+    font-size: 10px;
+  }
+
+  .shortcut-icon-mode-panel {
+    padding: 13px;
+  }
+
+  .text-icon-palette {
+    grid-template-columns: repeat(5, 30px);
+    gap: 12px 14px;
+  }
+
+  .text-icon-palette button {
+    width: 30px;
+    min-width: 30px;
+    height: 30px;
+    min-height: 30px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .shortcut-text-icon,
+  .shortcut-icon-mode-tabs button {
+    transition: none;
+  }
+}

@@ -5,6 +5,8 @@ export type Shortcut = {
   title: string;
   url: string;
   iconUrl?: string;
+  iconText?: string;
+  iconUpdatedAt?: string;
   iconColor: string;
   groupId?: Id;
   folderId?: Id;

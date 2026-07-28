@@ -526,6 +526,11 @@ const validColor = (value: unknown) => (
   typeof value === "string" && /^#[0-9a-f]{6}(?:[0-9a-f]{2})?$/i.test(value)
 );
 const validOptionalColor = (value: unknown) => value === undefined || validColor(value);
+const validOptionalIconText = (value: unknown) => {
+  if (value === undefined) return true;
+  if (typeof value !== "string" || value !== value.trim() || /[\u0000-\u001f\u007f]/.test(value)) return false;
+  return value.length > 0 && Array.from(value).length <= 2;
+};
 const validRasterDataUrl = (value: unknown, maxLength = 4 * 1024 * 1024) => (
   typeof value === "string"
   && value.length <= maxLength
@@ -582,6 +587,8 @@ const validateEntityArray = (
     if (
       !validOptionalTimestamp(entry.deletedAt)
       || (optionalFields.includes("iconUrl") && !validImageReference(entry.iconUrl))
+      || (optionalFields.includes("iconText") && !validOptionalIconText(entry.iconText))
+      || (optionalFields.includes("iconUpdatedAt") && !validOptionalTimestamp(entry.iconUpdatedAt))
       || (optionalFields.includes("iconColor") && !validOptionalColor(entry.iconColor))
       || (optionalFields.includes("color") && !validOptionalColor(entry.color))
       || (optionalFields.includes("groupId") && !validOptionalString(entry.groupId, MAX_STATE_ID_LENGTH))
@@ -666,6 +673,8 @@ export function validateAppStatePayload(value: unknown, label = "数据"): asser
     order: "number"
   }, [
     "iconUrl",
+    "iconText",
+    "iconUpdatedAt",
     "iconColor",
     "groupId",
     "folderId",
@@ -1564,7 +1573,11 @@ export function normalizeState(state: AppState): AppState {
     updatedAt,
     shortcuts: (state.shortcuts || []).map((shortcut) => ({
       ...shortcut,
-      iconUrl: normalizeStoredImageReference(shortcut.iconUrl, true)
+      iconUrl: normalizeStoredImageReference(shortcut.iconUrl, true),
+      iconText: typeof shortcut.iconText === "string"
+        ? Array.from(shortcut.iconText.trim()).slice(0, 2).join("") || undefined
+        : undefined,
+      iconUpdatedAt: validTimestamp(shortcut.iconUpdatedAt) ? shortcut.iconUpdatedAt : undefined
     })),
     shortcutFolders: (state.shortcutFolders || []).map((folder) => ({
       ...folder,

@@ -4,11 +4,11 @@ WhyNavo is a local-first new tab dashboard for shortcuts, widgets, notes, todos,
 
 It is built as a Chrome / Edge Manifest V3 extension and as a responsive web app for mobile and tablet use. The core idea is simple: user data should work locally first, remain exportable, and only sync to the cloud after the user signs in.
 
-Current release: **0.9.6**. See the [bilingual release notes](docs/releases/0.9.6.md).
+Current release: **0.9.7**. See the [bilingual release notes](docs/releases/0.9.7.md).
 
-> **上线状态 / Launch status:** 公开源码和本地 0.9.6 构建目前可用于审查与测试。在线注册和云同步仍处于预发布阶段，必须等到对应的公开 Release、正式邮件发件域名、加密异地备份、数据库迁移和线上冒烟测试全部通过后再作为正式服务推广。当前请勿把在线服务用于唯一的重要数据副本。
+> **上线状态 / Launch status:** 公开源码和本地 0.9.7 构建目前可用于审查与测试。在线注册和云同步仍处于预发布阶段，必须等到对应的公开 Release、正式邮件发件域名、加密异地备份、数据库迁移和线上冒烟测试全部通过后再作为正式服务推广。当前请勿把在线服务用于唯一的重要数据副本。
 >
-> The public source and local 0.9.6 build are available for review and testing. Hosted account registration and cloud sync remain pre-release until the matching public Release, production email sender, encrypted off-site backup, database migration, and live smoke tests all pass. Do not use the hosted service as the only copy of important data yet.
+> The public source and local 0.9.7 build are available for review and testing. Hosted account registration and cloud sync remain pre-release until the matching public Release, production email sender, encrypted off-site backup, database migration, and live smoke tests all pass. Do not use the hosted service as the only copy of important data yet.
 
 ![WhyNavo Sample A workspace](docs/images/whynavo-0.8.1-sample-a.png)
 

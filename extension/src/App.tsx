@@ -174,7 +174,6 @@ const RATES_CACHE_MAX_AGE_MS = 6 * 60 * 60 * 1000;
 const ICON_LOAD_TIMEOUT_MS = 5000;
 const ICON_FAILURE_RETRY_MS = 6 * 60 * 60 * 1000;
 const MIN_SHARP_ICON_SIZE = 96;
-const MIN_ICON_PREVIEW_SIZE = 16;
 const SHORTCUT_RENDER_BATCH = 48;
 const ICON_MANAGER_RENDER_BATCH = 80;
 const MAX_CUSTOM_WALLPAPERS = 12;
@@ -518,6 +517,29 @@ const isGeneratedFavicon = (url?: string) => (
 );
 const isSimpleIconsUrl = (url?: string) => iconUrlMatches(url, ["cdn.simpleicons.org"], "/");
 const builtInIconPrefix = "whynavo-icon:";
+const shortcutIconTextPalette = [
+  "#F59E0B", "#22C55E", "#14B8A6", "#3B82F6", "#6366F1",
+  "#7C3AED", "#DB2777", "#EF4444", "#FB7185", "#A78BFA",
+  "#A16207", "#C08457", "#64748B", "#647D5A", "#4B7B6B",
+  "#607D8B", "#4F6FAF", "#737373", "#3F3F46", "#18181B"
+];
+const normalizeShortcutIconText = (value?: string) => Array.from((value || "").trim()).slice(0, 2).join("");
+const shortcutIconTextColor = (background: string) => {
+  const hex = background.replace("#", "");
+  const value = Number.parseInt(hex.length === 3 ? hex.split("").map((part) => part + part).join("") : hex, 16);
+  if (!Number.isFinite(value)) return "#FFFFFF";
+  const red = (value >> 16) & 255;
+  const green = (value >> 8) & 255;
+  const blue = value & 255;
+  const linearChannel = (channel: number) => {
+    const normalized = channel / 255;
+    return normalized <= 0.04045
+      ? normalized / 12.92
+      : ((normalized + 0.055) / 1.055) ** 2.4;
+  };
+  const luminance = 0.2126 * linearChannel(red) + 0.7152 * linearChannel(green) + 0.0722 * linearChannel(blue);
+  return luminance > 0.18 ? "#172026" : "#FFFFFF";
+};
 const builtInShortcutIcons = [
   { id: "general", label: "通用", Icon: Globe2, tone: "#38BDF8" },
   { id: "ai", label: "AI", Icon: Bot, tone: "#A78BFA" },
@@ -561,6 +583,22 @@ const builtInShortcutIconFor = (iconUrl?: string) => {
   if (!iconUrl?.startsWith(builtInIconPrefix)) return undefined;
   return builtInShortcutIcons.find((icon) => icon.id === iconUrl.slice(builtInIconPrefix.length));
 };
+
+function ShortcutTextIcon({ text, color }: { text: string; color: string }) {
+  const normalizedText = normalizeShortcutIconText(text) || "网";
+  return (
+    <span
+      className="shortcut-text-icon"
+      style={{
+        "--text-icon-background": color,
+        "--text-icon-foreground": shortcutIconTextColor(color)
+      } as React.CSSProperties}
+      aria-hidden="true"
+    >
+      {normalizedText}
+    </span>
+  );
+}
 
 type IconCandidate = {
   url: string;
@@ -698,6 +736,20 @@ const iconCandidatesFor = (url: string, iconUrl?: string, title = "") => {
   });
 };
 
+const iconCandidateCacheKey = (candidates: IconCandidate[], url: string, iconUrl?: string) => {
+  const hasLocalCandidate = candidates.some((candidate) => candidate.url.startsWith("data:") || candidate.url.startsWith("blob:"));
+  return hasLocalCandidate
+    ? `local:${url}:${iconUrl?.length || 0}:${iconUrl?.slice(-48) || ""}`
+    : candidates.map((candidate) => `${candidate.kind}:${candidate.url}`).join("|");
+};
+
+const invalidateResolvedShortcutIcon = (url: string, iconUrl?: string, title = "") => {
+  const candidates = iconCandidatesFor(url, iconUrl, title);
+  const key = iconCandidateCacheKey(candidates, url, iconUrl);
+  if (!key || !resolvedIconCache.delete(key)) return;
+  scheduleResolvedIconCachePersist();
+};
+
 function BuiltInShortcutIcon({ iconUrl, fallback = "" }: { iconUrl?: string; fallback?: string }) {
   const icon = builtInShortcutIconFor(iconUrl);
   if (!icon) return <>{fallback}</>;
@@ -705,13 +757,15 @@ function BuiltInShortcutIcon({ iconUrl, fallback = "" }: { iconUrl?: string; fal
   return <span className="built-in-shortcut-glyph" style={{ "--icon-tone": icon.tone } as React.CSSProperties}><Icon size={22} strokeWidth={2.3} /></span>;
 }
 
-function ShortcutIconContent({ url, iconUrl, title = "", fallback = "", priority = false }: { url: string; iconUrl?: string; title?: string; fallback?: string; priority?: boolean }) {
+function ShortcutIconContent({ url, iconUrl, iconText, iconColor = "#64748B", iconUpdatedAt, title = "", fallback = "", priority = false }: { url: string; iconUrl?: string; iconText?: string; iconColor?: string; iconUpdatedAt?: string; title?: string; fallback?: string; priority?: boolean }) {
+  const normalizedText = normalizeShortcutIconText(iconText);
+  if (normalizedText) return <ShortcutTextIcon text={normalizedText} color={iconColor} />;
   const builtInIcon = builtInShortcutIconFor(iconUrl);
   if (builtInIcon) return <BuiltInShortcutIcon iconUrl={iconUrl} fallback={fallback} />;
-  return <ShortcutIconImage url={url} iconUrl={iconUrl} title={title} fallback={fallback} priority={priority} />;
+  return <ShortcutIconImage url={url} iconUrl={iconUrl} iconColor={iconColor} refreshKey={iconUpdatedAt} title={title} fallback={fallback} priority={priority} />;
 }
 
-function ShortcutIconImage({ url, iconUrl, title = "", alt = "", fallback = "", priority = false }: { url: string; iconUrl?: string; title?: string; alt?: string; fallback?: string; priority?: boolean }) {
+function ShortcutIconImage({ url, iconUrl, iconColor = "#64748B", refreshKey, title = "", alt = "", fallback = "", priority = false }: { url: string; iconUrl?: string; iconColor?: string; refreshKey?: string; title?: string; alt?: string; fallback?: string; priority?: boolean }) {
   const candidates = useMemo(() => iconCandidatesFor(url, iconUrl, title), [url, iconUrl, title, remoteIconLookupEnabled]);
   const [index, setIndex] = useState(0);
   const [loaded, setLoaded] = useState(false);
@@ -719,9 +773,7 @@ function ShortcutIconImage({ url, iconUrl, title = "", alt = "", fallback = "", 
   const imageRef = useRef<HTMLImageElement>(null);
   const loadedRef = useRef(false);
   const hasLocalCandidate = candidates.some((candidate) => candidate.url.startsWith("data:") || candidate.url.startsWith("blob:"));
-  const candidateKey = hasLocalCandidate
-    ? `local:${url}:${iconUrl?.length || 0}:${iconUrl?.slice(-48) || ""}`
-    : candidates.map((candidate) => `${candidate.kind}:${candidate.url}`).join("|");
+  const candidateKey = iconCandidateCacheKey(candidates, url, iconUrl);
   const current = candidates[index];
 
   useEffect(() => {
@@ -738,7 +790,7 @@ function ShortcutIconImage({ url, iconUrl, title = "", alt = "", fallback = "", 
     }
     setLoaded(false);
     loadedRef.current = false;
-  }, [candidateKey]);
+  }, [candidateKey, refreshKey]);
 
   useEffect(() => {
     if (priority) {
@@ -775,10 +827,10 @@ function ShortcutIconImage({ url, iconUrl, title = "", alt = "", fallback = "", 
   }, [candidateKey, candidates.length, hasLocalCandidate, index, shouldLoad]);
 
   const fallbackText = fallback || "网";
-  if (!current || index >= candidates.length) return <span className="shortcut-icon-fallback">{fallbackText}</span>;
+  if (!current || index >= candidates.length) return <ShortcutTextIcon text={fallbackText} color={iconColor} />;
   return (
     <>
-      {!loaded && <span className="shortcut-icon-fallback" aria-hidden="true">{fallbackText}</span>}
+      {!loaded && <ShortcutTextIcon text={fallbackText} color={iconColor} />}
       <img
         ref={imageRef}
         key={current.url}
@@ -827,7 +879,7 @@ function IconChoicePreview({ src, fallback, onStatus }: { src: string; fallback:
       referrerPolicy="no-referrer"
       onLoad={(event) => {
         const shortestEdge = Math.min(event.currentTarget.naturalWidth, event.currentTarget.naturalHeight);
-        if (!isVectorIconUrl(src) && shortestEdge < MIN_ICON_PREVIEW_SIZE) {
+        if (!isVectorIconUrl(src) && shortestEdge < MIN_SHARP_ICON_SIZE) {
           setFailed(true);
           onStatus?.("failed");
           return;
@@ -2518,10 +2570,17 @@ export default function App() {
       showToast("网站名称不能超过 1000 个字符");
       return;
     }
+    const iconUrlProvided = Object.prototype.hasOwnProperty.call(shortcut, "iconUrl");
+    const iconTextProvided = Object.prototype.hasOwnProperty.call(shortcut, "iconText");
     const suppliedIcon = shortcut.iconUrl?.trim();
     const normalizedIcon = suppliedIcon ? normalizeIconReference(suppliedIcon) : undefined;
     if (suppliedIcon && !normalizedIcon) {
       showToast("图标只支持 HTTP/HTTPS 地址、内置图标或上传的图片");
+      return;
+    }
+    const normalizedIconText = normalizeShortcutIconText(shortcut.iconText);
+    if (shortcut.iconText && !normalizedIconText) {
+      showToast(text("文字图标需要填写 1–2 个字符", "Text icons require 1–2 characters"));
       return;
     }
     const isNewShortcut = !shortcut.id || !stateRef.current.shortcuts.some((item) => item.id === shortcut.id);
@@ -2536,14 +2595,22 @@ export default function App() {
     updateState((current) => {
       const updatedAt = nowIso();
       const existing = shortcut.id ? current.shortcuts.find((item) => item.id === shortcut.id) : undefined;
+      const nextIconText = iconTextProvided ? normalizedIconText || undefined : existing?.iconText;
+      const nextIconUrl = nextIconText
+        ? undefined
+        : iconUrlProvided
+          ? normalizedIcon || faviconFor(url)
+          : existing?.iconUrl || faviconFor(url);
       const next: Shortcut = {
         ...existing,
         id: existing?.id || uid(),
         title,
         url,
-        iconUrl: shortcut.iconUrl !== undefined
-          ? normalizedIcon || faviconFor(url)
-          : existing?.iconUrl || faviconFor(url),
+        iconUrl: nextIconUrl,
+        iconText: nextIconText,
+        iconUpdatedAt: iconUrlProvided || iconTextProvided || shortcut.iconColor !== undefined
+          ? updatedAt
+          : existing?.iconUpdatedAt,
         iconColor: shortcut.iconColor || existing?.iconColor || colorFor(title),
         groupId: shortcut.groupId || existing?.groupId || current.shortcutGroups[0]?.id,
         folderId: shortcut.folderId === "" ? undefined : shortcut.folderId ?? existing?.folderId,
@@ -2571,6 +2638,13 @@ export default function App() {
           : current.settings
       };
     });
+    if (iconUrlProvided || iconTextProvided) {
+      invalidateResolvedShortcutIcon(
+        url,
+        normalizedIconText ? undefined : normalizedIcon || faviconFor(url),
+        title
+      );
+    }
     showToast(requestedHomePlacement && !canPlaceOnHome
       ? text("主页最多显示 12 个入口；网站已保存到空间。", "Home supports up to 12 entries. The site was saved to Spaces.")
       : shortcut.id
@@ -3927,7 +4001,7 @@ export default function App() {
                       >
                         <a href={safeHttpHref(shortcut.url)} title={shortcut.url} target="_blank" rel="noreferrer">
                           <span className="shortcut-icon">
-                            <ShortcutIconContent url={shortcut.url} iconUrl={shortcut.iconUrl} title={shortcut.title} fallback={shortcut.title.slice(0, 1)} />
+                            <ShortcutIconContent url={shortcut.url} iconUrl={shortcut.iconUrl} iconText={shortcut.iconText} iconColor={shortcut.iconColor} iconUpdatedAt={shortcut.iconUpdatedAt} title={shortcut.title} fallback={shortcut.title.slice(0, 1)} />
                           </span>
                           <span>{shortcut.title}</span>
                         </a>
@@ -4562,7 +4636,7 @@ function HomeShortcuts({ tiles, iconSize, editing, floating, onOpenFolder, onEdi
           ) : (
             <>
               <span className="shortcut-icon">
-                <ShortcutIconContent url={item.shortcut.url} iconUrl={item.shortcut.iconUrl} title={item.shortcut.title} fallback={item.shortcut.title.slice(0, 1)} priority={index < 8} />
+                <ShortcutIconContent url={item.shortcut.url} iconUrl={item.shortcut.iconUrl} iconText={item.shortcut.iconText} iconColor={item.shortcut.iconColor} iconUpdatedAt={item.shortcut.iconUpdatedAt} title={item.shortcut.title} fallback={item.shortcut.title.slice(0, 1)} priority={index < 8} />
               </span>
               <span>{item.shortcut.title}</span>
             </>
@@ -4684,7 +4758,7 @@ function SearchWorkspace({ query, onQueryChange, onWebSearch, engineLabel, short
             {matchedShortcuts.map((shortcut, index) => (
               <a href={safeHttpHref(shortcut.url)} target="_blank" rel="noreferrer" key={shortcut.id}>
                 <span className="lucid-result-icon">
-                  <ShortcutIconContent url={shortcut.url} iconUrl={shortcut.iconUrl} title={shortcut.title} fallback={shortcut.title.slice(0, 1)} priority={index < 8} />
+                  <ShortcutIconContent url={shortcut.url} iconUrl={shortcut.iconUrl} iconText={shortcut.iconText} iconColor={shortcut.iconColor} iconUpdatedAt={shortcut.iconUpdatedAt} title={shortcut.title} fallback={shortcut.title.slice(0, 1)} priority={index < 8} />
                 </span>
                 <span><strong>{shortcut.title}</strong><small>{shortcut.url}</small></span>
               </a>
@@ -5008,7 +5082,7 @@ function Dock({ shortcuts }: { shortcuts: Shortcut[] }) {
     <nav className="dock" aria-label="固定快捷入口">
       {shortcuts.slice(0, 14).map((shortcut) => (
         <a key={shortcut.id} data-shortcut-id={shortcut.id} href={safeHttpHref(shortcut.url)} title={shortcut.title} target="_blank" rel="noreferrer">
-          <ShortcutIconContent url={shortcut.url} iconUrl={shortcut.iconUrl} title={shortcut.title} fallback={shortcut.title.slice(0, 1)} />
+          <ShortcutIconContent url={shortcut.url} iconUrl={shortcut.iconUrl} iconText={shortcut.iconText} iconColor={shortcut.iconColor} iconUpdatedAt={shortcut.iconUpdatedAt} title={shortcut.title} fallback={shortcut.title.slice(0, 1)} />
         </a>
       ))}
     </nav>
@@ -6279,7 +6353,7 @@ function FolderView({ folder, shortcuts, onClose, onAdd, onEditFolder }: {
             >
               <a href={safeHttpHref(shortcut.url)} title={shortcut.url} target="_blank" rel="noreferrer">
                 <span className="shortcut-icon">
-                  <ShortcutIconContent url={shortcut.url} iconUrl={shortcut.iconUrl} title={shortcut.title} fallback={shortcut.title.slice(0, 1)} />
+                  <ShortcutIconContent url={shortcut.url} iconUrl={shortcut.iconUrl} iconText={shortcut.iconText} iconColor={shortcut.iconColor} iconUpdatedAt={shortcut.iconUpdatedAt} title={shortcut.title} fallback={shortcut.title.slice(0, 1)} />
                 </span>
                 <span>{shortcut.title}</span>
               </a>
@@ -6338,6 +6412,8 @@ function FolderDialog({ folder, groups, onClose, onSave, onDelete }: {
   );
 }
 
+type ShortcutIconMode = "online" | "text" | "upload";
+
 function ShortcutDialog({ shortcut, groups, folders, onClose, onSave }: {
   shortcut?: Shortcut;
   groups: AppState["shortcutGroups"];
@@ -6348,13 +6424,24 @@ function ShortcutDialog({ shortcut, groups, folders, onClose, onSave }: {
   const language = useUiLanguage();
   const text = (zh: string, en: string) => localized(language, zh, en);
   const [draft, setDraft] = useState<Partial<Shortcut>>(shortcut || { iconColor: "#14B8A6", groupId: groups[0]?.id });
+  const initialIconUrl = shortcut?.iconUrl || "";
+  const [iconMode, setIconMode] = useState<ShortcutIconMode>(shortcut?.iconText
+    ? "text"
+    : initialIconUrl.startsWith("data:image/")
+      ? "upload"
+      : "online");
+  const [onlineIconUrl, setOnlineIconUrl] = useState(initialIconUrl.startsWith("data:image/") ? "" : initialIconUrl);
+  const [uploadedIconUrl, setUploadedIconUrl] = useState(initialIconUrl.startsWith("data:image/") ? initialIconUrl : "");
+  const [customIconText, setCustomIconText] = useState(normalizeShortcutIconText(shortcut?.iconText || shortcut?.title || "网"));
+  const [uploadError, setUploadError] = useState("");
   const [iconChoiceStatus, setIconChoiceStatus] = useState<Record<string, "loading" | "ready" | "failed">>({});
   const iconTitle = draft.title || shortcut?.title || "";
   const iconUrl = draft.url || shortcut?.url || "";
+  const iconColor = draft.iconColor || "#14B8A6";
   const collectedIconChoices = useMemo(() => {
     const siteCandidates = siteIconCandidatesFor(iconUrl).slice(0, 2);
     const rows: Array<{ label: string; url?: string }> = [
-      { label: text("当前", "Current"), url: draft.iconUrl && !draft.iconUrl.startsWith(builtInIconPrefix) ? draft.iconUrl : undefined },
+      { label: text("当前", "Current"), url: onlineIconUrl && !onlineIconUrl.startsWith(builtInIconPrefix) ? onlineIconUrl : undefined },
       { label: text("自动", "Auto"), url: faviconFor(iconUrl) },
       { label: text("品牌", "Brand"), url: curatedIconFor(iconUrl, iconTitle) },
       ...siteCandidates.map((url, index) => ({ label: text(`站点 ${index + 1}`, `Site ${index + 1}`), url })),
@@ -6367,16 +6454,29 @@ function ShortcutDialog({ shortcut, groups, folders, onClose, onSave }: {
       seen.add(item.url);
       return true;
     });
-  }, [draft.iconUrl, iconTitle, iconUrl, language]);
+  }, [onlineIconUrl, iconTitle, iconUrl, language]);
+  const previewIconUrl = iconMode === "online" ? onlineIconUrl : iconMode === "upload" ? uploadedIconUrl : undefined;
+  const previewIconText = iconMode === "text" ? normalizeShortcutIconText(customIconText) : undefined;
+  const canSaveIcon = iconMode !== "text" || Boolean(previewIconText);
   return (
     <DialogShell title={shortcut?.id ? text("编辑快捷导航", "Edit shortcut") : text("新增快捷导航", "Add shortcut")} onClose={onClose}>
       <label>{text("名称", "Name")}<input maxLength={MAX_ENTITY_NAME_CHARS} value={draft.title || ""} onChange={(event) => setDraft({ ...draft, title: event.target.value })} /></label>
       <label>{text("网址", "URL")}<input maxLength={MAX_URL_CHARS} value={draft.url || ""} onChange={(event) => setDraft({ ...draft, url: event.target.value })} placeholder="https://example.com" /></label>
-      <label>{text("图标 URL（可选，默认自动获取）", "Icon URL (optional, detected automatically)")}<input maxLength={4 * 1024 * 1024} value={draft.iconUrl || ""} onChange={(event) => setDraft({ ...draft, iconUrl: event.target.value })} placeholder={text("留空会自动使用网站图标", "Leave blank to detect the site icon")} /></label>
-      <div className="shortcut-icon-toolbar">
-        <button type="button" onClick={() => setDraft({ ...draft, iconUrl: draft.url ? faviconFor(draft.url) : "" })}>{text("自动获取图标", "Detect icon")}</button>
-        <button type="button" onClick={() => setDraft({ ...draft, iconUrl: "" })}>{text("清空图标", "Clear icon")}</button>
+      <div className="shortcut-icon-mode-tabs" role="group" aria-label={text("图标类型", "Icon type")}>
+        <button type="button" className={iconMode === "online" ? "active" : ""} aria-pressed={iconMode === "online"} onClick={() => setIconMode("online")}><Globe2 size={16} />{text("在线图标", "Online")}</button>
+        <button type="button" className={iconMode === "text" ? "active" : ""} aria-pressed={iconMode === "text"} onClick={() => {
+          setCustomIconText((current) => normalizeShortcutIconText(current) || normalizeShortcutIconText(draft.title || "网"));
+          setIconMode("text");
+        }}><Palette size={16} />{text("纯色图标", "Text")}</button>
+        <button type="button" className={iconMode === "upload" ? "active" : ""} aria-pressed={iconMode === "upload"} onClick={() => setIconMode("upload")}><Upload size={16} />{text("本地上传", "Upload")}</button>
       </div>
+
+      {iconMode === "online" && <div className="shortcut-icon-mode-panel online-icon-panel">
+        <label>{text("图标 URL（可选，默认自动获取）", "Icon URL (optional, detected automatically)")}<input maxLength={4 * 1024 * 1024} value={onlineIconUrl} onChange={(event) => setOnlineIconUrl(event.target.value)} placeholder={text("留空会自动使用网站图标", "Leave blank to detect the site icon")} /></label>
+        <div className="shortcut-icon-toolbar">
+          <button type="button" onClick={() => setOnlineIconUrl(draft.url ? faviconFor(draft.url) || "" : "")}><RefreshCcw size={15} />{text("重新采集", "Detect again")}</button>
+          <button type="button" onClick={() => setOnlineIconUrl("")}><X size={15} />{text("使用自动回退", "Use automatic fallback")}</button>
+        </div>
       {collectedIconChoices.length > 0 && (
         <section className="collected-icon-picker" aria-label={text("采集图标", "Collected icons")}>
           <div className="default-icon-picker-head">
@@ -6387,11 +6487,11 @@ function ShortcutDialog({ shortcut, groups, folders, onClose, onSave }: {
             {collectedIconChoices.map((choice) => (
               <button
                 type="button"
-                className={`${draft.iconUrl === choice.url ? "active" : ""} ${iconChoiceStatus[choice.url] === "failed" ? "is-unavailable" : ""}`.trim()}
-                aria-pressed={draft.iconUrl === choice.url}
+                className={`${onlineIconUrl === choice.url ? "active" : ""} ${iconChoiceStatus[choice.url] === "failed" ? "is-unavailable" : ""}`.trim()}
+                aria-pressed={onlineIconUrl === choice.url}
                 disabled={iconChoiceStatus[choice.url] !== "ready"}
                 key={choice.url}
-                onClick={() => setDraft({ ...draft, iconUrl: choice.url })}
+                onClick={() => setOnlineIconUrl(choice.url)}
                 title={iconChoiceStatus[choice.url] === "failed" ? text("该图标无法加载", "This icon could not be loaded") : choice.url}
               >
                 <span><IconChoicePreview src={choice.url} fallback={(draft.title || "网").slice(0, 1)} onStatus={(status) => setIconChoiceStatus((current) => current[choice.url] === status ? current : { ...current, [choice.url]: status })} /></span>
@@ -6413,10 +6513,10 @@ function ShortcutDialog({ shortcut, groups, folders, onClose, onSave }: {
             return (
               <button
                 type="button"
-                className={draft.iconUrl === value ? "active" : ""}
-                aria-pressed={draft.iconUrl === value}
+                className={onlineIconUrl === value ? "active" : ""}
+                aria-pressed={onlineIconUrl === value}
                 key={icon.id}
-                onClick={() => setDraft({ ...draft, iconUrl: value })}
+                onClick={() => setOnlineIconUrl(value)}
                 style={{ "--icon-tone": icon.tone } as React.CSSProperties}
                 title={builtInShortcutIconLabelFor(language, icon)}
               >
@@ -6427,16 +6527,69 @@ function ShortcutDialog({ shortcut, groups, folders, onClose, onSave }: {
           })}
         </div>
       </section>
+      </div>}
+
+      {iconMode === "text" && (
+        <section className="shortcut-icon-mode-panel text-icon-panel" aria-label={text("纯色文字图标", "Solid text icon")}>
+          <div className="text-icon-editor-preview"><ShortcutTextIcon text={previewIconText || "网"} color={iconColor} /></div>
+          <div className="text-icon-palette" role="group" aria-label={text("图标颜色", "Icon color")}>
+            {shortcutIconTextPalette.map((color) => (
+              <button
+                type="button"
+                className={iconColor.toLowerCase() === color.toLowerCase() ? "active" : ""}
+                aria-pressed={iconColor.toLowerCase() === color.toLowerCase()}
+                aria-label={text(`选择颜色 ${color}`, `Choose color ${color}`)}
+                key={color}
+                style={{ "--swatch": color } as React.CSSProperties}
+                onClick={() => setDraft({ ...draft, iconColor: color })}
+              />
+            ))}
+          </div>
+          <label className="text-icon-input"><span>{text("图标文字", "Icon text")}</span><input value={customIconText} maxLength={4} onChange={(event) => setCustomIconText(normalizeShortcutIconText(event.target.value))} placeholder={text("建议 1–2 个字符", "Use 1–2 characters")} /></label>
+          <small>{text("适合无法采集图标的网站；文字与颜色会在所有设备同步。", "Use when a site icon cannot be detected. Text and color sync across devices.")}</small>
+        </section>
+      )}
+
+      {iconMode === "upload" && (
+        <section className="shortcut-icon-mode-panel upload-icon-panel" aria-label={text("上传本地图标", "Upload a local icon")}>
+          <div className="upload-icon-preview">
+            {uploadedIconUrl
+              ? <span className="shortcut-icon" style={{ "--icon": "88px" } as React.CSSProperties}><ShortcutIconContent url={draft.url || ""} iconUrl={uploadedIconUrl} iconColor={iconColor} title={draft.title || ""} fallback={(draft.title || "网").slice(0, 1)} /></span>
+              : <span className="upload-icon-empty"><ImageIcon size={26} /><small>{text("PNG、JPG 或 WebP", "PNG, JPG, or WebP")}</small></span>}
+          </div>
+          <div className="upload-icon-actions">
+            <label className="file-pick"><Upload size={16} />{text(uploadedIconUrl ? "更换图片" : "选择图片", uploadedIconUrl ? "Replace image" : "Choose image")}<input type="file" accept="image/png,image/jpeg,image/webp,image/avif" onChange={(event) => {
+              const input = event.currentTarget;
+              const file = input.files?.[0];
+              input.value = "";
+              if (!file) return;
+              setUploadError("");
+              void shrinkImage(file, 512, 0.9, language)
+                .then((dataUrl) => setUploadedIconUrl(dataUrl))
+                .catch((error) => setUploadError(error instanceof Error ? error.message : text("图片处理失败", "Image processing failed")));
+            }} /></label>
+            {uploadedIconUrl && <button type="button" onClick={() => setUploadedIconUrl("")}><Trash2 size={15} />{text("移除", "Remove")}</button>}
+          </div>
+          {uploadError && <p className="field-error" role="alert">{uploadError}</p>}
+          <small>{text("图片压缩后仅保存在本设备；其他设备会使用同色文字回退，避免把私人图片明文上传。", "The compressed image stays on this device. Other devices use the same-color text fallback so private images are not uploaded in plaintext.")}</small>
+        </section>
+      )}
+
       <div className="shortcut-dialog-preview">
         <span className="shortcut-icon" style={{ "--icon": "58px", "--fallback-color": draft.iconColor || "#737373" } as React.CSSProperties}>
-          <ShortcutIconContent url={draft.url || ""} iconUrl={draft.iconUrl} title={draft.title || ""} fallback={(draft.title || "网").slice(0, 1)} />
+          <ShortcutIconContent url={draft.url || ""} iconUrl={previewIconUrl} iconText={previewIconText} iconColor={iconColor} title={draft.title || ""} fallback={(draft.title || "网").slice(0, 1)} />
         </span>
-        <span>{draft.title || text("预览", "Preview")}</span>
+        <span><strong>{draft.title || text("预览", "Preview")}</strong><small>{iconMode === "online" ? text("在线图标", "Online icon") : iconMode === "text" ? text("纯色文字", "Solid text") : text("本地上传", "Local upload")}</small></span>
       </div>
       <label>{text("分组", "Category")}<select value={draft.groupId || groups[0]?.id} onChange={(event) => setDraft({ ...draft, groupId: event.target.value })}>{groups.map((group) => <option value={group.id} key={group.id}>{shortcutGroupNameFor(language, group)}</option>)}</select></label>
       <label>{text("文件夹", "Folder")}<select value={draft.folderId || ""} onChange={(event) => setDraft({ ...draft, folderId: event.target.value || undefined })}><option value="">{text("不放入文件夹", "No folder")}</option>{folders.map((folder) => <option value={folder.id} key={folder.id}>{folder.name}</option>)}</select></label>
       <label className="check-row"><input type="checkbox" checked={Boolean(draft.pinned)} onChange={(event) => setDraft({ ...draft, pinned: event.target.checked })} /> {text("固定到 Dock", "Pin to Dock")}</label>
-      <button className="primary" onClick={() => onSave(draft)}><Save size={16} /> {text("保存并应用", "Save and apply")}</button>
+      <button className="primary" disabled={!canSaveIcon || (iconMode === "upload" && !uploadedIconUrl)} onClick={() => onSave({
+        ...draft,
+        iconUrl: iconMode === "online" ? onlineIconUrl : iconMode === "upload" ? uploadedIconUrl : "",
+        iconText: iconMode === "text" ? previewIconText : "",
+        iconColor
+      })}><Save size={16} /> {text("保存并应用", "Save and apply")}</button>
     </DialogShell>
   );
 }
@@ -6787,7 +6940,7 @@ function ResourceCenterDialog({ state, shortcuts, updateState, initialTab = "wid
               {visibleIconShortcuts.map((shortcut) => (
                 <button type="button" key={shortcut.id} onClick={() => onEditShortcut(shortcut)}>
                   <span className="shortcut-icon">
-                    <ShortcutIconContent url={shortcut.url} iconUrl={shortcut.iconUrl} title={shortcut.title} fallback={shortcut.title.slice(0, 1)} />
+                    <ShortcutIconContent url={shortcut.url} iconUrl={shortcut.iconUrl} iconText={shortcut.iconText} iconColor={shortcut.iconColor} iconUpdatedAt={shortcut.iconUpdatedAt} title={shortcut.title} fallback={shortcut.title.slice(0, 1)} />
                   </span>
                   <span>
                     <strong>{shortcut.title}</strong>
