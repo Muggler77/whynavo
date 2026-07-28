@@ -190,9 +190,10 @@ try {
   assert.doesNotThrow(() => validateAppStatePayload(migrated.state, "test state"), "valid app data must pass structural validation");
   const recurringState = {
     ...migrated.state,
-    shortcuts: [{ ...migrated.state.shortcuts[0], homeX: 0.25, homeY: 0.75 }],
+    shortcuts: [{ ...migrated.state.shortcuts[0], homeVisible: true, homeX: 0.25, homeY: 0.75 }],
+    shortcutFolders: [{ ...migrated.state.shortcutFolders[0], homeVisible: false }],
     todos: [{ ...migrated.state.todos[0], recurrence: "weekdays", reminderTime: "09:30", completedOn: "2026-07-28" }],
-    settings: { ...migrated.state.settings, homeSiteFloating: true }
+    settings: { ...migrated.state.settings, homeSiteFloating: true, homeSelectionInitialized: true }
   };
   assert.doesNotThrow(() => validateAppStatePayload(recurringState, "test state"), "valid home positions and recurring task schedules must survive validation");
   assert.throws(
@@ -204,6 +205,11 @@ try {
     () => validateAppStatePayload({ ...recurringState, shortcuts: [{ ...recurringState.shortcuts[0], homeX: 2 }] }, "test state"),
     /记录字段/,
     "home canvas coordinates outside the normalized boundary must be rejected"
+  );
+  assert.throws(
+    () => validateAppStatePayload({ ...recurringState, shortcuts: [{ ...recurringState.shortcuts[0], homeVisible: "yes" }] }, "test state"),
+    /记录字段/,
+    "home visibility must remain a boolean before persistence"
   );
   const normalizedLegacyImages = normalizeState({
     ...migrated.state,
@@ -338,7 +344,7 @@ try {
     settings: { ...legacyState.settings, iconSize: 64, visualRefreshVersion: 7 }
   });
   assert.equal(oldDefaultVisual.settings.iconSize, 58, "old default icon size should migrate to the new unified default");
-  assert.equal(oldDefaultVisual.settings.visualRefreshVersion, 15, "visual refresh version should advance");
+  assert.equal(oldDefaultVisual.settings.visualRefreshVersion, 16, "visual refresh version should advance");
   assert.deepEqual(oldDefaultVisual.settings.customNavPages, [], "legacy state should receive an empty custom page list");
   assert.deepEqual(oldDefaultVisual.settings.hiddenNavPages, ["tools"], "legacy state should adopt the restrained Sample A navigation");
   assert.equal(oldDefaultVisual.settings.navigationDisplay, "always", "legacy state should receive a visible desktop navigation");
@@ -1161,6 +1167,10 @@ try {
   assert.match(appSource, /hasLocalCandidate\s*\? `local:/, "large inline icons must not be copied into persistent cache keys");
   assert.doesNotMatch(appSource, /directCandidates\[1\]/, "icon fallback chains must remain bounded for predictable loading time");
   assert.match(appSource, /onPointerLeave=\{scheduleNavigationClose\}/, "auto-hidden navigation must have an explicit delayed close boundary");
+  assert.match(appSource, /homeSelectionInitialized[\s\S]*homeVisible === true/, "Home membership must use an explicit synchronized selection instead of Dock pinning");
+  assert.match(appSource, /onToggleHome[\s\S]*添加到主页/, "shortcut context actions must visibly add or remove the selected Home entry");
+  assert.match(appSource, /Math\.hypot\([\s\S]*>= 6/, "Home icon editing must retain a drag threshold so a click opens the editor without moving the icon");
+  assert.match(appSource, /iconChoiceStatus\[choice\.url\] !== "ready"/, "failed collected-icon candidates must not remain selectable");
   assert.match(appSource, /validateAppStatePayload\(snapshot\.state, "同步恢复点"\)/, "sync restore points must be validated before use");
   assert.match(appSource, /PASSWORD_RECOVERY/, "password recovery links must open the password update workflow");
   assert.match(appSource, /passwordRecovery=\{passwordRecovery\}/, "the account dialog must receive password recovery state");

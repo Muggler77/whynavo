@@ -442,6 +442,7 @@ const SETTINGS_KEYS = new Set([
   "navigationSide",
   "remoteIconLookup",
   "homeSiteFloating",
+  "homeSelectionInitialized",
   "timeZone",
   "supabaseUrl",
   "supabaseAnonKey",
@@ -586,6 +587,7 @@ const validateEntityArray = (
       || (optionalFields.includes("groupId") && !validOptionalString(entry.groupId, MAX_STATE_ID_LENGTH))
       || (optionalFields.includes("folderId") && !validOptionalString(entry.folderId, MAX_STATE_ID_LENGTH))
       || (optionalFields.includes("conflictBody") && !validOptionalString(entry.conflictBody))
+      || (optionalFields.includes("homeVisible") && !validOptionalBoolean(entry.homeVisible))
       || (optionalFields.includes("homeX") && !validOptionalNumberInRange(entry.homeX, 0, 1))
       || (optionalFields.includes("homeY") && !validOptionalNumberInRange(entry.homeY, 0, 1))
       || (optionalFields.includes("recurrence") && entry.recurrence !== undefined && !["daily", "weekdays", "weekly"].includes(String(entry.recurrence)))
@@ -667,6 +669,7 @@ export function validateAppStatePayload(value: unknown, label = "数据"): asser
     "iconColor",
     "groupId",
     "folderId",
+    "homeVisible",
     "homeX",
     "homeY"
   ]) && validateEntityArray(state.shortcutFolders, {
@@ -676,6 +679,7 @@ export function validateAppStatePayload(value: unknown, label = "数据"): asser
     "iconUrl",
     "iconColor",
     "groupId",
+    "homeVisible",
     "homeX",
     "homeY"
   ], true) && validateEntityArray(state.shortcutGroups, {
@@ -750,6 +754,7 @@ export function validateAppStatePayload(value: unknown, label = "数据"): asser
     || !validOptionalBoolean(settings.weatherUseLocation)
     || !validOptionalBoolean(settings.remoteIconLookup)
     || !validOptionalBoolean(settings.homeSiteFloating)
+    || !validOptionalBoolean(settings.homeSelectionInitialized)
     || (settings.iconPresentation !== undefined && !["original", "soft", "minimal"].includes(String(settings.iconPresentation)))
     || (settings.language !== undefined && !["zh-CN", "en-US"].includes(String(settings.language)))
     || !["comfortable", "compact"].includes(String(settings.gridDensity))
@@ -1479,7 +1484,7 @@ export function normalizeState(state: AppState): AppState {
         ? "aurora-lake"
         : state.settings.wallpaperPreset || "lucid-room",
     wallpaperRotation: visualVersion < 5 ? false : state.settings.wallpaperRotation ?? false,
-    visualRefreshVersion: 15,
+    visualRefreshVersion: 16,
     iconSize: Math.min(80, Math.max(48, visualVersion < 8 && state.settings.iconSize === 64 ? 58 : state.settings.iconSize || 58)),
     glass: Math.min(88, Math.max(28, state.settings.glass || 42)),
     customWallpapers: state.settings.customWallpapers || [],
@@ -1519,6 +1524,7 @@ export function normalizeState(state: AppState): AppState {
     navigationSide: state.settings.navigationSide === "right" ? "right" : "left",
     remoteIconLookup: state.settings.remoteIconLookup ?? true,
     homeSiteFloating: state.settings.homeSiteFloating ?? true,
+    homeSelectionInitialized: state.settings.homeSelectionInitialized ?? false,
     timeZone: validTimeZone(state.settings.timeZone) ? state.settings.timeZone : "Asia/Shanghai",
     dateTimeColor: state.settings.dateTimeColor || "#ffffff",
     widgetAccentColor: state.settings.widgetAccentColor || "#2dd4bf",

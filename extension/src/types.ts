@@ -10,6 +10,7 @@ export type Shortcut = {
   folderId?: Id;
   pinned: boolean;
   order: number;
+  homeVisible?: boolean;
   homeX?: number;
   homeY?: number;
   updatedAt: string;
@@ -23,6 +24,7 @@ export type ShortcutFolder = {
   iconUrl?: string;
   iconColor: string;
   order: number;
+  homeVisible?: boolean;
   homeX?: number;
   homeY?: number;
   updatedAt: string;
@@ -144,6 +146,7 @@ export type Settings = {
   navigationSide?: "left" | "right";
   remoteIconLookup?: boolean;
   homeSiteFloating?: boolean;
+  homeSelectionInitialized?: boolean;
   timeZone?: string;
   supabaseUrl?: string;
   supabaseAnonKey?: string;

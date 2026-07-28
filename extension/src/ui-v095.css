@@ -1,0 +1,98 @@
+/* WhyNavo 0.9.5: collision-safe Spaces, explicit Home editing, and softer icon motion. */
+
+@media (min-width: 1025px), (min-width: 761px) and (hover: hover) {
+  .workspace.page-shortcuts,
+  .workspace.page-custom {
+    width: min(1274px, calc(100% - 232px));
+  }
+}
+
+.sample-a-sites-panel .home-shortcut-positioned .shortcut-icon {
+  overflow: hidden;
+  border-radius: 26% !important;
+  clip-path: inset(0 round 26%);
+  filter: drop-shadow(0 12px 18px rgba(25, 32, 37, 0.14));
+  transform-origin: 50% 58%;
+}
+
+.sample-a-sites-panel .home-shortcut-positioned:nth-child(3n + 2) .shortcut-icon {
+  border-radius: 32% !important;
+  clip-path: inset(0 round 32%);
+}
+
+.sample-a-sites-panel .home-shortcut-positioned:nth-child(4n) .shortcut-icon {
+  border-radius: 50% !important;
+  clip-path: circle(50% at 50% 50%);
+}
+
+.sample-a-sites-panel .home-shortcut-positioned .shortcut-icon-image,
+.sample-a-sites-panel .home-shortcut-positioned .shortcut-icon-fallback,
+.sample-a-sites-panel .home-shortcut-positioned .built-in-shortcut-glyph {
+  border-radius: inherit;
+}
+
+@keyframes whynavo-site-float-soft {
+  0%, 100% { transform: translate3d(0, 0, 0) rotate(-0.15deg); }
+  48% { transform: translate3d(1px, -4px, 0) rotate(0.18deg); }
+  76% { transform: translate3d(-1px, -1px, 0) rotate(0deg); }
+}
+
+.sample-a-sites-panel.sites-floating:not(.layout-editing) .home-shortcut-positioned .shortcut-icon {
+  animation-name: whynavo-site-float-soft;
+  animation-duration: calc(10s + var(--float-index) * 0.52s);
+}
+
+.sample-a-sites-panel.sites-floating:not(.layout-editing) .home-shortcut-positioned:hover .shortcut-icon,
+.sample-a-sites-panel.sites-floating:not(.layout-editing) .home-shortcut-positioned:focus-visible .shortcut-icon {
+  transform: translateY(-2px) scale(1.035);
+}
+
+.sample-a-sites-panel .tile-drag-handle {
+  top: 0;
+  right: 0;
+  width: 27px;
+  height: 27px;
+  color: var(--lucid-ink);
+  border-radius: 50%;
+}
+
+.page-nav-secondary .nav-page-manager-control {
+  color: var(--lucid-ink);
+  background: color-mix(in srgb, var(--lucid-surface-solid) 60%, transparent);
+  border: 1px dashed var(--lucid-line-strong);
+}
+
+.page-nav-secondary .nav-page-manager-control:hover,
+.page-nav-secondary .nav-page-manager-control:focus-visible {
+  background: var(--lucid-hover);
+  border-style: solid;
+}
+
+.lucid-page-row-actions button.is-saved {
+  color: #067a68;
+  background: rgba(20, 184, 166, 0.12);
+  border-color: rgba(20, 184, 166, 0.3);
+}
+
+.collected-icon-grid button:disabled {
+  cursor: wait;
+}
+
+.collected-icon-grid button.is-unavailable {
+  opacity: 0.38;
+  cursor: not-allowed;
+  filter: grayscale(1);
+}
+
+@media (min-width: 761px) and (max-width: 900px) and (hover: hover) {
+  .workspace.page-shortcuts,
+  .workspace.page-custom {
+    width: calc(100% - 196px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sample-a-sites-panel.sites-floating:not(.layout-editing) .home-shortcut-positioned .shortcut-icon {
+    animation: none;
+  }
+}

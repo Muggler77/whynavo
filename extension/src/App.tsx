@@ -812,9 +812,12 @@ function ShortcutIconImage({ url, iconUrl, title = "", alt = "", fallback = "", 
   );
 }
 
-function IconChoicePreview({ src, fallback }: { src: string; fallback: string }) {
+function IconChoicePreview({ src, fallback, onStatus }: { src: string; fallback: string; onStatus?: (status: "loading" | "ready" | "failed") => void }) {
   const [failed, setFailed] = useState(false);
-  useEffect(() => setFailed(false), [src]);
+  useEffect(() => {
+    setFailed(false);
+    onStatus?.("loading");
+  }, [src]);
   if (failed) return <span className="icon-choice-fallback">{fallback}</span>;
   return (
     <img
@@ -825,9 +828,17 @@ function IconChoicePreview({ src, fallback }: { src: string; fallback: string })
       referrerPolicy="no-referrer"
       onLoad={(event) => {
         const shortestEdge = Math.min(event.currentTarget.naturalWidth, event.currentTarget.naturalHeight);
-        if (!isVectorIconUrl(src) && shortestEdge < MIN_ICON_PREVIEW_SIZE) setFailed(true);
+        if (!isVectorIconUrl(src) && shortestEdge < MIN_ICON_PREVIEW_SIZE) {
+          setFailed(true);
+          onStatus?.("failed");
+          return;
+        }
+        onStatus?.("ready");
       }}
-      onError={() => setFailed(true)}
+      onError={() => {
+        setFailed(true);
+        onStatus?.("failed");
+      }}
     />
   );
 }
@@ -2193,11 +2204,17 @@ export default function App() {
         order: Number.isFinite(firstChildOrder) ? firstChildOrder : folder.order
       };
     });
-    const linkTiles = allShortcuts
+    const legacyLinkTiles = allShortcuts
       .filter((shortcut) => !shortcut.folderId || !liveFolderIds.has(shortcut.folderId))
       .map((shortcut) => ({ kind: "shortcut" as const, shortcut, order: shortcut.order }));
-    return [...folderTiles, ...linkTiles].sort((a, b) => a.order - b.order).slice(0, 24);
-  }, [allFolders, allShortcuts, liveFolderIds]);
+    const legacyTiles = [...folderTiles, ...legacyLinkTiles].sort((a, b) => a.order - b.order);
+    if (!state.settings.homeSelectionInitialized) return legacyTiles.slice(0, 12);
+    const selectedFolders = folderTiles.filter((item) => item.folder.homeVisible === true);
+    const selectedLinks = allShortcuts
+      .filter((shortcut) => shortcut.homeVisible === true)
+      .map((shortcut) => ({ kind: "shortcut" as const, shortcut, order: shortcut.order }));
+    return [...selectedFolders, ...selectedLinks].sort((a, b) => a.order - b.order).slice(0, 12);
+  }, [allFolders, allShortcuts, liveFolderIds, state.settings.homeSelectionInitialized]);
   const openFolder = allFolders.find((folder) => folder.id === openFolderId);
   const folderShortcuts = useMemo(() => {
     if (!openFolderId) return [];
@@ -2459,6 +2476,10 @@ export default function App() {
       return;
     }
     const isNewShortcut = !shortcut.id || !stateRef.current.shortcuts.some((item) => item.id === shortcut.id);
+    const requestedHomePlacement = isNewShortcut && shortcut.homeVisible === true;
+    const canPlaceOnHome = !requestedHomePlacement || homeShortcutTiles.length < 12;
+    const legacyHomeShortcutIds = new Set(homeShortcutTiles.flatMap((item) => item.kind === "shortcut" ? [item.shortcut.id] : []));
+    const legacyHomeFolderIds = new Set(homeShortcutTiles.flatMap((item) => item.kind === "folder" ? [item.folder.id] : []));
     if (isNewShortcut && stateRef.current.shortcuts.length >= MAX_ENTITY_RECORDS) {
       showToast("网站记录已达到 5000 条安全上限，请先导出备份并整理旧记录");
       return;
@@ -2467,6 +2488,7 @@ export default function App() {
       const updatedAt = nowIso();
       const existing = shortcut.id ? current.shortcuts.find((item) => item.id === shortcut.id) : undefined;
       const next: Shortcut = {
+        ...existing,
         id: existing?.id || uid(),
         title,
         url,
@@ -2478,20 +2500,38 @@ export default function App() {
         folderId: shortcut.folderId === "" ? undefined : shortcut.folderId ?? existing?.folderId,
         pinned: Boolean(shortcut.pinned ?? existing?.pinned),
         order: existing?.order ?? current.shortcuts.length,
+        homeVisible: requestedHomePlacement ? (canPlaceOnHome ? true : undefined) : shortcut.homeVisible ?? existing?.homeVisible,
+        homeX: shortcut.homeX ?? existing?.homeX,
+        homeY: shortcut.homeY ?? existing?.homeY,
         updatedAt
       };
+      const initializeHomeSelection = requestedHomePlacement && canPlaceOnHome && !current.settings.homeSelectionInitialized;
+      const shortcuts = existing
+        ? current.shortcuts.map((item) => (item.id === next.id ? next : item))
+        : [...current.shortcuts, next];
       return {
         ...current,
-        shortcuts: existing
-          ? current.shortcuts.map((item) => (item.id === next.id ? next : item))
-          : [...current.shortcuts, next]
+        shortcutFolders: initializeHomeSelection
+          ? current.shortcutFolders.map((folder) => legacyHomeFolderIds.has(folder.id) ? { ...folder, homeVisible: true, updatedAt } : folder)
+          : current.shortcutFolders,
+        shortcuts: initializeHomeSelection
+          ? shortcuts.map((item) => legacyHomeShortcutIds.has(item.id) || item.id === next.id ? { ...item, homeVisible: true, updatedAt } : item)
+          : shortcuts,
+        settings: initializeHomeSelection
+          ? { ...current.settings, homeSelectionInitialized: true, updatedAt }
+          : current.settings
       };
     });
+    showToast(requestedHomePlacement && !canPlaceOnHome
+      ? text("主页最多显示 12 个入口；网站已保存到空间。", "Home supports up to 12 entries. The site was saved to Spaces.")
+      : shortcut.id
+        ? text("网站与图标已保存", "Site and icon saved")
+        : text("网站已添加", "Site added"));
     setDialog(null);
     setEditingShortcut(undefined);
   };
 
-  const openNewShortcut = (groupId?: string) => {
+  const openNewShortcut = (groupId?: string, addToHome = false) => {
     setEditingShortcut({
       id: "",
       title: "",
@@ -2500,6 +2540,7 @@ export default function App() {
       groupId: groupId || groups[0]?.id,
       pinned: false,
       order: state.shortcuts.length,
+      homeVisible: addToHome || undefined,
       updatedAt: nowIso()
     });
     setDialog("shortcut");
@@ -2539,12 +2580,16 @@ export default function App() {
       const updatedAt = nowIso();
       const existing = folder.id ? current.shortcutFolders?.find((item) => item.id === folder.id) : undefined;
       const next: ShortcutFolder = {
+        ...existing,
         id: existing?.id || uid(),
         name,
         groupId: folder.groupId || existing?.groupId || current.shortcutGroups[0]?.id,
         iconUrl: folder.iconUrl !== undefined ? normalizedIcon : existing?.iconUrl,
         iconColor: folder.iconColor || existing?.iconColor || colorFor(name),
         order: existing?.order ?? (current.shortcutFolders || []).length,
+        homeVisible: folder.homeVisible ?? existing?.homeVisible,
+        homeX: folder.homeX ?? existing?.homeX,
+        homeY: folder.homeY ?? existing?.homeY,
         updatedAt
       };
       return {
@@ -2554,6 +2599,7 @@ export default function App() {
           : [...(current.shortcutFolders || []), next]
       };
     });
+    showToast(folder.id ? text("文件夹与图标已保存", "Folder and icon saved") : text("文件夹已创建", "Folder created"));
     setDialog(null);
     setEditingFolder(undefined);
   };
@@ -2592,14 +2638,37 @@ export default function App() {
     showToast("已删除文件夹");
   };
 
-  const togglePinned = (id: string) => {
+  const toggleHomeTile = (tile: HomeTileRef) => {
+    const selected = new Set<HomeTileRef>(homeShortcutTiles.map((item) => (
+      item.kind === "folder" ? `folder:${item.folder.id}` as HomeTileRef : `shortcut:${item.shortcut.id}` as HomeTileRef
+    )));
+    const removing = selected.has(tile);
+    if (!removing && selected.size >= 12) {
+      showToast(text("主页最多显示 12 个入口，请先移除一个。", "Home supports up to 12 entries. Remove one first."));
+      setShortcutMenu(null);
+      setFolderMenu(null);
+      return;
+    }
+    if (removing) selected.delete(tile);
+    else selected.add(tile);
+    const updatedAt = nowIso();
     updateState((current) => ({
       ...current,
-      shortcuts: current.shortcuts.map((item) =>
-        item.id === id ? { ...item, pinned: !item.pinned, updatedAt: nowIso() } : item
-      )
+      shortcuts: current.shortcuts.map((item) => {
+        const shouldShow = selected.has(`shortcut:${item.id}`);
+        if (shouldShow === (item.homeVisible === true)) return item;
+        return { ...item, homeVisible: shouldShow || undefined, updatedAt };
+      }),
+      shortcutFolders: current.shortcutFolders.map((folder) => {
+        const shouldShow = selected.has(`folder:${folder.id}`);
+        if (shouldShow === (folder.homeVisible === true)) return folder;
+        return { ...folder, homeVisible: shouldShow || undefined, updatedAt };
+      }),
+      settings: { ...current.settings, homeSelectionInitialized: true, updatedAt }
     }));
     setShortcutMenu(null);
+    setFolderMenu(null);
+    showToast(removing ? text("已从主页移除", "Removed from Home") : text("已添加到主页", "Added to Home"));
   };
 
   const addGroup = () => {
@@ -3679,6 +3748,7 @@ export default function App() {
             })}
           </div>
           <div className="page-nav-secondary">
+            <button className="nav-page-manager-control" onClick={() => setDialog("pages")} title={text("页面与导航管理", "Manage pages and navigation")} aria-label={text("页面与导航管理", "Manage pages and navigation")}><Plus size={19} /><span>{text("页面", "Pages")}</span></button>
             <button onClick={() => setDialog("settings")} title={text("设置", "Settings")}><Settings size={18} /><span>{text("设置", "Settings")}</span></button>
             {navigationDisplay === "hidden" && (
               <button className="nav-hide-control" onClick={() => setNavigationOpen(false)} title={text("隐藏导航", "Hide navigation")} aria-label={text("隐藏导航", "Hide navigation")}><EyeOff size={18} /></button>
@@ -3714,7 +3784,7 @@ export default function App() {
                         <span>{text("快捷入口", "Quick access")}</span>
                         <h2>{text("我的网站", "My Sites")}</h2>
                       </div>
-                      <button type="button" aria-label={text("添加网站", "Add site")} title={text("添加网站", "Add site")} onClick={() => openNewShortcut()}><Plus size={17} /></button>
+                      <button type="button" aria-label={text("添加主页网站", "Add Home site")} title={text("添加主页网站", "Add Home site")} onClick={() => openNewShortcut(undefined, true)}><Plus size={17} /></button>
                     </header>
                     <HomeShortcuts
                       tiles={homeShortcutTiles.slice(0, 12)}
@@ -3722,8 +3792,10 @@ export default function App() {
                       editing={layoutEditing}
                       floating={state.settings.homeSiteFloating !== false}
                       onOpenFolder={(folderId) => setOpenFolderId(folderId)}
+                      onEditShortcut={(shortcut) => { setEditingShortcut(shortcut); setDialog("shortcut"); }}
+                      onEditFolder={(folder) => { setEditingFolder(folder); setDialog("folder"); }}
                       onMoveTile={moveHomeTile}
-                      onAdd={() => openNewShortcut()}
+                      onAdd={() => openNewShortcut(undefined, true)}
                     />
                   </section>
 
@@ -3869,9 +3941,10 @@ export default function App() {
         <ShortcutContextMenu
           menu={shortcutMenu}
           shortcut={allShortcuts.find((item) => item.id === shortcutMenu.shortcutId)}
+          onHome={homeShortcutTiles.some((item) => item.kind === "shortcut" && item.shortcut.id === shortcutMenu.shortcutId)}
           onClose={() => setShortcutMenu(null)}
           onEdit={(shortcut) => { setEditingShortcut(shortcut); setDialog("shortcut"); setShortcutMenu(null); }}
-          onPin={togglePinned}
+          onToggleHome={(shortcut) => toggleHomeTile(`shortcut:${shortcut.id}`)}
           onDelete={deleteShortcut}
         />
       )}
@@ -3879,9 +3952,11 @@ export default function App() {
         <FolderContextMenu
           menu={folderMenu}
           folder={allFolders.find((item) => item.id === folderMenu.folderId)}
+          onHome={homeShortcutTiles.some((item) => item.kind === "folder" && item.folder.id === folderMenu.folderId)}
           onClose={() => setFolderMenu(null)}
           onOpen={(folder) => { setOpenFolderId(folder.id); setFolderMenu(null); }}
           onEdit={(folder) => { setEditingFolder(folder); setDialog("folder"); setFolderMenu(null); }}
+          onToggleHome={(folder) => toggleHomeTile(`folder:${folder.id}`)}
           onDelete={(folder) => { deleteFolder(folder.id); setFolderMenu(null); }}
         />
       )}
@@ -4072,7 +4147,6 @@ export default function App() {
           onRestoreMigrationBackup={restoreMigrationBackup}
           onCheckUpdate={() => runUpdateCheck(true)}
           onOpenTimeZone={() => setDialog("timezone")}
-          onOpenPageManager={() => setDialog("pages")}
           onWeatherUseLocationChange={async (enabled) => {
             if (enabled) {
               const granted = await requestDeviceLocationPermission().catch(() => false);
@@ -4365,19 +4439,21 @@ function ToolHub({ shortcutCount, folderCount, widgetCount, syncLabel, onOpenWid
   );
 }
 
-function HomeShortcuts({ tiles, iconSize, editing, floating, onOpenFolder, onMoveTile, onAdd }: {
+function HomeShortcuts({ tiles, iconSize, editing, floating, onOpenFolder, onEditShortcut, onEditFolder, onMoveTile, onAdd }: {
   tiles: Array<{ kind: "folder"; folder: ShortcutFolder; order: number } | { kind: "shortcut"; shortcut: Shortcut; order: number }>;
   iconSize: number;
   editing: boolean;
   floating: boolean;
   onOpenFolder: (folderId: string) => void;
+  onEditShortcut: (shortcut: Shortcut) => void;
+  onEditFolder: (folder: ShortcutFolder) => void;
   onMoveTile: (tile: HomeTileRef, x: number, y: number) => void;
   onAdd: () => void;
 }) {
   const language = useUiLanguage();
   const text = (zh: string, en: string) => localized(language, zh, en);
   const canvasRef = useRef<HTMLElement>(null);
-  const [dragging, setDragging] = useState<{ key: HomeTileRef; pointerId: number; position: HomeTilePosition }>();
+  const [dragging, setDragging] = useState<{ key: HomeTileRef; pointerId: number; position: HomeTilePosition; startX: number; startY: number; moved: boolean }>();
   const tileKey = (item: { kind: "folder"; folder: ShortcutFolder } | { kind: "shortcut"; shortcut: Shortcut }): HomeTileRef => (
     item.kind === "folder" ? `folder:${item.folder.id}` : `shortcut:${item.shortcut.id}`
   );
@@ -4401,21 +4477,33 @@ function HomeShortcuts({ tiles, iconSize, editing, floating, onOpenFolder, onMov
   };
   const startDrag = (event: ReactPointerEvent<HTMLButtonElement>, key: HomeTileRef) => {
     if (!editing || event.button !== 0) return;
-    const position = pointerPosition(event.clientX, event.clientY);
-    if (!position) return;
+    const index = tiles.findIndex((item) => tileKey(item) === key);
+    const item = tiles[index];
+    if (!item) return;
     event.preventDefault();
     event.currentTarget.setPointerCapture(event.pointerId);
-    setDragging({ key, pointerId: event.pointerId, position });
+    setDragging({ key, pointerId: event.pointerId, position: savedPosition(item, index), startX: event.clientX, startY: event.clientY, moved: false });
   };
   const moveDrag = (event: ReactPointerEvent<HTMLElement>) => {
     if (!dragging || event.pointerId !== dragging.pointerId) return;
     const position = pointerPosition(event.clientX, event.clientY);
-    if (position) setDragging({ ...dragging, position });
+    if (position) setDragging({
+      ...dragging,
+      position,
+      moved: dragging.moved || Math.hypot(event.clientX - dragging.startX, event.clientY - dragging.startY) >= 6
+    });
   };
   const finishDrag = (event: ReactPointerEvent<HTMLElement>) => {
     if (!dragging || event.pointerId !== dragging.pointerId) return;
-    const position = pointerPosition(event.clientX, event.clientY) || dragging.position;
-    onMoveTile(dragging.key, position.x, position.y);
+    const item = tiles.find((candidate) => tileKey(candidate) === dragging.key);
+    if (dragging.moved) {
+      const position = pointerPosition(event.clientX, event.clientY) || dragging.position;
+      onMoveTile(dragging.key, position.x, position.y);
+    } else if (item?.kind === "shortcut") {
+      onEditShortcut(item.shortcut);
+    } else if (item?.kind === "folder") {
+      onEditFolder(item.folder);
+    }
     setDragging(undefined);
   };
 
@@ -4460,7 +4548,7 @@ function HomeShortcuts({ tiles, iconSize, editing, floating, onOpenFolder, onMov
               data-folder-id={item.kind === "folder" ? item.folder.id : undefined}
               data-shortcut-id={item.kind === "shortcut" ? item.shortcut.id : undefined}
               style={style}
-              title={text("拖动调整位置，右键更换图标", "Drag to position; right-click to change the icon")}
+              title={text("单击编辑图标，拖动调整位置", "Click to edit the icon; drag to reposition")}
               onPointerDown={(event) => startDrag(event, key)}
               onKeyDown={(event) => {
                 const step = event.shiftKey ? 0.08 : 0.025;
@@ -4471,7 +4559,7 @@ function HomeShortcuts({ tiles, iconSize, editing, floating, onOpenFolder, onMov
               }}
             >
               {content}
-              <span className="tile-drag-handle" aria-hidden="true"><GripVertical size={14} /></span>
+              <span className="tile-drag-handle" aria-hidden="true"><Edit3 size={13} /></span>
             </button>
           );
           return item.kind === "folder" ? (
@@ -4957,12 +5045,13 @@ function useContextMenuSurface<T extends HTMLElement>(onClose: () => void) {
   return surfaceRef;
 }
 
-function ShortcutContextMenu({ menu, shortcut, onClose, onEdit, onPin, onDelete }: {
+function ShortcutContextMenu({ menu, shortcut, onHome, onClose, onEdit, onToggleHome, onDelete }: {
   menu: Exclude<ShortcutMenuState, null>;
   shortcut?: Shortcut;
+  onHome: boolean;
   onClose: () => void;
   onEdit: (shortcut: Shortcut) => void;
-  onPin: (id: string) => void;
+  onToggleHome: (shortcut: Shortcut) => void;
   onDelete: (id: string) => void;
 }) {
   const language = useUiLanguage();
@@ -4973,30 +5062,33 @@ function ShortcutContextMenu({ menu, shortcut, onClose, onEdit, onPin, onDelete 
   return createPortal(
     <div ref={surfaceRef} className="shortcut-menu" role="menu" aria-label={text(`${shortcut.title}快捷操作`, `${shortcut.title} actions`)} tabIndex={-1} style={position} onContextMenu={(event) => event.preventDefault()}>
       <a role="menuitem" href={safeHttpHref(shortcut.url)} target="_blank" rel="noreferrer">{text("打开新标签页", "Open in new tab")}</a>
-      <button type="button" role="menuitem" onClick={() => onPin(shortcut.id)}><Pin size={15} /> {shortcut.pinned ? text("从主页移除", "Remove from Home") : text("放到主页", "Add to Home")}</button>
-      <button type="button" role="menuitem" onClick={() => onEdit(shortcut)}><Edit3 size={15} /> {text("编辑图标", "Edit shortcut")}</button>
+      <button type="button" role="menuitem" onClick={() => onToggleHome(shortcut)}><House size={15} /> {onHome ? text("从主页移除", "Remove from Home") : text("添加到主页", "Add to Home")}</button>
+      <button type="button" role="menuitem" onClick={() => onEdit(shortcut)}><Edit3 size={15} /> {text("更换图标与信息", "Change icon and details")}</button>
       <button type="button" role="menuitem" className="danger" onClick={() => onDelete(shortcut.id)}><Trash2 size={15} /> {text("删除", "Delete")}</button>
     </div>,
     document.body
   );
 }
 
-function FolderContextMenu({ menu, folder, onClose, onOpen, onEdit, onDelete }: {
+function FolderContextMenu({ menu, folder, onHome, onClose, onOpen, onEdit, onToggleHome, onDelete }: {
   menu: Exclude<FolderMenuState, null>;
   folder?: ShortcutFolder;
+  onHome: boolean;
   onClose: () => void;
   onOpen: (folder: ShortcutFolder) => void;
   onEdit: (folder: ShortcutFolder) => void;
+  onToggleHome: (folder: ShortcutFolder) => void;
   onDelete: (folder: ShortcutFolder) => void;
 }) {
   const language = useUiLanguage();
   const text = (zh: string, en: string) => localized(language, zh, en);
   const surfaceRef = useContextMenuSurface<HTMLDivElement>(onClose);
   if (!folder) return null;
-  const position = contextMenuPosition(menu.x, menu.y, 196, 148);
+  const position = contextMenuPosition(menu.x, menu.y, 196, 188);
   return createPortal(
     <div ref={surfaceRef} className="shortcut-menu" role="menu" aria-label={text(`${folder.name}文件夹操作`, `${folder.name} folder actions`)} tabIndex={-1} style={position} onContextMenu={(event) => event.preventDefault()}>
       <button type="button" role="menuitem" onClick={() => onOpen(folder)}><Folder size={15} /> {text("打开文件夹", "Open folder")}</button>
+      <button type="button" role="menuitem" onClick={() => onToggleHome(folder)}><House size={15} /> {onHome ? text("从主页移除", "Remove from Home") : text("添加到主页", "Add to Home")}</button>
       <button type="button" role="menuitem" onClick={() => onEdit(folder)}><Edit3 size={15} /> {text("编辑文件夹", "Edit folder")}</button>
       <button type="button" role="menuitem" className="danger" onClick={() => onDelete(folder)}><Trash2 size={15} /> {text("删除文件夹", "Delete folder")}</button>
     </div>,
@@ -6202,6 +6294,7 @@ function ShortcutDialog({ shortcut, groups, folders, onClose, onSave }: {
   const language = useUiLanguage();
   const text = (zh: string, en: string) => localized(language, zh, en);
   const [draft, setDraft] = useState<Partial<Shortcut>>(shortcut || { iconColor: "#14B8A6", groupId: groups[0]?.id });
+  const [iconChoiceStatus, setIconChoiceStatus] = useState<Record<string, "loading" | "ready" | "failed">>({});
   const iconTitle = draft.title || shortcut?.title || "";
   const iconUrl = draft.url || shortcut?.url || "";
   const collectedIconChoices = useMemo(() => {
@@ -6240,13 +6333,15 @@ function ShortcutDialog({ shortcut, groups, folders, onClose, onSave }: {
             {collectedIconChoices.map((choice) => (
               <button
                 type="button"
-                className={draft.iconUrl === choice.url ? "active" : ""}
+                className={`${draft.iconUrl === choice.url ? "active" : ""} ${iconChoiceStatus[choice.url] === "failed" ? "is-unavailable" : ""}`.trim()}
+                aria-pressed={draft.iconUrl === choice.url}
+                disabled={iconChoiceStatus[choice.url] !== "ready"}
                 key={choice.url}
                 onClick={() => setDraft({ ...draft, iconUrl: choice.url })}
-                title={choice.url}
+                title={iconChoiceStatus[choice.url] === "failed" ? text("该图标无法加载", "This icon could not be loaded") : choice.url}
               >
-                <span><IconChoicePreview src={choice.url} fallback={(draft.title || "网").slice(0, 1)} /></span>
-                <em>{choice.label}</em>
+                <span><IconChoicePreview src={choice.url} fallback={(draft.title || "网").slice(0, 1)} onStatus={(status) => setIconChoiceStatus((current) => current[choice.url] === status ? current : { ...current, [choice.url]: status })} /></span>
+                <em>{iconChoiceStatus[choice.url] === "failed" ? text("不可用", "Unavailable") : choice.label}</em>
               </button>
             ))}
           </div>
@@ -6265,6 +6360,7 @@ function ShortcutDialog({ shortcut, groups, folders, onClose, onSave }: {
               <button
                 type="button"
                 className={draft.iconUrl === value ? "active" : ""}
+                aria-pressed={draft.iconUrl === value}
                 key={icon.id}
                 onClick={() => setDraft({ ...draft, iconUrl: value })}
                 style={{ "--icon-tone": icon.tone } as React.CSSProperties}
@@ -6286,7 +6382,7 @@ function ShortcutDialog({ shortcut, groups, folders, onClose, onSave }: {
       <label>{text("分组", "Category")}<select value={draft.groupId || groups[0]?.id} onChange={(event) => setDraft({ ...draft, groupId: event.target.value })}>{groups.map((group) => <option value={group.id} key={group.id}>{shortcutGroupNameFor(language, group)}</option>)}</select></label>
       <label>{text("文件夹", "Folder")}<select value={draft.folderId || ""} onChange={(event) => setDraft({ ...draft, folderId: event.target.value || undefined })}><option value="">{text("不放入文件夹", "No folder")}</option>{folders.map((folder) => <option value={folder.id} key={folder.id}>{folder.name}</option>)}</select></label>
       <label className="check-row"><input type="checkbox" checked={Boolean(draft.pinned)} onChange={(event) => setDraft({ ...draft, pinned: event.target.checked })} /> {text("固定到 Dock", "Pin to Dock")}</label>
-      <button className="primary" onClick={() => onSave(draft)}><Save size={16} /> {text("保存", "Save")}</button>
+      <button className="primary" onClick={() => onSave(draft)}><Save size={16} /> {text("保存并应用", "Save and apply")}</button>
     </DialogShell>
   );
 }
@@ -6700,13 +6796,18 @@ function PageManagerDialog({
   const [icon, setIcon] = useState<CustomNavPageIcon>("star");
   const [systemDrafts, setSystemDrafts] = useState(() => Object.fromEntries(
     systemOrder.map((page) => [page, {
-      name: systemLabels[page] || systemNavDefaults[page].label,
+      name: systemLabels[page] || localized(language, systemNavDefaults[page].title, systemNavDefaults[page].label),
       icon: systemIcons[page] || systemNavDefaults[page].icon
     }])
   ) as Record<SystemNavPage, { name: string; icon: CustomNavPageIcon }>);
   const [customDrafts, setCustomDrafts] = useState(() => Object.fromEntries(
     customPages.map((page) => [page.id, { name: page.name, icon: page.icon }])
   ) as Record<string, { name: string; icon: CustomNavPageIcon }>);
+  const [savedRow, setSavedRow] = useState<string>();
+  const confirmSaved = (row: string) => {
+    setSavedRow(row);
+    window.setTimeout(() => setSavedRow((current) => current === row ? undefined : current), 1400);
+  };
   const createPage = () => {
     if (!name.trim()) return;
     onAdd(name, icon);
@@ -6731,12 +6832,12 @@ function PageManagerDialog({
                 aria-label={text(`${systemNavDefaults[page].title}导航名称`, `${systemNavDefaults[page].label} navigation name`)}
                 maxLength={24}
                 value={draft.name}
-                onChange={(event) => setSystemDrafts((current) => ({ ...current, [page]: { ...draft, name: event.target.value } }))}
+                onChange={(event) => { setSavedRow(undefined); setSystemDrafts((current) => ({ ...current, [page]: { ...draft, name: event.target.value } })); }}
               />
               <select
                 aria-label={text(`${systemNavDefaults[page].title}导航图标`, `${systemNavDefaults[page].label} navigation icon`)}
                 value={draft.icon}
-                onChange={(event) => setSystemDrafts((current) => ({ ...current, [page]: { ...draft, icon: event.target.value as CustomNavPageIcon } }))}
+                onChange={(event) => { setSavedRow(undefined); setSystemDrafts((current) => ({ ...current, [page]: { ...draft, icon: event.target.value as CustomNavPageIcon } })); }}
               >
                 {(Object.entries(customNavPageIcons) as Array<[CustomNavPageIcon, (typeof customNavPageIcons)[CustomNavPageIcon]]>).map(([key, meta]) => (
                   <option value={key} key={key}>{customNavPageIconLabelFor(language, key)}</option>
@@ -6745,7 +6846,7 @@ function PageManagerDialog({
               <div className="lucid-page-row-actions">
                 <button type="button" disabled={index === 0} title={text("向上移动", "Move up")} aria-label={text("向上移动", "Move up")} onClick={() => onMoveSystem(page, -1)}><ArrowUp size={15} /></button>
                 <button type="button" disabled={index === systemOrder.length - 1} title={text("向下移动", "Move down")} aria-label={text("向下移动", "Move down")} onClick={() => onMoveSystem(page, 1)}><ArrowDown size={15} /></button>
-                <button type="button" title={text("保存入口", "Save entry")} aria-label={text("保存入口", "Save entry")} onClick={() => onUpdateSystem(page, draft.name, draft.icon)}><Save size={15} /></button>
+                <button type="button" className={savedRow === `system:${page}` ? "is-saved" : ""} title={savedRow === `system:${page}` ? text("已保存", "Saved") : text("保存入口", "Save entry")} aria-label={text("保存入口", "Save entry")} onClick={() => { onUpdateSystem(page, draft.name, draft.icon); confirmSaved(`system:${page}`); }}>{savedRow === `system:${page}` ? <Check size={15} /> : <Save size={15} />}</button>
                 {page === "widgets" ? <span className="page-manager-locked" title={text("主页固定显示", "Home is always visible")}><Pin size={14} /></span> : (
                   <button type="button" title={hidden ? text(`显示${draft.name}`, `Show ${draft.name}`) : text(`隐藏${draft.name}`, `Hide ${draft.name}`)} onClick={() => onToggleSystem(page)}>
                   {hidden ? <Plus size={16} /> : <EyeOff size={16} />}
@@ -6769,12 +6870,12 @@ function PageManagerDialog({
                 aria-label={text(`${page.name}页面名称`, `${page.name} page name`)}
                 maxLength={24}
                 value={draft.name}
-                onChange={(event) => setCustomDrafts((current) => ({ ...current, [page.id]: { ...draft, name: event.target.value } }))}
+                onChange={(event) => { setSavedRow(undefined); setCustomDrafts((current) => ({ ...current, [page.id]: { ...draft, name: event.target.value } })); }}
               />
               <select
                 aria-label={text(`${page.name}页面图标`, `${page.name} page icon`)}
                 value={draft.icon}
-                onChange={(event) => setCustomDrafts((current) => ({ ...current, [page.id]: { ...draft, icon: event.target.value as CustomNavPageIcon } }))}
+                onChange={(event) => { setSavedRow(undefined); setCustomDrafts((current) => ({ ...current, [page.id]: { ...draft, icon: event.target.value as CustomNavPageIcon } })); }}
               >
                 {(Object.entries(customNavPageIcons) as Array<[CustomNavPageIcon, (typeof customNavPageIcons)[CustomNavPageIcon]]>).map(([key, meta]) => (
                   <option value={key} key={key}>{customNavPageIconLabelFor(language, key)}</option>
@@ -6783,7 +6884,7 @@ function PageManagerDialog({
               <div className="lucid-page-row-actions">
                 <button type="button" disabled={index === 0} title={text("向上移动", "Move up")} aria-label={text("向上移动", "Move up")} onClick={() => onMoveCustom(page, -1)}><ArrowUp size={15} /></button>
                 <button type="button" disabled={index === customPages.length - 1} title={text("向下移动", "Move down")} aria-label={text("向下移动", "Move down")} onClick={() => onMoveCustom(page, 1)}><ArrowDown size={15} /></button>
-                <button type="button" title={text("保存页面", "Save page")} aria-label={text("保存页面", "Save page")} onClick={() => onUpdateCustom(page, draft.name, draft.icon)}><Save size={15} /></button>
+                <button type="button" className={savedRow === `custom:${page.id}` ? "is-saved" : ""} title={savedRow === `custom:${page.id}` ? text("已保存", "Saved") : text("保存页面", "Save page")} aria-label={text("保存页面", "Save page")} onClick={() => { onUpdateCustom(page, draft.name, draft.icon); confirmSaved(`custom:${page.id}`); }}>{savedRow === `custom:${page.id}` ? <Check size={15} /> : <Save size={15} />}</button>
                 <button type="button" className="page-manager-delete" title={text(`删除${page.name}页面`, `Delete ${page.name}`)} onClick={() => onDelete(page)}><Trash2 size={16} /></button>
               </div>
             </div>
@@ -6814,7 +6915,7 @@ function PageManagerDialog({
   );
 }
 
-function SettingsDialog({ state, updateCheck, migrationBackupAvailable, updateState, onImport, onImportBackup, onExport, onRestoreMigrationBackup, onCheckUpdate, onOpenTimeZone, onOpenPageManager, onWeatherUseLocationChange, onClose }: {
+function SettingsDialog({ state, updateCheck, migrationBackupAvailable, updateState, onImport, onImportBackup, onExport, onRestoreMigrationBackup, onCheckUpdate, onOpenTimeZone, onWeatherUseLocationChange, onClose }: {
   state: AppState;
   updateCheck: UpdateCheckResult;
   migrationBackupAvailable: boolean;
@@ -6825,7 +6926,6 @@ function SettingsDialog({ state, updateCheck, migrationBackupAvailable, updateSt
   onRestoreMigrationBackup: () => void;
   onCheckUpdate: () => void;
   onOpenTimeZone: () => void;
-  onOpenPageManager: () => void;
   onWeatherUseLocationChange: (enabled: boolean) => Promise<void>;
   onClose: () => void;
 }) {
@@ -6944,11 +7044,6 @@ function SettingsDialog({ state, updateCheck, migrationBackupAvailable, updateSt
                   <button type="button" role="radio" aria-checked={settings.navigationDisplay === "hidden"} className={settings.navigationDisplay === "hidden" ? "active" : ""} onClick={() => setSetting("navigationDisplay", "hidden")}><EyeOff size={15} />{text("隐藏", "Hidden")}</button>
                 </div>
               </div>
-              <button type="button" className="lucid-settings-callout" onClick={onOpenPageManager}>
-                <LayoutGrid size={18} />
-                <span><strong>{text("编辑页面与导航图标", "Edit pages and navigation icons")}</strong><small>{text("修改名称、图标、顺序，或添加自己的页面", "Change names, icons, order, or add your own page")}</small></span>
-                <ChevronRight size={17} />
-              </button>
             </section>
           )}
 

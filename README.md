@@ -4,11 +4,11 @@ WhyNavo is a local-first new tab dashboard for shortcuts, widgets, notes, todos,
 
 It is built as a Chrome / Edge Manifest V3 extension and as a responsive web app for mobile and tablet use. The core idea is simple: user data should work locally first, remain exportable, and only sync to the cloud after the user signs in.
 
-Current release: **0.9.4**. See the [bilingual release notes](docs/releases/0.9.4.md).
+Current release: **0.9.5**. See the [bilingual release notes](docs/releases/0.9.5.md).
 
-> **上线状态 / Launch status:** 公开源码和本地 0.9.4 构建目前可用于审查与测试。在线注册和云同步仍处于预发布阶段，必须等到对应的公开 Release、正式邮件发件域名、加密异地备份、数据库迁移和线上冒烟测试全部通过后再作为正式服务推广。当前请勿把在线服务用于唯一的重要数据副本。
+> **上线状态 / Launch status:** 公开源码和本地 0.9.5 构建目前可用于审查与测试。在线注册和云同步仍处于预发布阶段，必须等到对应的公开 Release、正式邮件发件域名、加密异地备份、数据库迁移和线上冒烟测试全部通过后再作为正式服务推广。当前请勿把在线服务用于唯一的重要数据副本。
 >
-> The public source and local 0.9.4 build are available for review and testing. Hosted account registration and cloud sync remain pre-release until the matching public Release, production email sender, encrypted off-site backup, database migration, and live smoke tests all pass. Do not use the hosted service as the only copy of important data yet.
+> The public source and local 0.9.5 build are available for review and testing. Hosted account registration and cloud sync remain pre-release until the matching public Release, production email sender, encrypted off-site backup, database migration, and live smoke tests all pass. Do not use the hosted service as the only copy of important data yet.
 
 ![WhyNavo Sample A workspace](docs/images/whynavo-0.8.1-sample-a.png)
 
@@ -30,13 +30,13 @@ WhyNavo is both a ready-to-use product and a publicly auditable, configurable co
 - User data isolation: cloud data is protected by Supabase Auth and Row Level Security.
 - Password safety: login, registration, and replacement passwords are checked against Have I Been Pwned with a k-anonymous five-character hash prefix; the full password and full hash stay on the device.
 - Bounded cloud sessions: account-bound database functions reject WhyNavo cloud-data access after 90 days or 30 days of inactivity without forcing single-device sign-in.
-- Editable home workspace: freely position My Sites icons, reorder widgets, and optionally enable subtle icon motion.
+- Editable home workspace: choose up to 12 dedicated My Sites entries, click to replace their icons, freely position them, reorder widgets, and optionally enable subtle icon motion.
 - Full-bleed website icons: real site artwork fills the icon itself without an extra colored container.
 - Translucent workspace: neutral, wallpaper-aware materials keep cards readable without imposing random widget colors.
 - Purpose-built widgets: all 12 widgets use distinct layouts suited to their content instead of repeating one generic card template.
 - Curated wallpaper library: 32 built-in choices, including 20 original desktop/mobile pairs across Japanese, illustrated, cat, and cinematic styles.
 - Personal pages: add pages to the left navigation, assign shortcut groups to them, or hide optional built-in pages.
-- Custom navigation: rename, reorder, hide, restore, and replace the icon of every built-in workspace destination.
+- Custom navigation: use the dedicated navigation `+` control to rename, reorder, hide, restore, and replace the icon of every built-in workspace destination.
 - Dedicated workspaces: Search, Notes, Tasks, Sites, and Tools use task-specific layouts instead of repeating the home page.
 - Cross-platform usage: works on macOS, Windows, iOS, iPadOS, Android, and other modern browsers depending on extension/PWA support.
 - Recurring tasks: daily, weekday, and weekly tasks can use optional local Chrome reminders without an external reminder service.
