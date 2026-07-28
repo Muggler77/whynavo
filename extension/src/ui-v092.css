@@ -1,4 +1,26 @@
-/* WhyNavo 0.9.2: current-layout editing, calm canvas geometry, and floating settings. */
+/* WhyNavo interface refinements: current-layout editing, centered canvas geometry, and floating settings. */
+
+/* Center the canvas on the viewport. The fixed navigation never shifts content. */
+@media (min-width: 701px) {
+  .shell {
+    padding-right: 52px;
+    padding-left: 52px;
+  }
+
+  .topbar {
+    width: 100%;
+    max-width: none;
+    margin-inline: auto;
+  }
+
+  .hero,
+  .workspace,
+  .dock {
+    width: min(1274px, calc(100% - 72px));
+    max-width: none;
+    margin-inline: auto;
+  }
+}
 
 /* Keep every non-home workspace on the same visual center line. */
 .workspace.page-search,
@@ -22,6 +44,15 @@
   margin-inline: auto;
   justify-items: center;
   text-align: center;
+}
+
+.sample-a-canvas.without-sites {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.sample-a-canvas.without-sites .sample-a-primary-widgets {
+  width: min(980px, 100%);
+  margin-inline: auto;
 }
 
 .lucid-search-summary {
@@ -291,6 +322,51 @@
   font-weight: 650;
 }
 
+.sample-weather-status.weather-sunny,
+.forecast-sunny .forecast-condition {
+  color: #a96b13;
+}
+
+.sample-weather-status.weather-cloudy,
+.forecast-cloudy .forecast-condition {
+  color: #4b7184;
+}
+
+.sample-weather-status.weather-rain,
+.forecast-rain .forecast-condition {
+  color: #287ba4;
+}
+
+.sample-weather-status.weather-snow,
+.forecast-snow .forecast-condition {
+  color: #617b91;
+}
+
+.sample-weather-status.weather-storm,
+.forecast-storm .forecast-condition {
+  color: #6d64a1;
+}
+
+.sample-weather-status.weather-fog,
+.forecast-fog .forecast-condition {
+  color: #6c7c83;
+}
+
+.sample-weather-forecast .forecast-condition {
+  display: grid;
+  min-height: 38px;
+  place-items: center;
+  gap: 2px;
+}
+
+.sample-weather-forecast .forecast-condition em {
+  color: currentColor;
+  font-size: 8px;
+  font-style: normal;
+  font-weight: 600;
+  line-height: 1;
+}
+
 .sample-weather-facts {
   display: grid;
   min-height: 44px;
@@ -477,6 +553,34 @@
 }
 
 @media (max-width: 700px) {
+  .shell {
+    padding-right: 12px;
+    padding-left: 12px;
+  }
+
+  .topbar,
+  .hero,
+  .workspace,
+  .dock {
+    width: 100%;
+    margin-inline: auto;
+  }
+
+  .sample-a-canvas {
+    gap: 36px;
+  }
+
+  .sample-a-sites-panel {
+    height: auto;
+    min-height: 0;
+    padding-bottom: 0;
+  }
+
+  .sample-a-sites-panel .home-shortcuts {
+    min-height: 0;
+    margin-bottom: 0;
+  }
+
   .workspace.page-search,
   .workspace.page-notes,
   .workspace.page-tasks {
@@ -484,8 +588,8 @@
   }
 
   .compact-page-heading {
-    justify-items: start;
-    text-align: left;
+    justify-items: center;
+    text-align: center;
   }
 
   .lucid-search-summary {

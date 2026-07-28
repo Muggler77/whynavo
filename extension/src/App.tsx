@@ -9,6 +9,10 @@ import {
   Camera,
   ChevronLeft,
   ChevronRight,
+  Cloud,
+  CloudFog,
+  CloudLightning,
+  CloudRain,
   CloudSun,
   Code2,
   CalendarDays,
@@ -70,6 +74,7 @@ import {
   Wallet,
   Wrench,
   ShoppingBag,
+  Snowflake,
   Upload,
   TimerReset,
   UserCircle,
@@ -175,16 +180,6 @@ const UiLanguageContext = createContext<UiLanguage>("zh-CN");
 const localized = (language: UiLanguage, zh: string, en: string) => language === "en-US" ? en : zh;
 const useUiLanguage = () => useContext(UiLanguageContext);
 
-const sampleAStarterSites = [
-  { title: "Google", url: "https://www.google.com/", icon: "/starter-icons/google.svg" },
-  { title: "YouTube", url: "https://www.youtube.com/", icon: "/starter-icons/youtube.svg" },
-  { title: "X", url: "https://x.com/", icon: "/starter-icons/x.svg" },
-  { title: "Notion", url: "https://www.notion.so/", icon: "/starter-icons/notion.svg" },
-  { title: "Figma", url: "https://www.figma.com/", icon: "/starter-icons/figma.svg" },
-  { title: "Salesforce", url: "https://www.salesforce.com/", icon: "/starter-icons/salesforce.svg" },
-  { title: "Slack", url: "https://slack.com/", icon: "/starter-icons/slack.svg" },
-  { title: "GitHub", url: "https://github.com/", icon: "/starter-icons/github.svg" }
-] as const;
 const MAX_IMAGE_DATA_URL_LENGTH = 3 * 1024 * 1024;
 const MAX_BACKUP_IMPORT_BYTES = 64 * 1024 * 1024;
 const MAX_ENTITY_RECORDS = 5000;
@@ -944,6 +939,17 @@ const weatherLabelFor = (code: number | undefined, language: UiLanguage) => {
   if ([71, 73, 75, 77, 85, 86].includes(code)) return "Snow";
   if ([95, 96, 99].includes(code)) return "Thunderstorm";
   return "Weather";
+};
+
+const WeatherConditionIcon = ({ code, size = 22 }: { code?: number; size?: number }) => {
+  const tone = weatherToneForCode(code);
+  if (tone === "sunny") return <Sun size={size} />;
+  if (tone === "rain") return <CloudRain size={size} />;
+  if (tone === "snow") return <Snowflake size={size} />;
+  if (tone === "storm") return <CloudLightning size={size} />;
+  if (tone === "fog") return <CloudFog size={size} />;
+  if (code === 1 || code === 2) return <CloudSun size={size} />;
+  return <Cloud size={size} />;
 };
 
 
@@ -3687,26 +3693,25 @@ export default function App() {
         >
           {activePage === "widgets" ? (
             <section className={`home-dashboard sample-a-home ${layoutEditing ? "is-editing" : ""}`}>
-              <div className="sample-a-canvas">
-                <section className="sample-a-sites-panel">
-                  <header>
-                    <div>
-                      <span>{text("快捷入口", "Quick access")}</span>
-                      <h2>{text("我的网站", "My Sites")}</h2>
-                    </div>
-                    <button type="button" aria-label={text("添加网站", "Add site")} title={text("添加网站", "Add site")} onClick={() => openNewShortcut()}><Plus size={17} /></button>
-                  </header>
-                  <HomeShortcuts
-                    tiles={homeShortcutTiles.slice(0, 12)}
-                    iconSize={state.settings.iconSize}
-                    editing={layoutEditing}
-                    onOpenFolder={(folderId) => setOpenFolderId(folderId)}
-                    onMoveTile={moveHomeTile}
-                  />
-                  {!homeShortcutTiles.length && (
-                    <StarterSites />
-                  )}
-                </section>
+              <div className={`sample-a-canvas ${homeShortcutTiles.length ? "" : "without-sites"}`}>
+                {homeShortcutTiles.length > 0 && (
+                  <section className="sample-a-sites-panel">
+                    <header>
+                      <div>
+                        <span>{text("快捷入口", "Quick access")}</span>
+                        <h2>{text("我的网站", "My Sites")}</h2>
+                      </div>
+                      <button type="button" aria-label={text("添加网站", "Add site")} title={text("添加网站", "Add site")} onClick={() => openNewShortcut()}><Plus size={17} /></button>
+                    </header>
+                    <HomeShortcuts
+                      tiles={homeShortcutTiles.slice(0, 12)}
+                      iconSize={state.settings.iconSize}
+                      editing={layoutEditing}
+                      onOpenFolder={(folderId) => setOpenFolderId(folderId)}
+                      onMoveTile={moveHomeTile}
+                    />
+                  </section>
+                )}
 
                 {layoutEditing ? (
                   <Suspense fallback={(
@@ -4428,30 +4433,6 @@ function HomeShortcuts({ tiles, iconSize, editing, onOpenFolder, onMoveTile }: {
   );
 }
 
-function StarterSites() {
-  return (
-    <section className="home-shortcuts sample-a-starter-sites" aria-label="推荐网站">
-      <div className="home-shortcuts-row" style={{ "--icon": "64px" } as React.CSSProperties}>
-        {sampleAStarterSites.map((site) => (
-          <a
-            className="home-shortcut"
-            href={site.url}
-            key={site.title}
-            title={site.title}
-            target="_blank"
-            rel="noreferrer"
-          >
-            <span className="shortcut-icon">
-              <img src={site.icon} alt="" loading="eager" decoding="async" />
-            </span>
-            <span>{site.title}</span>
-          </a>
-        ))}
-      </div>
-    </section>
-  );
-}
-
 function SearchWorkspace({ query, onQueryChange, onWebSearch, onToggleEngine, engineLabel, shortcuts, notes, todos, onAddShortcut, onOpenNotes, onOpenTasks }: {
   query: string;
   onQueryChange: (value: string) => void;
@@ -5062,9 +5043,9 @@ function WeatherWidget({ widgetKey, size, weather, city, useLocation, refreshing
                 <span>{weatherLabelFor(weather.weatherCode, language)}</span>
                 <small>{text("体感温度", "Feels like")} {Math.round(weather.temperature + Math.min(3, weather.windSpeed / 12))}°</small>
               </div>
-              <div className="sample-weather-status" aria-hidden="true">
-                <CloudSun size={42} />
-                <span>{text("当前天气", "Current")}</span>
+              <div className={`sample-weather-status weather-${weatherToneForCode(weather.weatherCode)}`} aria-hidden="true">
+                <WeatherConditionIcon code={weather.weatherCode} size={42} />
+                <span>{weatherLabelFor(weather.weatherCode, language)}</span>
               </div>
             </div>
             {size !== "small" && (
@@ -5091,7 +5072,10 @@ function WeatherWidget({ widgetKey, size, weather, city, useLocation, refreshing
             return (
               <a className={`forecast-${dayTone}`} href={source} target="_blank" rel="noreferrer" key={day.date} title={`${day.date} ${weatherLabelFor(day.weatherCode, language)}`}>
                 <span>{date.toLocaleDateString(language, { weekday: "short" })}</span>
-                <i className="forecast-mark" aria-hidden="true" />
+                <span className="forecast-condition">
+                  <WeatherConditionIcon code={day.weatherCode} size={23} />
+                  <em>{weatherLabelFor(day.weatherCode, language)}</em>
+                </span>
                 <strong>{Math.round(day.temperatureMax)}° <small>{Math.round(day.temperatureMin)}°</small></strong>
               </a>
             );

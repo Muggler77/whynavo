@@ -229,24 +229,6 @@
   border-radius: 7px;
 }
 
-.sample-a-starter-sites a[href*="x.com"] .shortcut-icon,
-.sample-a-starter-sites a[href*="github.com"] .shortcut-icon {
-  background: #101214;
-  border-radius: 50%;
-}
-
-.sample-a-starter-sites a[href*="x.com"] .shortcut-icon img {
-  width: 58%;
-  height: 58%;
-  filter: invert(1);
-}
-
-.sample-a-starter-sites a[href*="github.com"] .shortcut-icon img {
-  width: 76%;
-  height: 76%;
-  filter: brightness(0) invert(1);
-}
-
 .sample-a-primary-widgets {
   height: 398px;
   gap: 24px;
@@ -1707,22 +1689,6 @@
     height: 250px;
   }
 
-  .sample-a-starter-sites .home-shortcuts-row {
-    display: grid;
-    height: auto;
-    grid-template-columns: repeat(8, minmax(0, 1fr));
-    gap: 18px 10px;
-  }
-
-  .sample-a-starter-sites .home-shortcut,
-  .sample-a-starter-sites .home-shortcut:nth-child(n) {
-    position: relative;
-    top: auto;
-    left: auto;
-    width: auto;
-    height: 76px;
-  }
-
   .sample-a-primary-widgets {
     width: 100%;
     height: auto;
@@ -1755,9 +1721,6 @@
     grid-column: auto !important;
   }
 
-  .sample-a-starter-sites .home-shortcuts-row {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-  }
 }
 
 @media (max-width: 760px), (hover: none) and (max-width: 1024px) {
@@ -1825,22 +1788,6 @@
 
   .sample-a-sites-panel .home-shortcuts {
     min-height: 0;
-  }
-
-  .sample-a-starter-sites .home-shortcuts-row {
-    display: grid;
-    height: auto;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 22px 12px;
-  }
-
-  .sample-a-starter-sites .home-shortcut,
-  .sample-a-starter-sites .home-shortcut:nth-child(n) {
-    position: relative;
-    top: auto;
-    left: auto;
-    width: auto;
-    height: 70px;
   }
 
   .sample-a-primary-widgets .widget,
@@ -1988,10 +1935,6 @@
 @media (max-width: 480px) {
   .sample-a-hero .hero-search {
     width: 100%;
-  }
-
-  .sample-a-starter-sites .home-shortcuts-row {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 
   .sample-weather-current {
