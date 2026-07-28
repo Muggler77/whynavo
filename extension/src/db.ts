@@ -540,7 +540,11 @@ export async function readRates<T>(): Promise<T | undefined> {
 }
 
 export function downloadJson(filename: string, data: unknown) {
-  const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+  downloadText(filename, JSON.stringify(data, null, 2), "application/json");
+}
+
+export function downloadText(filename: string, content: string, type = "text/plain;charset=utf-8") {
+  const blob = new Blob([content], { type });
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement("a");
   anchor.href = url;

@@ -3,16 +3,22 @@
   "name": "WhyNavo - Local-first New Tab",
   "short_name": "WhyNavo",
   "description": "A local-first new tab dashboard for shortcuts, widgets, notes, todos, weather, and optional sync.",
-  "version": "0.9.3",
+  "version": "0.9.4",
   "chrome_url_overrides": {
     "newtab": "index.html"
   },
   "permissions": [
-    "search"
+    "search",
+    "alarms",
+    "storage"
   ],
   "optional_permissions": [
-    "geolocation"
+    "geolocation",
+    "notifications"
   ],
+  "background": {
+    "service_worker": "background.js"
+  },
   "host_permissions": [
     "https://api.open-meteo.com/*",
     "https://api.pwnedpasswords.com/*",

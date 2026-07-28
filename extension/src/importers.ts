@@ -273,6 +273,8 @@ export function parseImportText(input: string): ImportShortcut[] {
 
   try {
     const parsed = JSON.parse(text);
+    const legacyTabRows = normalizeLegacyTabExport(parsed);
+    if (legacyTabRows) return legacyTabRows;
     if (!Array.isArray(parsed) && Array.isArray(parsed.shortcuts) && (Array.isArray(parsed.shortcutFolders) || Array.isArray(parsed.shortcutGroups))) {
       return normalizeAppStateRows(parsed as Record<string, unknown>);
     }
@@ -284,6 +286,42 @@ export function parseImportText(input: string): ImportShortcut[] {
 
   if (/<a\s/i.test(text)) return parseBookmarksHtml(text);
   return parseCsv(text);
+}
+
+function normalizeLegacyTabExport(parsed: unknown): ImportShortcut[] | undefined {
+  if (!isImportRecord(parsed) || !isImportRecord(parsed.data)) return undefined;
+  const iconStore = parsed.data["store-icon"];
+  if (!isImportRecord(iconStore) || !Array.isArray(iconStore.icons)) return undefined;
+
+  const result: ImportShortcut[] = [];
+  const appendSite = (raw: unknown, groupName?: string, folderName?: string) => {
+    if (!isImportRecord(raw) || raw.type !== "site" || result.length >= MAX_IMPORTED_SHORTCUTS) return;
+    const title = cleanLabel(raw.name || raw.title);
+    const url = cleanUrl(String(raw.target || raw.url || ""));
+    if (!title || !url) return;
+    result.push({
+      title,
+      url,
+      iconUrl: cleanIconUrl(raw.bgImage || raw.iconUrl),
+      groupName: cleanLabel(groupName, 500) || undefined,
+      folderName: cleanLabel(folderName, 500) || undefined
+    });
+  };
+
+  iconStore.icons.slice(0, MAX_IMPORTED_SHORTCUTS).forEach((rawGroup) => {
+    if (!isImportRecord(rawGroup) || !Array.isArray(rawGroup.children)) return;
+    const groupName = cleanLabel(rawGroup.name, 500) || undefined;
+    rawGroup.children.slice(0, MAX_IMPORTED_SHORTCUTS * 2).forEach((rawItem) => {
+      if (!isImportRecord(rawItem)) return;
+      if (rawItem.type === "folder-icon" && Array.isArray(rawItem.children)) {
+        const folderName = cleanLabel(rawItem.name, 500) || undefined;
+        rawItem.children.slice(0, MAX_IMPORTED_SHORTCUTS * 2).forEach((child) => appendSite(child, groupName, folderName));
+        return;
+      }
+      appendSite(rawItem, groupName);
+    });
+  });
+  return result;
 }
 
 function normalizeImportRows(rows: unknown[], inheritedFolderName?: string): ImportShortcut[] {

@@ -1,6 +1,8 @@
 import {
   ArrowDown,
   ArrowUp,
+  Bell,
+  BellOff,
   BookOpen,
   Bot,
   Briefcase,
@@ -55,6 +57,7 @@ import {
   EyeOff,
   Plus,
   RefreshCcw,
+  Repeat2,
   Server,
   Save,
   Search,
@@ -81,13 +84,14 @@ import {
   Wind,
   X
 } from "lucide-react";
-import { createContext, lazy, Suspense, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, type FocusEvent, type KeyboardEvent, type MouseEvent } from "react";
+import { createContext, lazy, Suspense, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, type FocusEvent, type KeyboardEvent, type MouseEvent, type PointerEvent as ReactPointerEvent } from "react";
 import { createPortal } from "react-dom";
-import { accountScopedKey, adoptLegacyStateForAccount, clearLocalAccountDeletionPending, clearLocalDeletedAccountMarkerForVerifiedUser, commitAnonymousStateAdoption, deleteKey, deleteLocalAccountData, downloadJson, hasLegacyUnscopedState, loadStateForAccount, markLocalAccountDeletionPending, mergeAndSaveStateForAccount, readKey, readPendingLocalAccountDeletionIds, saveStateForAccount, writeKey } from "./db";
+import { accountScopedKey, adoptLegacyStateForAccount, clearLocalAccountDeletionPending, clearLocalDeletedAccountMarkerForVerifiedUser, commitAnonymousStateAdoption, deleteKey, deleteLocalAccountData, downloadJson, downloadText, hasLegacyUnscopedState, loadStateForAccount, markLocalAccountDeletionPending, mergeAndSaveStateForAccount, readKey, readPendingLocalAccountDeletionIds, saveStateForAccount, writeKey } from "./db";
 import { defaultNavigationOrder, defaultState, defaultWidgetOrder, defaultWidgetSizes, nowIso, uid } from "./defaultState";
 import { MAX_IMPORTED_SHORTCUTS, MAX_IMPORT_TEXT_CHARS, colorFor, curatedIconCount, curatedIconFor, fallbackFaviconFor, faviconFor, importedToShortcuts, normalizeIconReference, parseImportText, siteIconCandidatesFor } from "./importers";
 import { MIGRATION_BACKUP_KEY, type StateBackup } from "./migrations";
 import { fetchRates, getCachedRates } from "./rates";
+import { checkWebTaskReminders, isRecurringTodoDueOn, isTodoCompletedForDate, nextTodoCompletion, recurrenceLabel, requestTaskReminderPermission, syncTaskReminders } from "./reminders";
 import { CAPTCHA_CONFIGURED, DEFAULT_AUTH_REDIRECT_URL } from "./projectConfig";
 import TurnstileChallenge, { type TurnstileChallengeHandle } from "./TurnstileChallenge";
 import { fetchWeather, fetchWeatherByCoordinates, getCachedWeather, getDevicePosition, requestDeviceLocationPermission, weatherLabel } from "./weather";
@@ -139,6 +143,7 @@ type PageMenuState = { x: number; y: number } | null;
 type WidgetMenuState = { x: number; y: number; widgetKey?: WidgetKey } | null;
 type HomePage = SystemNavPage;
 type HomeTileRef = `shortcut:${string}` | `folder:${string}`;
+type HomeTilePosition = { x: number; y: number };
 type SyncMode = "merge" | "push" | "pull";
 type AuthResult = { status: "signed-in" | "verification-sent"; message: string };
 type ToastAction = { label: string; onClick: () => void };
@@ -203,7 +208,20 @@ const MAX_RESOLVED_ICON_CACHE_ENTRIES = 300;
 const FAILED_ICON_CACHE_PREFIX = "failed:";
 let remoteIconLookupEnabled = true;
 const SortableWidgetGrid = lazy(() => import("./SortableWidgetGrid"));
-const SortableHomeShortcutGrid = lazy(() => import("./SortableHomeShortcutGrid"));
+const defaultHomeTilePositions: HomeTilePosition[] = [
+  { x: 0.18, y: 0.14 },
+  { x: 0.57, y: 0.22 },
+  { x: 0.82, y: 0.38 },
+  { x: 0.32, y: 0.48 },
+  { x: 0.68, y: 0.62 },
+  { x: 0.14, y: 0.78 },
+  { x: 0.48, y: 0.86 },
+  { x: 0.86, y: 0.82 },
+  { x: 0.45, y: 0.08 },
+  { x: 0.08, y: 0.42 },
+  { x: 0.88, y: 0.10 },
+  { x: 0.42, y: 0.68 }
+];
 const cssImageUrl = (value: string) => {
   const escaped = value
     .replace(/\\/g, "\\\\")
@@ -664,8 +682,8 @@ const iconCandidatesFor = (url: string, iconUrl?: string, title = "") => {
     customIconUrl && !isGeneratedFavicon(customIconUrl)
       ? { url: customIconUrl, kind: isSimpleIconsUrl(customIconUrl) ? "brand-mark" : "site-art", vector: isVectorIconUrl(customIconUrl) }
       : undefined,
-    serviceIcon ? { url: serviceIcon, kind: "site-art", vector: false } : undefined,
     curated ? { url: curated, kind: "brand-mark", vector: true } : undefined,
+    serviceIcon ? { url: serviceIcon, kind: "site-art", vector: false } : undefined,
     ...directCandidates.map((candidate) => ({ url: candidate, kind: "site-art" as const, vector: false })),
     fallbackIcon ? { url: fallbackIcon, kind: "site-art", vector: false } : undefined,
     customIconUrl && isGeneratedFavicon(customIconUrl) ? { url: customIconUrl, kind: "site-art", vector: false } : undefined
@@ -1883,6 +1901,19 @@ export default function App() {
     return () => window.clearTimeout(timer);
   }, []);
 
+  useEffect(() => {
+    if (!ready) return;
+    void syncTaskReminders(state.todos, uiLanguage);
+  }, [ready, state.todos, uiLanguage]);
+
+  useEffect(() => {
+    if (!ready) return;
+    const check = () => checkWebTaskReminders(stateRef.current.todos, uiLanguage);
+    check();
+    const timer = window.setInterval(check, 30_000);
+    return () => window.clearInterval(timer);
+  }, [ready, uiLanguage]);
+
   const updateState = (updater: (state: AppState) => AppState) => {
     setState((current) => {
       const updatedAt = nowIso();
@@ -2841,43 +2872,26 @@ export default function App() {
     });
   };
 
-  const moveHomeTile = (source?: HomeTileRef | string, target?: HomeTileRef | string) => {
-    if (!source || !target || source === target) return;
-    const parse = (value: string) => {
-      const [kind, id] = value.split(":") as ["shortcut" | "folder", string];
-      return (kind === "shortcut" || kind === "folder") && id ? { kind, id } : undefined;
-    };
-    const sourceRef = parse(source);
-    const targetRef = parse(target);
-    if (!sourceRef || !targetRef) return;
+  const moveHomeTile = (tile: HomeTileRef, x: number, y: number) => {
+    const [kind, id] = tile.split(":") as ["shortcut" | "folder", string];
+    if (!id || (kind !== "shortcut" && kind !== "folder")) return;
     rememberUndo("调整主页位置");
-    updateState((current) => {
-      const folders = (current.shortcutFolders || [])
-        .filter((folder) => !folder.deletedAt)
-        .map((folder) => ({ kind: "folder" as const, id: folder.id, order: folder.order }));
-      const shortcuts = current.shortcuts
-        .filter((shortcut) => !shortcut.deletedAt && !shortcut.folderId)
-        .map((shortcut) => ({ kind: "shortcut" as const, id: shortcut.id, order: shortcut.order }));
-      const tiles = [...folders, ...shortcuts].sort((a, b) => a.order - b.order);
-      const from = tiles.findIndex((item) => item.kind === sourceRef.kind && item.id === sourceRef.id);
-      const to = tiles.findIndex((item) => item.kind === targetRef.kind && item.id === targetRef.id);
-      if (from < 0 || to < 0) return current;
-      const [moved] = tiles.splice(from, 1);
-      tiles.splice(to, 0, moved);
-      const orderByKey = new Map(tiles.map((item, order) => [`${item.kind}:${item.id}`, order]));
-      const updatedAt = nowIso();
-      return {
-        ...current,
-        shortcutFolders: (current.shortcutFolders || []).map((folder) => {
-          const order = orderByKey.get(`folder:${folder.id}`);
-          return order === undefined || order === folder.order ? folder : { ...folder, order, updatedAt };
-        }),
-        shortcuts: current.shortcuts.map((shortcut) => {
-          const order = orderByKey.get(`shortcut:${shortcut.id}`);
-          return order === undefined || order === shortcut.order ? shortcut : { ...shortcut, order, updatedAt };
-        })
-      };
-    });
+    const homeX = Math.max(0, Math.min(1, x));
+    const homeY = Math.max(0, Math.min(1, y));
+    const updatedAt = nowIso();
+    updateState((current) => kind === "folder"
+      ? {
+          ...current,
+          shortcutFolders: (current.shortcutFolders || []).map((folder) => (
+            folder.id === id ? { ...folder, homeX, homeY, updatedAt } : folder
+          ))
+        }
+      : {
+          ...current,
+          shortcuts: current.shortcuts.map((shortcut) => (
+            shortcut.id === id ? { ...shortcut, homeX, homeY, updatedAt } : shortcut
+          ))
+        });
   };
 
   const exportData = () => {
@@ -3693,9 +3707,8 @@ export default function App() {
         >
           {activePage === "widgets" ? (
             <section className={`home-dashboard sample-a-home ${layoutEditing ? "is-editing" : ""}`}>
-              <div className={`sample-a-canvas ${homeShortcutTiles.length ? "" : "without-sites"}`}>
-                {homeShortcutTiles.length > 0 && (
-                  <section className="sample-a-sites-panel">
+              <div className="sample-a-canvas">
+                  <section className={`sample-a-sites-panel ${state.settings.homeSiteFloating !== false ? "sites-floating" : "sites-still"} ${layoutEditing ? "layout-editing" : ""}`}>
                     <header>
                       <div>
                         <span>{text("快捷入口", "Quick access")}</span>
@@ -3707,24 +3720,24 @@ export default function App() {
                       tiles={homeShortcutTiles.slice(0, 12)}
                       iconSize={state.settings.iconSize}
                       editing={layoutEditing}
+                      floating={state.settings.homeSiteFloating !== false}
                       onOpenFolder={(folderId) => setOpenFolderId(folderId)}
                       onMoveTile={moveHomeTile}
+                      onAdd={() => openNewShortcut()}
                     />
                   </section>
-                )}
 
                 {layoutEditing ? (
                   <Suspense fallback={(
                     <section className="sample-a-primary-widgets" aria-label={text("主要小组件", "Primary widgets")}>
                       {primaryWidgetItems.map((item) => (
-                        <div className="widget-sortable-shell widget-size-wide" data-widget-key={item.id} key={item.id}>{item.content}</div>
+                        <div className={`widget-sortable-shell widget-size-${item.size}`} data-widget-key={item.id} key={item.id}>{item.content}</div>
                       ))}
                     </section>
                   )}>
                     <SortableWidgetGrid
                       items={primaryWidgetItems}
                       className="sample-a-primary-widgets"
-                      forceWide
                       language={uiLanguage}
                       onMove={(source, target) => {
                         reorderWidget(source, target);
@@ -3736,7 +3749,7 @@ export default function App() {
                 ) : (
                   <section className="sample-a-primary-widgets" aria-label={text("主要小组件", "Primary widgets")}>
                     {primaryWidgetItems.map((item) => (
-                      <div className="widget-sortable-shell widget-size-wide" data-widget-key={item.id} key={item.id}>
+                      <div className={`widget-sortable-shell widget-size-${item.size}`} data-widget-key={item.id} key={item.id}>
                         {item.content}
                       </div>
                     ))}
@@ -3886,6 +3899,7 @@ export default function App() {
         <WidgetContextMenu
           menu={widgetMenu}
           size={widgetMenu.widgetKey ? widgetSizes[widgetMenu.widgetKey] : undefined}
+          siteFloating={state.settings.homeSiteFloating !== false}
           onClose={() => setWidgetMenu(null)}
           onResize={(key, size) => {
             setWidgetSize(key, size);
@@ -3897,6 +3911,17 @@ export default function App() {
           onOpenLibrary={() => { setDialog("library"); setWidgetMenu(null); }}
           onRefresh={() => { void refreshExternalData(state, true); setWidgetMenu(null); }}
           onRotateWallpaper={() => { rotateMainWallpaper(); setWidgetMenu(null); }}
+          onToggleSiteFloating={() => {
+            updateState((current) => ({
+              ...current,
+              settings: {
+                ...current.settings,
+                homeSiteFloating: current.settings.homeSiteFloating === false,
+                updatedAt: nowIso()
+              }
+            }));
+            setWidgetMenu(null);
+          }}
           onHide={(key) => {
             setWidgetEnabled(key, false);
             setWidgetMenu(null);
@@ -4340,95 +4365,148 @@ function ToolHub({ shortcutCount, folderCount, widgetCount, syncLabel, onOpenWid
   );
 }
 
-function HomeShortcuts({ tiles, iconSize, editing, onOpenFolder, onMoveTile }: {
+function HomeShortcuts({ tiles, iconSize, editing, floating, onOpenFolder, onMoveTile, onAdd }: {
   tiles: Array<{ kind: "folder"; folder: ShortcutFolder; order: number } | { kind: "shortcut"; shortcut: Shortcut; order: number }>;
   iconSize: number;
   editing: boolean;
+  floating: boolean;
   onOpenFolder: (folderId: string) => void;
-  onMoveTile: (source?: HomeTileRef | string, target?: HomeTileRef | string) => void;
+  onMoveTile: (tile: HomeTileRef, x: number, y: number) => void;
+  onAdd: () => void;
 }) {
   const language = useUiLanguage();
   const text = (zh: string, en: string) => localized(language, zh, en);
+  const canvasRef = useRef<HTMLElement>(null);
+  const [dragging, setDragging] = useState<{ key: HomeTileRef; pointerId: number; position: HomeTilePosition }>();
   const tileKey = (item: { kind: "folder"; folder: ShortcutFolder } | { kind: "shortcut"; shortcut: Shortcut }): HomeTileRef => (
     item.kind === "folder" ? `folder:${item.folder.id}` : `shortcut:${item.shortcut.id}`
   );
-  if (tiles.length === 0) return null;
-  if (editing) {
-    const sortableItems = tiles.map((item, index) => {
-      const key = tileKey(item);
-      if (item.kind === "folder") {
-        return {
-          id: key,
-          label: item.folder.name,
-          content: (
+  const savedPosition = (item: (typeof tiles)[number], index: number) => {
+    const entity = item.kind === "folder" ? item.folder : item.shortcut;
+    const fallback = defaultHomeTilePositions[index % defaultHomeTilePositions.length];
+    return {
+      x: typeof entity.homeX === "number" ? entity.homeX : fallback.x,
+      y: typeof entity.homeY === "number" ? entity.homeY : fallback.y
+    };
+  };
+  const pointerPosition = (clientX: number, clientY: number): HomeTilePosition | undefined => {
+    const rect = canvasRef.current?.getBoundingClientRect();
+    if (!rect?.width || !rect.height) return undefined;
+    const horizontalInset = Math.min(0.22, (Math.max(48, Math.min(iconSize, 80)) / 2 + 8) / rect.width);
+    const verticalInset = Math.min(0.22, (Math.max(48, Math.min(iconSize, 80)) / 2 + 8) / rect.height);
+    return {
+      x: Math.max(horizontalInset, Math.min(1 - horizontalInset, (clientX - rect.left) / rect.width)),
+      y: Math.max(verticalInset, Math.min(1 - verticalInset, (clientY - rect.top) / rect.height))
+    };
+  };
+  const startDrag = (event: ReactPointerEvent<HTMLButtonElement>, key: HomeTileRef) => {
+    if (!editing || event.button !== 0) return;
+    const position = pointerPosition(event.clientX, event.clientY);
+    if (!position) return;
+    event.preventDefault();
+    event.currentTarget.setPointerCapture(event.pointerId);
+    setDragging({ key, pointerId: event.pointerId, position });
+  };
+  const moveDrag = (event: ReactPointerEvent<HTMLElement>) => {
+    if (!dragging || event.pointerId !== dragging.pointerId) return;
+    const position = pointerPosition(event.clientX, event.clientY);
+    if (position) setDragging({ ...dragging, position });
+  };
+  const finishDrag = (event: ReactPointerEvent<HTMLElement>) => {
+    if (!dragging || event.pointerId !== dragging.pointerId) return;
+    const position = pointerPosition(event.clientX, event.clientY) || dragging.position;
+    onMoveTile(dragging.key, position.x, position.y);
+    setDragging(undefined);
+  };
+
+  return (
+    <section
+      ref={canvasRef}
+      className={`home-shortcuts home-sites-canvas ${editing ? "layout-editing" : ""} ${floating ? "is-floating" : ""}`}
+      aria-label={text("主页快捷入口", "Home shortcuts")}
+      onPointerMove={moveDrag}
+      onPointerUp={finishDrag}
+      onPointerCancel={() => setDragging(undefined)}
+    >
+      <div className="home-shortcuts-row" style={{ "--icon": Math.max(48, Math.min(iconSize, 80)) + "px" } as React.CSSProperties}>
+        {tiles.map((item, index) => {
+          const key = tileKey(item);
+          const position = dragging?.key === key ? dragging.position : savedPosition(item, index);
+          const style = {
+            "--home-x": `${position.x * 100}%`,
+            "--home-y": `${position.y * 100}%`,
+            "--float-index": index
+          } as React.CSSProperties;
+          const content = item.kind === "folder" ? (
             <>
-              <span className={`shortcut-icon folder-icon ${item.folder.iconUrl ? "has-image" : ""}`} style={{ "--folder-color": item.folder.iconColor } as React.CSSProperties}>
+              <span className={"shortcut-icon folder-icon " + (item.folder.iconUrl ? "has-image" : "")} style={{ "--folder-color": item.folder.iconColor } as React.CSSProperties}>
                 <FolderIconContent iconUrl={item.folder.iconUrl} size={Math.round(Math.max(48, Math.min(iconSize, 80)) * 0.46)} />
               </span>
               <span>{item.folder.name}</span>
             </>
-          )
-        };
-      }
-      return {
-        id: key,
-        label: item.shortcut.title,
-        content: (
-          <>
-            <span className="shortcut-icon">
-              <ShortcutIconContent url={item.shortcut.url} iconUrl={item.shortcut.iconUrl} title={item.shortcut.title} fallback={item.shortcut.title.slice(0, 1)} priority={index < 8} />
-            </span>
-            <span>{item.shortcut.title}</span>
-          </>
-        )
-      };
-    });
-    return (
-      <Suspense fallback={null}>
-        <SortableHomeShortcutGrid
-          items={sortableItems}
-          iconSize={iconSize}
-          language={language}
-          onMove={(source, target) => onMoveTile(source, target)}
-        />
-      </Suspense>
-    );
-  }
-  return (
-    <section className="home-shortcuts" aria-label={text("主页快捷入口", "Home shortcuts")}>
-      <div className="home-shortcuts-row" style={{ "--icon": Math.max(48, Math.min(iconSize, 80)) + "px" } as React.CSSProperties}>
-        {tiles.map((item, index) => {
+          ) : (
+            <>
+              <span className="shortcut-icon">
+                <ShortcutIconContent url={item.shortcut.url} iconUrl={item.shortcut.iconUrl} title={item.shortcut.title} fallback={item.shortcut.title.slice(0, 1)} priority={index < 8} />
+              </span>
+              <span>{item.shortcut.title}</span>
+            </>
+          );
+          if (editing) return (
+            <button
+              type="button"
+              className={`home-shortcut home-shortcut-positioned is-positioning ${dragging?.key === key ? "is-dragging" : ""}`}
+              key={key}
+              data-folder-id={item.kind === "folder" ? item.folder.id : undefined}
+              data-shortcut-id={item.kind === "shortcut" ? item.shortcut.id : undefined}
+              style={style}
+              title={text("拖动调整位置，右键更换图标", "Drag to position; right-click to change the icon")}
+              onPointerDown={(event) => startDrag(event, key)}
+              onKeyDown={(event) => {
+                const step = event.shiftKey ? 0.08 : 0.025;
+                const delta = event.key === "ArrowLeft" ? [-step, 0] : event.key === "ArrowRight" ? [step, 0] : event.key === "ArrowUp" ? [0, -step] : event.key === "ArrowDown" ? [0, step] : undefined;
+                if (!delta) return;
+                event.preventDefault();
+                onMoveTile(key, position.x + delta[0], position.y + delta[1]);
+              }}
+            >
+              {content}
+              <span className="tile-drag-handle" aria-hidden="true"><GripVertical size={14} /></span>
+            </button>
+          );
           return item.kind === "folder" ? (
           <button
             type="button"
-            className="home-shortcut folder-home"
+            className="home-shortcut home-shortcut-positioned folder-home"
             key={"folder-" + item.folder.id}
             data-folder-id={item.folder.id}
+            style={style}
             onClick={() => onOpenFolder(item.folder.id)}
             title={item.folder.name}
           >
-            <span className={"shortcut-icon folder-icon " + (item.folder.iconUrl ? "has-image" : "")} style={{ "--folder-color": item.folder.iconColor } as React.CSSProperties}>
-              <FolderIconContent iconUrl={item.folder.iconUrl} size={Math.round(Math.max(48, Math.min(iconSize, 80)) * 0.46)} />
-            </span>
-            <span>{item.folder.name}</span>
+            {content}
           </button>
         ) : (
           <a
-            className="home-shortcut"
+            className="home-shortcut home-shortcut-positioned"
             href={safeHttpHref(item.shortcut.url)}
             key={item.shortcut.id}
             data-shortcut-id={item.shortcut.id}
+            style={style}
             title={item.shortcut.url}
             target="_blank"
             rel="noreferrer"
           >
-            <span className="shortcut-icon">
-              <ShortcutIconContent url={item.shortcut.url} iconUrl={item.shortcut.iconUrl} title={item.shortcut.title} fallback={item.shortcut.title.slice(0, 1)} priority={index < 8} />
-            </span>
-            <span>{item.shortcut.title}</span>
+            {content}
           </a>
         )})}
       </div>
+      {!tiles.length && (
+        <button type="button" className="home-sites-empty" onClick={onAdd}>
+          <Plus size={20} />
+          <span>{text("添加第一个网站", "Add your first site")}</span>
+        </button>
+      )}
     </section>
   );
 }
@@ -4518,8 +4596,8 @@ function SearchWorkspace({ query, onQueryChange, onWebSearch, onToggleEngine, en
           <header><span><ListTodo size={16} />{text("任务", "Tasks")}</span><button type="button" onClick={onOpenTasks}>{text("打开", "Open")}</button></header>
           <div className="lucid-text-results">
             {matchedTodos.map((todo) => (
-              <button type="button" className={todo.done ? "is-done" : ""} onClick={onOpenTasks} key={todo.id}>
-                <span><strong>{todoTextFor(language, todo.text)}</strong><small>{todo.done ? text("已完成", "Completed") : text("待处理", "Open")}</small></span>
+              <button type="button" className={isTodoCompletedForDate(todo) ? "is-done" : ""} onClick={onOpenTasks} key={todo.id}>
+                <span><strong>{todoTextFor(language, todo.text)}</strong><small>{isTodoCompletedForDate(todo) ? text("已完成", "Completed") : todo.recurrence ? recurrenceLabel(todo, language) : text("待处理", "Open")}</small></span>
                 <Check size={15} />
               </button>
             ))}
@@ -4621,7 +4699,7 @@ function NotesWorkspace({ state, updateState }: {
               placeholder={text("写下想法、链接或下一步…", "Write down an idea, link, or next step...")}
               aria-label={text("笔记内容", "Note content")}
             />
-            <footer><ShieldCheck size={14} /><span>{text("自动保存在本机，登录后可安全同步。", "Saved locally automatically and synced securely after sign-in.")}</span></footer>
+            <footer><ShieldCheck size={14} /><span>{text("自动保存在本机；登录后可同步到你的账号。", "Saved locally automatically; sign in to sync with your account.")}</span></footer>
           </>
         ) : (
           <button type="button" className="lucid-note-empty" onClick={addNote}><StickyNote size={24} /><span>{text("新建第一条笔记", "Create your first note")}</span></button>
@@ -4639,26 +4717,60 @@ function TasksWorkspace({ state, updateState }: {
   const textFor = (zh: string, en: string) => localized(language, zh, en);
   const [text, setText] = useState("");
   const [filter, setFilter] = useState<"open" | "all" | "done">("open");
+  const [fixedTask, setFixedTask] = useState(false);
+  const [recurrence, setRecurrence] = useState<NonNullable<Todo["recurrence"]>>("daily");
+  const [reminderTime, setReminderTime] = useState("");
+  const [reminderWeekday, setReminderWeekday] = useState(new Date().getDay());
+  const [editingScheduleId, setEditingScheduleId] = useState<string>();
+  const weekdayNames = language === "en-US"
+    ? ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]
+    : ["周日", "周一", "周二", "周三", "周四", "周五", "周六"];
   const todos = state.todos.filter((todo) => !todo.deletedAt).sort((left, right) => left.order - right.order);
-  const visibleTodos = todos.filter((todo) => filter === "all" || (filter === "done" ? todo.done : !todo.done));
-  const doneCount = todos.filter((todo) => todo.done).length;
-  const progress = todos.length ? Math.round(doneCount / todos.length * 100) : 0;
+  const dueTodos = todos.filter((todo) => !todo.recurrence || isRecurringTodoDueOn(todo));
+  const visibleTodos = todos.filter((todo) => {
+    const completed = isTodoCompletedForDate(todo);
+    if (filter === "all") return true;
+    if (todo.recurrence && !isRecurringTodoDueOn(todo)) return false;
+    return filter === "done" ? completed : !completed;
+  });
+  const doneCount = dueTodos.filter((todo) => isTodoCompletedForDate(todo)).length;
+  const progress = dueTodos.length ? Math.round(doneCount / dueTodos.length * 100) : 0;
 
-  const addTodo = () => {
+  const addTodo = async () => {
     const value = text.trim();
     if (!value) return;
     if (value.length > MAX_TODO_TEXT_CHARS || state.todos.length >= MAX_ENTITY_RECORDS) {
       window.alert(textFor("任务内容过长或已达到安全上限", "The task is too long or the safety limit has been reached."));
       return;
     }
-    const todo: Todo = { id: uid(), text: value, done: false, order: todos.length, updatedAt: nowIso() };
+    const todo: Todo = {
+      id: uid(),
+      text: value,
+      done: false,
+      order: todos.length,
+      recurrence: fixedTask ? recurrence : undefined,
+      reminderTime: fixedTask && reminderTime ? reminderTime : undefined,
+      reminderWeekday: fixedTask && recurrence === "weekly" ? reminderWeekday : undefined,
+      updatedAt: nowIso()
+    };
+    if (todo.reminderTime) {
+      const permissionGranted = await requestTaskReminderPermission().catch(() => false);
+      if (!permissionGranted) {
+        window.alert(textFor("固定任务已保存，但通知权限未开启；开启权限前不会弹出提醒。", "The recurring task was saved, but notification permission is off. It will not alert until permission is enabled."));
+      }
+    }
     updateState((current) => ({ ...current, todos: [...current.todos, todo] }));
     setText("");
+    setReminderTime("");
     setFilter("open");
   };
   const toggleTodo = (id: string) => updateState((current) => ({
     ...current,
-    todos: current.todos.map((todo) => todo.id === id ? { ...todo, done: !todo.done, updatedAt: nowIso() } : todo)
+    todos: current.todos.map((todo) => todo.id === id ? { ...todo, ...nextTodoCompletion(todo), updatedAt: nowIso() } : todo)
+  }));
+  const updateTodoSchedule = (id: string, patch: Partial<Pick<Todo, "recurrence" | "reminderTime" | "reminderWeekday">>) => updateState((current) => ({
+    ...current,
+    todos: current.todos.map((todo) => todo.id === id ? { ...todo, ...patch, done: false, completedOn: undefined, updatedAt: nowIso() } : todo)
   }));
   const deleteTodo = (id: string) => {
     const deletedAt = nowIso();
@@ -4676,15 +4788,41 @@ function TasksWorkspace({ state, updateState }: {
         </div>
         <div>
           <span>{textFor("今天", "Today")}</span>
-          <h2>{todos.length - doneCount ? textFor(`${todos.length - doneCount} 件事等待完成`, `${todos.length - doneCount} tasks remaining`) : textFor("今天的任务已完成", "Everything is complete for today")}</h2>
-          <p>{textFor(`已完成 ${doneCount} / ${todos.length}`, `${doneCount} of ${todos.length} completed`)}</p>
+          <h2>{dueTodos.length - doneCount ? textFor(`${dueTodos.length - doneCount} 件事等待完成`, `${dueTodos.length - doneCount} tasks remaining`) : textFor("今天的任务已完成", "Everything is complete for today")}</h2>
+          <p>{textFor(`已完成 ${doneCount} / ${dueTodos.length}`, `${doneCount} of ${dueTodos.length} completed`)}</p>
         </div>
       </header>
 
-      <form className="lucid-task-composer" onSubmit={(event) => { event.preventDefault(); addTodo(); }}>
-        <Plus size={18} aria-hidden="true" />
-        <input value={text} maxLength={MAX_TODO_TEXT_CHARS} onChange={(event) => setText(event.target.value)} placeholder={textFor("添加下一件要做的事", "Add the next thing to do")} aria-label={textFor("新任务", "New task")} />
-        <button type="submit" disabled={!text.trim()}>{textFor("添加", "Add")}</button>
+      <form className="lucid-task-composer" onSubmit={(event) => { event.preventDefault(); void addTodo(); }}>
+        <div className="lucid-task-entry">
+          <Plus size={18} aria-hidden="true" />
+          <input value={text} maxLength={MAX_TODO_TEXT_CHARS} onChange={(event) => setText(event.target.value)} placeholder={textFor("添加下一件要做的事", "Add the next thing to do")} aria-label={textFor("新任务", "New task")} />
+          <button type="submit" disabled={!text.trim()}>{textFor("添加", "Add")}</button>
+        </div>
+        <div className="lucid-task-schedule-controls">
+          <button type="button" className={fixedTask ? "active" : ""} aria-pressed={fixedTask} onClick={() => setFixedTask((value) => !value)}><Repeat2 size={15} />{textFor("固定任务", "Recurring")}</button>
+          {fixedTask && (
+            <>
+              <label>
+                <span className="sr-only">{textFor("重复周期", "Repeat interval")}</span>
+                <select value={recurrence} onChange={(event) => setRecurrence(event.target.value as NonNullable<Todo["recurrence"]>)}>
+                  <option value="daily">{textFor("每天", "Every day")}</option>
+                  <option value="weekdays">{textFor("工作日", "Weekdays")}</option>
+                  <option value="weekly">{textFor("每周", "Every week")}</option>
+                </select>
+              </label>
+              {recurrence === "weekly" && (
+                <label>
+                  <span className="sr-only">{textFor("星期", "Weekday")}</span>
+                  <select value={reminderWeekday} onChange={(event) => setReminderWeekday(Number(event.target.value))}>
+                    {weekdayNames.map((name, index) => <option value={index} key={name}>{name}</option>)}
+                  </select>
+                </label>
+              )}
+              <label className="lucid-reminder-time"><Bell size={14} /><span className="sr-only">{textFor("提醒时间", "Reminder time")}</span><input type="time" value={reminderTime} onChange={(event) => setReminderTime(event.target.value)} /></label>
+            </>
+          )}
+        </div>
       </form>
 
       <div className="lucid-task-toolbar">
@@ -4699,16 +4837,49 @@ function TasksWorkspace({ state, updateState }: {
       </div>
 
       <div className="lucid-task-list">
-        {visibleTodos.map((todo) => (
-          <div className={todo.done ? "is-done" : ""} key={todo.id}>
+        {visibleTodos.map((todo) => {
+          const completed = isTodoCompletedForDate(todo);
+          return (
+          <div className={`${completed ? "is-done" : ""} ${todo.recurrence ? "is-recurring" : ""}`} key={todo.id}>
             <label>
-              <input type="checkbox" checked={todo.done} onChange={() => toggleTodo(todo.id)} />
+              <input type="checkbox" checked={completed} onChange={() => toggleTodo(todo.id)} />
               <span>{todoTextFor(language, todo.text)}</span>
             </label>
-            <small>{todo.done ? textFor("已完成", "Completed") : textFor("待处理", "Open")}</small>
+            {todo.recurrence ? (
+              <button type="button" className="lucid-task-schedule" onClick={() => setEditingScheduleId((current) => current === todo.id ? undefined : todo.id)}>
+                <Repeat2 size={13} />
+                <span>{recurrenceLabel(todo, language)}</span>
+                {todo.reminderTime ? <><Bell size={12} /><span>{todo.reminderTime}</span></> : <BellOff size={12} />}
+              </button>
+            ) : <small>{completed ? textFor("已完成", "Completed") : textFor("待处理", "Open")}</small>}
             <button type="button" title={textFor("删除任务", "Delete task")} aria-label={textFor("删除任务", "Delete task")} onClick={() => deleteTodo(todo.id)}><X size={15} /></button>
+            {editingScheduleId === todo.id && todo.recurrence && (
+              <div className="lucid-task-schedule-editor">
+                <select value={todo.recurrence} onChange={(event) => updateTodoSchedule(todo.id, {
+                  recurrence: event.target.value as NonNullable<Todo["recurrence"]>,
+                  reminderWeekday: event.target.value === "weekly" ? new Date().getDay() : undefined
+                })}>
+                  <option value="daily">{textFor("每天", "Every day")}</option>
+                  <option value="weekdays">{textFor("工作日", "Weekdays")}</option>
+                  <option value="weekly">{textFor("每周", "Every week")}</option>
+                </select>
+                {todo.recurrence === "weekly" && (
+                  <select aria-label={textFor("星期", "Weekday")} value={todo.reminderWeekday ?? 0} onChange={(event) => updateTodoSchedule(todo.id, { reminderWeekday: Number(event.target.value) })}>
+                    {weekdayNames.map((name, index) => <option value={index} key={name}>{name}</option>)}
+                  </select>
+                )}
+                <input type="time" value={todo.reminderTime || ""} onChange={(event) => updateTodoSchedule(todo.id, { reminderTime: event.target.value || undefined })} />
+                <button type="button" onClick={() => {
+                  setEditingScheduleId(undefined);
+                  if (!todo.reminderTime) return;
+                  void requestTaskReminderPermission().then((granted) => {
+                    if (!granted) window.alert(textFor("提醒时间已保存，但通知权限未开启；开启权限前不会弹出提醒。", "The reminder time was saved, but notification permission is off. It will not alert until permission is enabled."));
+                  }).catch(() => undefined);
+                }}><Check size={14} />{textFor("完成", "Done")}</button>
+              </div>
+            )}
           </div>
-        ))}
+        )})}
         {!visibleTodos.length && (
           <p className="lucid-task-empty">{filter === "done" ? textFor("还没有已完成任务。", "No completed tasks yet.") : textFor("这里很安静，可以专注下一件事。", "Nothing here yet. Focus on the next thing.")}</p>
         )}
@@ -4895,14 +5066,16 @@ function WidgetSizePicker({ widgetKey, value, onChange, disabled = false, compac
   );
 }
 
-function WidgetContextMenu({ menu, size, onClose, onResize, onOpenLibrary, onRefresh, onRotateWallpaper, onHide }: {
+function WidgetContextMenu({ menu, size, siteFloating, onClose, onResize, onOpenLibrary, onRefresh, onRotateWallpaper, onToggleSiteFloating, onHide }: {
   menu: Exclude<WidgetMenuState, null>;
   size?: WidgetSize;
+  siteFloating: boolean;
   onClose: () => void;
   onResize: (key: WidgetKey, size: WidgetSize) => void;
   onOpenLibrary: () => void;
   onRefresh: () => void;
   onRotateWallpaper: () => void;
+  onToggleSiteFloating: () => void;
   onHide: (key: WidgetKey) => void;
 }) {
   const language = useUiLanguage();
@@ -4922,6 +5095,7 @@ function WidgetContextMenu({ menu, size, onClose, onResize, onOpenLibrary, onRef
         <WidgetSizePicker widgetKey={menu.widgetKey} value={size} onChange={(nextSize) => onResize(menu.widgetKey!, nextSize)} />
       )}
       <div className="widget-menu-actions">
+        {!menu.widgetKey && <button onClick={onToggleSiteFloating}>{siteFloating ? <EyeOff size={14} /> : <Sparkles size={14} />} {siteFloating ? text("关闭图标浮动", "Turn off icon motion") : text("开启图标浮动", "Turn on icon motion")}</button>}
         <button onClick={onOpenLibrary}><Palette size={14} /> {text("更多小组件", "More widgets")}</button>
         <button onClick={onRefresh}><RefreshCcw size={14} /> {text("刷新数据", "Refresh data")}</button>
         <button onClick={onRotateWallpaper}><Shuffle size={14} /> {text("更换壁纸", "Change wallpaper")}</button>
@@ -5390,10 +5564,11 @@ function TodoWidget({ widgetKey, size, state, updateState }: { widgetKey: Widget
   const [text, setText] = useState("");
   const [panelOpen, setPanelOpen] = useState(false);
   const todos = state.todos.filter((item) => !item.deletedAt).sort((a, b) => a.order - b.order);
-  const activeCount = todos.filter((todo) => !todo.done).length;
-  const doneCount = todos.length - activeCount;
-  const completionPercent = todos.length ? Math.round((doneCount / todos.length) * 100) : 0;
-  const visibleTodos = todos.slice(0, 3);
+  const dueTodos = todos.filter((todo) => !todo.recurrence || isRecurringTodoDueOn(todo));
+  const activeCount = dueTodos.filter((todo) => !isTodoCompletedForDate(todo)).length;
+  const doneCount = dueTodos.length - activeCount;
+  const completionPercent = dueTodos.length ? Math.round((doneCount / dueTodos.length) * 100) : 0;
+  const visibleTodos = dueTodos.slice(0, 3);
   const add = () => {
     if (!text.trim()) return;
     if (text.trim().length > MAX_TODO_TEXT_CHARS) {
@@ -5416,7 +5591,7 @@ function TodoWidget({ widgetKey, size, state, updateState }: { widgetKey: Widget
   };
   const toggleTodo = (id: string) => updateState((current) => ({
     ...current,
-    todos: current.todos.map((item) => item.id === id ? { ...item, done: !item.done, updatedAt: nowIso() } : item)
+    todos: current.todos.map((item) => item.id === id ? { ...item, ...nextTodoCompletion(item), updatedAt: nowIso() } : item)
   }));
   const deleteTodo = (id: string) => {
     const deletedAt = nowIso();
@@ -5429,13 +5604,19 @@ function TodoWidget({ widgetKey, size, state, updateState }: { widgetKey: Widget
     const deletedAt = nowIso();
     updateState((current) => ({
       ...current,
-      todos: current.todos.map((item) => item.done && !item.deletedAt ? { ...item, deletedAt, updatedAt: deletedAt } : item)
+      todos: current.todos.map((item) => {
+        if (item.deletedAt || !isTodoCompletedForDate(item)) return item;
+        return item.recurrence
+          ? { ...item, completedOn: undefined, updatedAt: deletedAt }
+          : { ...item, deletedAt, updatedAt: deletedAt };
+      })
     }));
   };
   const todoRows = (items: Todo[]) => items.map((todo) => (
     <label className="todo" key={todo.id}>
-      <input type="checkbox" checked={todo.done} onChange={() => toggleTodo(todo.id)} />
+      <input type="checkbox" checked={isTodoCompletedForDate(todo)} onChange={() => toggleTodo(todo.id)} />
       <span>{todoTextFor(language, todo.text)}</span>
+      {todo.recurrence && <small title={recurrenceLabel(todo, language)}><Repeat2 size={11} />{todo.reminderTime || ""}</small>}
       <button type="button" title={textFor("删除", "Delete")} onClick={(event) => { event.preventDefault(); event.stopPropagation(); deleteTodo(todo.id); }}>
         <X size={13} />
       </button>
@@ -5448,10 +5629,10 @@ function TodoWidget({ widgetKey, size, state, updateState }: { widgetKey: Widget
       widgetKey={widgetKey}
       tone="todo"
       size={size}
-      action={<button type="button" className="todo-count" title={textFor("管理任务", "Manage tasks")} onClick={() => setPanelOpen(true)}>{activeCount}/{todos.length}</button>}
+      action={<button type="button" className="todo-count" title={textFor("管理任务", "Manage tasks")} onClick={() => setPanelOpen(true)}>{activeCount}/{dueTodos.length}</button>}
     >
       <div className={`todo-dashboard todo-dashboard-${size}`}>
-        <div className="todo-overview" aria-label={textFor(`已完成 ${doneCount} 项，共 ${todos.length} 项`, `${doneCount} of ${todos.length} completed`)}>
+        <div className="todo-overview" aria-label={textFor(`已完成 ${doneCount} 项，共 ${dueTodos.length} 项`, `${doneCount} of ${dueTodos.length} completed`)}>
           <button
             type="button"
             className="todo-progress-dial"
@@ -5463,7 +5644,7 @@ function TodoWidget({ widgetKey, size, state, updateState }: { widgetKey: Widget
           </button>
           <div>
             <small>{textFor("今日进度", "Today's progress")}</small>
-            <strong>{doneCount} / {todos.length}</strong>
+            <strong>{doneCount} / {dueTodos.length}</strong>
             <span>{activeCount ? textFor(`还有 ${activeCount} 项`, `${activeCount} remaining`) : textFor("全部完成", "All complete")}</span>
           </div>
         </div>
@@ -5474,7 +5655,7 @@ function TodoWidget({ widgetKey, size, state, updateState }: { widgetKey: Widget
           </div>
           <div className="todo-preview">
             {visibleTodos.length ? todoRows(visibleTodos) : <button type="button" className="todo-empty" onClick={() => setPanelOpen(true)}>{textFor("今天还没有任务", "No tasks today")}</button>}
-            {todos.length > visibleTodos.length && <button type="button" className="todo-more" onClick={() => setPanelOpen(true)}>{textFor(`还有 ${todos.length - visibleTodos.length} 条，点击管理`, `${todos.length - visibleTodos.length} more · Manage`)}</button>}
+            {dueTodos.length > visibleTodos.length && <button type="button" className="todo-more" onClick={() => setPanelOpen(true)}>{textFor(`还有 ${dueTodos.length - visibleTodos.length} 条，点击管理`, `${dueTodos.length - visibleTodos.length} more · Manage`)}</button>}
           </div>
         </div>
       </div>
@@ -5578,8 +5759,8 @@ function FocusWidget({ widgetKey, size, state, updateState, onOpenTasks }: {
   const todos = state.todos
     .filter((item) => !item.deletedAt)
     .sort((a, b) => a.order - b.order);
-  const activeTodos = todos.filter((item) => !item.done);
-  const detailTodos = todos.slice(0, 3);
+  const dueTodos = todos.filter((item) => !item.recurrence || isRecurringTodoDueOn(item));
+  const detailTodos = dueTodos.slice(0, 3);
   const focusHeadline = state.settings.quickNote
     ?.split(/\r?\n/)
     .map((line) => line.trim())
@@ -5604,7 +5785,7 @@ function FocusWidget({ widgetKey, size, state, updateState, onOpenTasks }: {
   const progress = 1 - seconds / (25 * 60);
   const toggleTodo = (id: string) => updateState((current) => ({
     ...current,
-    todos: current.todos.map((item) => item.id === id ? { ...item, done: !item.done, updatedAt: nowIso() } : item)
+    todos: current.todos.map((item) => item.id === id ? { ...item, ...nextTodoCompletion(item), updatedAt: nowIso() } : item)
   }));
   return (
     <Widget
@@ -5627,7 +5808,7 @@ function FocusWidget({ widgetKey, size, state, updateState, onOpenTasks }: {
         <div className="sample-focus-list">
           {detailTodos.map((todo) => (
             <label key={todo.id}>
-              <input type="checkbox" checked={todo.done} onChange={() => toggleTodo(todo.id)} />
+              <input type="checkbox" checked={isTodoCompletedForDate(todo)} onChange={() => toggleTodo(todo.id)} />
               <span>{todoTextFor(language, todo.text)}</span>
             </label>
           ))}
@@ -5636,7 +5817,7 @@ function FocusWidget({ widgetKey, size, state, updateState, onOpenTasks }: {
           )}
         </div>
         <div className="sample-focus-footer">
-          <span>{text(`今天 · ${todos.length} 项`, `Today · ${todos.length} items`)}</span>
+          <span>{text(`今天 · ${dueTodos.length} 项`, `Today · ${dueTodos.length} items`)}</span>
           <button
             type="button"
             className={running ? "is-running" : ""}
@@ -6129,12 +6310,12 @@ function ImportDialog({ existingShortcuts, onClose, onImport }: {
   }, [existingShortcuts, rows]);
   return (
     <DialogShell title={label("导入快捷导航", "Import shortcuts")} onClose={onClose}>
-      <p className="hint">{label("支持 WhyNavo JSON、浏览器书签 HTML、CSV。CSV 格式：名称,网址,图标URL,分组,文件夹。", "Supports WhyNavo JSON, browser bookmark HTML, and CSV. CSV format: name, URL, icon URL, category, folder.")}</p>
+      <p className="hint">{label("支持 WhyNavo JSON、WeTab .data、浏览器书签 HTML、CSV。CSV 格式：名称,网址,图标URL,分组,文件夹。", "Supports WhyNavo JSON, WeTab .data, browser bookmark HTML, and CSV. CSV format: name, URL, icon URL, category, folder.")}</p>
       <label className="file-pick">
         <Upload size={16} /> {label("选择文件", "Choose file")}
         <input
           type="file"
-          accept=".json,.csv,.html,.htm,.txt"
+          accept=".json,.data,.csv,.html,.htm,.txt"
           onChange={async (event) => {
             const input = event.currentTarget;
             const file = event.target.files?.[0];
@@ -6653,6 +6834,19 @@ function SettingsDialog({ state, updateCheck, migrationBackupAvailable, updateSt
   const language: UiLanguage = settings.language === "en-US" ? "en-US" : "zh-CN";
   const text = (zh: string, en: string) => localized(language, zh, en);
   const noteConflicts = state.notes.filter((note) => !note.deletedAt && note.conflictBody);
+  const exportNotesMarkdown = () => {
+    const notes = state.notes
+      .filter((note) => !note.deletedAt)
+      .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt));
+    const markdown = notes.map((note) => [
+      `# ${(note.title || text("未命名笔记", "Untitled note")).replace(/[\r\n]+/g, " ")}`,
+      "",
+      note.body,
+      "",
+      `> ${text("更新时间", "Updated")}: ${new Date(note.updatedAt).toLocaleString(language)}`
+    ].join("\n")).join("\n\n---\n\n");
+    downloadText(`whynavo-notes-${new Date().toISOString().slice(0, 10)}.md`, markdown, "text/markdown;charset=utf-8");
+  };
   const setSetting = <K extends keyof AppState["settings"]>(key: K, value: AppState["settings"][K]) => {
     updateState((current) => ({ ...current, settings: { ...current.settings, [key]: value, updatedAt: nowIso() } }));
   };
@@ -6762,7 +6956,8 @@ function SettingsDialog({ state, updateCheck, migrationBackupAvailable, updateSt
             <section className="lucid-settings-section">
               <header><span>{text("本机优先数据", "Local-first data")}</span><h3>{text("备份、恢复和迁移都由你控制", "You control backup, restore, and migration")}</h3></header>
               <div className="lucid-data-actions">
-                <button type="button" onClick={onImport}><Import size={17} /><span><strong>{text("导入网站", "Import sites")}</strong><small>{text("支持浏览器书签与文本", "Supports browser bookmarks and text")}</small></span></button>
+                <button type="button" onClick={onImport}><Import size={17} /><span><strong>{text("导入网站", "Import sites")}</strong><small>{text("支持 WeTab、浏览器书签与文本", "Supports WeTab, browser bookmarks, and text")}</small></span></button>
+                <button type="button" onClick={exportNotesMarkdown}><FileText size={17} /><span><strong>{text("导出笔记", "Export notes")}</strong><small>{text("生成通用 Markdown 文件", "Creates a portable Markdown file")}</small></span></button>
                 <button type="button" onClick={onExport}><Download size={17} /><span><strong>{text("导出完整备份", "Export complete backup")}</strong><small>{text("包含网站、笔记、任务和设置", "Includes sites, notes, tasks, and settings")}</small></span></button>
                 <label className="lucid-data-action"><Upload size={17} /><span><strong>{text("恢复完整备份", "Restore complete backup")}</strong><small>{text("从 WhyNavo JSON 文件恢复", "Restore from a WhyNavo JSON file")}</small></span><input type="file" accept="application/json,.json" onChange={(event) => { const file = event.target.files?.[0]; if (file) void onImportBackup(file).catch((error) => window.alert(error instanceof Error ? error.message : text("备份恢复失败", "Backup restore failed"))); event.currentTarget.value = ""; }} /></label>
                 <button type="button" disabled={!migrationBackupAvailable} onClick={onRestoreMigrationBackup}><TimerReset size={17} /><span><strong>{text("回到更新前数据", "Restore pre-update data")}</strong><small>{migrationBackupAvailable ? text("恢复本设备最近迁移点", "Restore the latest migration point on this device") : text("当前没有迁移恢复点", "No migration restore point is available")}</small></span></button>

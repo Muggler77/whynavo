@@ -37,5 +37,9 @@ const manifest = JSON.parse(await readFile(join(extensionDist, "manifest.json"),
 assert.equal(manifest.manifest_version, 3, "extension package must contain a Manifest V3 manifest");
 assert.match(String(manifest.version || ""), /^\d+\.\d+\.\d+$/, "extension package version is invalid");
 assert.equal(manifest.chrome_url_overrides?.newtab, "index.html", "extension package must override the new tab page");
+assert.equal(manifest.background?.service_worker, "background.js", "recurring task reminders require the packaged background worker");
+assert.ok(manifest.permissions?.includes("alarms") && manifest.permissions?.includes("storage"), "recurring task reminders require local alarms and storage");
+assert.ok(manifest.optional_permissions?.includes("notifications"), "notification access must remain optional and user initiated");
+assert.ok(files.some((path) => relative(extensionDist, path) === "background.js"), "background worker is missing from the extension package");
 
 console.log(`Extension package check passed for ${files.length} files.`);

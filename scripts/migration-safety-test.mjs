@@ -13,6 +13,7 @@ const dbOutput = join(tempDir, "db.mjs");
 const defaultStateOutput = join(tempDir, "default-state.mjs");
 const urlsOutput = join(tempDir, "urls.mjs");
 const importersOutput = join(tempDir, "importers.mjs");
+const remindersOutput = join(tempDir, "reminders.mjs");
 const updatesOutput = join(tempDir, "updates.mjs");
 const edgeFunctionOutputs = ["send-auth-email", "delete-account", "boc-rates"]
   .map((name) => ({
@@ -96,6 +97,14 @@ try {
     logLevel: "silent"
   });
   await build({
+    entryPoints: [join(repoRoot, "extension/src/reminders.ts")],
+    outfile: remindersOutput,
+    bundle: true,
+    platform: "browser",
+    format: "esm",
+    logLevel: "silent"
+  });
+  await build({
     entryPoints: [join(repoRoot, "extension/src/updates.ts")],
     outfile: updatesOutput,
     bundle: true,
@@ -112,14 +121,15 @@ try {
   const { accountScopedKey } = await import(pathToFileURL(dbOutput).href);
   const { defaultState } = await import(pathToFileURL(defaultStateOutput).href);
   const { normalizeHttpUrl, safeHttpHref } = await import(pathToFileURL(urlsOutput).href);
-  const { MAX_IMPORTED_SHORTCUTS, faviconHostFor, importedToShortcuts, normalizeIconReference, parseBookmarksHtml, parseImportText } = await import(pathToFileURL(importersOutput).href);
+  const { MAX_IMPORTED_SHORTCUTS, curatedIconFor, fallbackFaviconFor, faviconFor, faviconHostFor, importedToShortcuts, normalizeIconReference, parseBookmarksHtml, parseImportText, siteIconCandidatesFor } = await import(pathToFileURL(importersOutput).href);
+  const { isRecurringTodoDueOn, isTodoCompletedForDate, localDateKey, nextTodoCompletion, recurrenceLabel } = await import(pathToFileURL(remindersOutput).href);
   const { checkForUpdate } = await import(pathToFileURL(updatesOutput).href);
   const projectConfigSource = await readFile(join(repoRoot, "extension/src/projectConfig.ts"), "utf8");
   const privacyNoticeSource = await readFile(join(repoRoot, "extension/public/privacy.html"), "utf8");
   const termsSource = await readFile(join(repoRoot, "extension/public/terms.html"), "utf8");
-  assert.match(projectConfigSource, /LEGAL_DOCUMENT_VERSION = "2026-07-26"/, "registration consent must use the current public legal-document version");
-  assert.match(privacyNoticeSource, /更新日期：2026 年 7 月 26 日[\s\S]*Effective date: July 26, 2026/, "the bilingual privacy notice must expose the consent version date");
-  assert.match(termsSource, /更新日期：2026 年 7 月 26 日[\s\S]*Effective date: July 26, 2026/, "the bilingual terms must match the recorded consent version");
+  assert.match(projectConfigSource, /LEGAL_DOCUMENT_VERSION = "2026-07-28"/, "registration consent must use the current public legal-document version");
+  assert.match(privacyNoticeSource, /更新日期：2026 年 7 月 28 日[\s\S]*Effective date: July 28, 2026/, "the bilingual privacy notice must expose the consent version date");
+  assert.match(termsSource, /更新日期：2026 年 7 月 28 日[\s\S]*Effective date: July 28, 2026/, "the bilingual terms must match the recorded consent version");
   const now = new Date("2026-07-15T00:00:00.000Z").toISOString();
   const originalFetch = globalThis.fetch;
   let leakedPasswordRequest;
@@ -178,6 +188,23 @@ try {
   assert.equal(migrated.backup?.state.notes[0].body, "重要数据", "backup must preserve original state");
   assert.equal(stateSchemaVersion(migrated.state), 1, "schema version should remain supported");
   assert.doesNotThrow(() => validateAppStatePayload(migrated.state, "test state"), "valid app data must pass structural validation");
+  const recurringState = {
+    ...migrated.state,
+    shortcuts: [{ ...migrated.state.shortcuts[0], homeX: 0.25, homeY: 0.75 }],
+    todos: [{ ...migrated.state.todos[0], recurrence: "weekdays", reminderTime: "09:30", completedOn: "2026-07-28" }],
+    settings: { ...migrated.state.settings, homeSiteFloating: true }
+  };
+  assert.doesNotThrow(() => validateAppStatePayload(recurringState, "test state"), "valid home positions and recurring task schedules must survive validation");
+  assert.throws(
+    () => validateAppStatePayload({ ...recurringState, todos: [{ ...recurringState.todos[0], reminderTime: "25:90" }] }, "test state"),
+    /记录字段/,
+    "invalid reminder times must be rejected before persistence"
+  );
+  assert.throws(
+    () => validateAppStatePayload({ ...recurringState, shortcuts: [{ ...recurringState.shortcuts[0], homeX: 2 }] }, "test state"),
+    /记录字段/,
+    "home canvas coordinates outside the normalized boundary must be rejected"
+  );
   const normalizedLegacyImages = normalizeState({
     ...migrated.state,
     shortcuts: [{ ...migrated.state.shortcuts[0], iconUrl: "http://example.com/icon.png" }],
@@ -311,7 +338,7 @@ try {
     settings: { ...legacyState.settings, iconSize: 64, visualRefreshVersion: 7 }
   });
   assert.equal(oldDefaultVisual.settings.iconSize, 58, "old default icon size should migrate to the new unified default");
-  assert.equal(oldDefaultVisual.settings.visualRefreshVersion, 14, "visual refresh version should advance");
+  assert.equal(oldDefaultVisual.settings.visualRefreshVersion, 15, "visual refresh version should advance");
   assert.deepEqual(oldDefaultVisual.settings.customNavPages, [], "legacy state should receive an empty custom page list");
   assert.deepEqual(oldDefaultVisual.settings.hiddenNavPages, ["tools"], "legacy state should adopt the restrained Sample A navigation");
   assert.equal(oldDefaultVisual.settings.navigationDisplay, "always", "legacy state should receive a visible desktop navigation");
@@ -887,6 +914,52 @@ try {
   assert.equal(faviconHostFor("https://192.168.1.1/admin"), undefined, "private IP shortcut names must not be disclosed to favicon providers");
   assert.equal(faviconHostFor("https://printer.local"), undefined, "special-use local hostnames must not be disclosed to favicon providers");
   assert.equal(faviconHostFor("https://intranet"), undefined, "single-label intranet hostnames must not be disclosed to favicon providers");
+  assert.equal(faviconFor("https://github.com/openai"), "https://www.google.com/s2/favicons?domain_url=https://github.com&sz=256", "automatic icon lookup must request a high-resolution favicon");
+  assert.equal(fallbackFaviconFor("https://github.com/openai"), "https://icons.duckduckgo.com/ip3/github.com.ico", "automatic icon lookup must retain an independent fallback provider");
+  assert.equal(siteIconCandidatesFor("https://github.com/openai")[0], "https://github.com/apple-touch-icon.png", "automatic icon lookup must try site-owned high-resolution artwork");
+  assert.equal(curatedIconFor("https://github.com/openai", "GitHub"), "https://cdn.simpleicons.org/github", "known brands must retain a vector fallback");
+  const legacyTabRows = parseImportText(JSON.stringify({
+    version: "1",
+    data: {
+      "store-icon": {
+        icons: [
+          {
+            name: "工作",
+            children: [
+              { type: "site", name: "站点 A", target: "https://a.example", bgImage: "https://a.example/icon.png" },
+              {
+                type: "folder-icon",
+                name: "资料",
+                children: [{ type: "site", name: "站点 B", target: "https://b.example", bgImage: "https://b.example/icon.png" }]
+              },
+              { type: "widget", name: "天气" }
+            ]
+          }
+        ]
+      }
+    }
+  }));
+  assert.deepEqual(
+    legacyTabRows,
+    [
+      { title: "站点 A", url: "https://a.example/", iconUrl: "https://a.example/icon.png", groupName: "工作", folderName: undefined },
+      { title: "站点 B", url: "https://b.example/", iconUrl: "https://b.example/icon.png", groupName: "工作", folderName: "资料" }
+    ],
+    "WeTab .data imports must preserve categories, folders, URLs, order, and safe HTTPS icons while ignoring widgets"
+  );
+  const reminderMonday = new Date(2026, 6, 27, 9, 0, 0);
+  const recurringTodo = { id: "repeat-1", text: "Daily", done: false, order: 0, recurrence: "weekdays", reminderTime: "09:00", updatedAt: now };
+  assert.equal(isRecurringTodoDueOn(recurringTodo, reminderMonday), true, "weekday tasks must be due Monday through Friday");
+  assert.equal(isRecurringTodoDueOn(recurringTodo, new Date(2026, 7, 1, 9, 0, 0)), false, "weekday tasks must not be due on Saturday");
+  const completedRecurringTodo = { ...recurringTodo, completedOn: localDateKey(reminderMonday) };
+  assert.equal(isTodoCompletedForDate(completedRecurringTodo, reminderMonday), true, "recurring completion must apply only to the selected day");
+  assert.equal(isTodoCompletedForDate(completedRecurringTodo, new Date(2026, 6, 28, 9, 0, 0)), false, "recurring tasks must reopen on their next due day");
+  assert.deepEqual(nextTodoCompletion(completedRecurringTodo, reminderMonday), { done: false, completedOn: undefined }, "recurring completion must be reversible without deleting the task");
+  assert.equal(recurrenceLabel({ ...recurringTodo, recurrence: "weekly", reminderWeekday: 1 }, "zh-CN"), "每周一", "weekly task labels must identify the selected weekday in Chinese");
+  assert.equal(recurrenceLabel({ ...recurringTodo, recurrence: "weekly", reminderWeekday: 1 }, "en-US"), "Every Mon", "weekly task labels must identify the selected weekday in English");
+  const remindersSource = await readFile(join(repoRoot, "extension/src/reminders.ts"), "utf8");
+  assert.match(remindersSource, /reminders:\s*hasPermissions\s*\?\s*reminderItems\(todos, language\)\s*:\s*\[\]/, "revoking notification permission must clear previously scheduled extension alarms");
+  assert.match(remindersSource, /isTodoCompletedForDate\(todo, now\)/, "completed recurring tasks must not emit a web reminder for the completed day");
   assert.deepEqual(
     parseBookmarksHtml(`
       <!doctype netscape-bookmark-file-1>
@@ -1019,8 +1092,10 @@ try {
   assert.equal(latestVersionManifest.latestVersion, packageManifest.version, "hosted version manifest must match the workspace release");
   assert.equal(latestVersionManifest.minimumSupportedVersion, packageManifest.version, "minimum sync version must match this security release");
   assert.match(latestVersionManifest.updateUrl, /\/releases\/latest$/, "extension update checks must lead ordinary users to the latest downloadable release");
-  assert.equal(extensionManifest.permissions.includes("storage"), false, "unused extension storage permission must not be requested");
-  assert.equal(extensionManifest.permissions.includes("alarms"), false, "unused extension alarms permission must not be requested");
+  assert.equal(extensionManifest.permissions.includes("storage"), true, "recurring reminders must persist only their local scheduling copy");
+  assert.equal(extensionManifest.permissions.includes("alarms"), true, "recurring reminders must continue while the new-tab page is closed");
+  assert.equal(extensionManifest.permissions.includes("notifications"), false, "notification access must not be requested from every user at installation");
+  assert.equal(extensionManifest.optional_permissions?.includes("notifications"), true, "notification access must be requested only after a user enables a reminder");
   assert.equal(extensionManifest.permissions.includes("geolocation"), false, "precise location must not be requested from every user at installation");
   assert.equal(extensionManifest.optional_permissions?.includes("geolocation"), true, "precise location must remain available as an explicit optional permission");
   assert.equal(extensionManifest.permissions.includes("search"), true, "new-tab web search must use the browser default provider through the Search API");

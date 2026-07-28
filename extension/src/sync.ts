@@ -441,6 +441,7 @@ const SETTINGS_KEYS = new Set([
   "navigationDisplay",
   "navigationSide",
   "remoteIconLookup",
+  "homeSiteFloating",
   "timeZone",
   "supabaseUrl",
   "supabaseAnonKey",
@@ -585,6 +586,12 @@ const validateEntityArray = (
       || (optionalFields.includes("groupId") && !validOptionalString(entry.groupId, MAX_STATE_ID_LENGTH))
       || (optionalFields.includes("folderId") && !validOptionalString(entry.folderId, MAX_STATE_ID_LENGTH))
       || (optionalFields.includes("conflictBody") && !validOptionalString(entry.conflictBody))
+      || (optionalFields.includes("homeX") && !validOptionalNumberInRange(entry.homeX, 0, 1))
+      || (optionalFields.includes("homeY") && !validOptionalNumberInRange(entry.homeY, 0, 1))
+      || (optionalFields.includes("recurrence") && entry.recurrence !== undefined && !["daily", "weekdays", "weekly"].includes(String(entry.recurrence)))
+      || (optionalFields.includes("reminderTime") && entry.reminderTime !== undefined && (typeof entry.reminderTime !== "string" || !/^(?:[01]\d|2[0-3]):[0-5]\d$/.test(entry.reminderTime)))
+      || (optionalFields.includes("reminderWeekday") && entry.reminderWeekday !== undefined && (!Number.isSafeInteger(entry.reminderWeekday) || Number(entry.reminderWeekday) < 0 || Number(entry.reminderWeekday) > 6))
+      || (optionalFields.includes("completedOn") && entry.completedOn !== undefined && !validDateKey(entry.completedOn))
     ) return false;
     return Object.entries(fields).every(([key, type]) => {
       const field = entry[key];
@@ -659,14 +666,18 @@ export function validateAppStatePayload(value: unknown, label = "数据"): asser
     "iconUrl",
     "iconColor",
     "groupId",
-    "folderId"
+    "folderId",
+    "homeX",
+    "homeY"
   ]) && validateEntityArray(state.shortcutFolders, {
     name: "string",
     order: "number"
   }, [
     "iconUrl",
     "iconColor",
-    "groupId"
+    "groupId",
+    "homeX",
+    "homeY"
   ], true) && validateEntityArray(state.shortcutGroups, {
     name: "string",
     order: "number"
@@ -676,7 +687,12 @@ export function validateAppStatePayload(value: unknown, label = "数据"): asser
     text: "string",
     done: "boolean",
     order: "number"
-  }) && validateEntityArray(state.notes, {
+  }, [
+    "recurrence",
+    "reminderTime",
+    "reminderWeekday",
+    "completedOn"
+  ]) && validateEntityArray(state.notes, {
     title: "string",
     body: "string"
   }, [
@@ -733,6 +749,7 @@ export function validateAppStatePayload(value: unknown, label = "数据"): asser
     || !validOptionalBoolean(settings.wallpaperRotation)
     || !validOptionalBoolean(settings.weatherUseLocation)
     || !validOptionalBoolean(settings.remoteIconLookup)
+    || !validOptionalBoolean(settings.homeSiteFloating)
     || (settings.iconPresentation !== undefined && !["original", "soft", "minimal"].includes(String(settings.iconPresentation)))
     || (settings.language !== undefined && !["zh-CN", "en-US"].includes(String(settings.language)))
     || !["comfortable", "compact"].includes(String(settings.gridDensity))
@@ -1441,6 +1458,10 @@ export function normalizeState(state: AppState): AppState {
   const visualVersion = state.settings.visualRefreshVersion || 0;
   const normalizedWidgets = { ...defaultWidgets, ...(state.settings.widgets || {}) };
   const normalizedWidgetSizes = { ...defaultWidgetSizes, ...(state.settings.widgetSizes || {}) };
+  if (visualVersion < 15) {
+    if (normalizedWidgetSizes.weather === "wide") normalizedWidgetSizes.weather = "medium";
+    if (normalizedWidgetSizes.calendar === "wide") normalizedWidgetSizes.calendar = "medium";
+  }
   const normalizedWidgetOrder = normalizeWidgetOrder(state.settings.widgetOrder);
   const usesLegacyDefaultWidgetOrder = normalizedWidgetOrder.every((key, index) => key === legacyDefaultWidgetOrder[index]);
   if (visualVersion < 6) {
@@ -1458,7 +1479,7 @@ export function normalizeState(state: AppState): AppState {
         ? "aurora-lake"
         : state.settings.wallpaperPreset || "lucid-room",
     wallpaperRotation: visualVersion < 5 ? false : state.settings.wallpaperRotation ?? false,
-    visualRefreshVersion: 14,
+    visualRefreshVersion: 15,
     iconSize: Math.min(80, Math.max(48, visualVersion < 8 && state.settings.iconSize === 64 ? 58 : state.settings.iconSize || 58)),
     glass: Math.min(88, Math.max(28, state.settings.glass || 42)),
     customWallpapers: state.settings.customWallpapers || [],
@@ -1497,6 +1518,7 @@ export function normalizeState(state: AppState): AppState {
       : "always",
     navigationSide: state.settings.navigationSide === "right" ? "right" : "left",
     remoteIconLookup: state.settings.remoteIconLookup ?? true,
+    homeSiteFloating: state.settings.homeSiteFloating ?? true,
     timeZone: validTimeZone(state.settings.timeZone) ? state.settings.timeZone : "Asia/Shanghai",
     dateTimeColor: state.settings.dateTimeColor || "#ffffff",
     widgetAccentColor: state.settings.widgetAccentColor || "#2dd4bf",

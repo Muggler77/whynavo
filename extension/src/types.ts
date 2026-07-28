@@ -10,6 +10,8 @@ export type Shortcut = {
   folderId?: Id;
   pinned: boolean;
   order: number;
+  homeX?: number;
+  homeY?: number;
   updatedAt: string;
   deletedAt?: string;
 };
@@ -21,6 +23,8 @@ export type ShortcutFolder = {
   iconUrl?: string;
   iconColor: string;
   order: number;
+  homeX?: number;
+  homeY?: number;
   updatedAt: string;
   deletedAt?: string;
 };
@@ -39,6 +43,10 @@ export type Todo = {
   text: string;
   done: boolean;
   order: number;
+  recurrence?: "daily" | "weekdays" | "weekly";
+  reminderTime?: string;
+  reminderWeekday?: number;
+  completedOn?: string;
   updatedAt: string;
   deletedAt?: string;
 };
@@ -135,6 +143,7 @@ export type Settings = {
   navigationDisplay?: "always" | "auto" | "hidden";
   navigationSide?: "left" | "right";
   remoteIconLookup?: boolean;
+  homeSiteFloating?: boolean;
   timeZone?: string;
   supabaseUrl?: string;
   supabaseAnonKey?: string;

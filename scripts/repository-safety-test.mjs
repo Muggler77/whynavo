@@ -58,6 +58,13 @@ for (const path of candidateFiles) {
   if (content === undefined) continue;
   scannedFileCount += 1;
   for (const rule of forbiddenContent) {
+    if (rule.label === "retired product branding") {
+      const disallowedUse = content
+        .split(/\r?\n/)
+        .some((line) => rule.pattern.test(line) && !/(?:支持|导入|迁移|support|import|migrat|\.data).*\bwetab\b|\bwetab\b.*(?:支持|导入|迁移|support|import|migrat|\.data)/i.test(line));
+      if (disallowedUse) findings.push(`${path}: ${rule.label}`);
+      continue;
+    }
     if (rule.pattern.test(content)) findings.push(`${path}: ${rule.label}`);
   }
   const unexpectedEmails = (content.match(emailPattern) || []).filter((email) => !allowedExampleEmails.has(email.toLowerCase()));

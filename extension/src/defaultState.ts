@@ -33,8 +33,8 @@ export const defaultWidgetOrder: WidgetKey[] = ["weather", "focus", "calendar", 
 export const defaultNavigationOrder: SystemNavPage[] = ["widgets", "shortcuts", "search", "notes", "tasks", "tools"];
 
 export const defaultWidgetSizes: Record<WidgetKey, WidgetSize> = {
-  weather: "wide",
-  calendar: "wide",
+  weather: "medium",
+  calendar: "medium",
   countdowns: "medium",
   todos: "wide",
   notes: "wide",
@@ -89,7 +89,7 @@ export const defaultState = (): AppState => {
       customWallpapers: [],
       wallpaperCollection: ["lucid-room", "coastal-glass", "neon-rain", "aurora-lake"],
       quickNote: "",
-      visualRefreshVersion: 14,
+      visualRefreshVersion: 15,
       dateTimeColor: "#ffffff",
       widgetAccentColor: "#2dd4bf",
       glass: 42,
@@ -110,6 +110,7 @@ export const defaultState = (): AppState => {
       navigationDisplay: "always",
       navigationSide: "left",
       remoteIconLookup: true,
+      homeSiteFloating: true,
       calendarRecords: {},
       widgets: widgetDefaults,
       supabaseUrl: DEFAULT_SUPABASE_URL,

@@ -59,12 +59,13 @@
   <body>
     <main>
       <h1>WhyNavo 隐私与数据说明</h1>
-      <p class="meta">更新日期：2026 年 7 月 26 日</p>
+      <p class="meta">更新日期：2026 年 7 月 28 日</p>
       <p class="notice">WhyNavo 采用本地优先设计。你无需登录即可使用，登录仅用于可选的跨设备同步。</p>
 
       <h2>本机数据</h2>
       <p>快捷方式、小组件、便签、待办、倒计时、日历、布局和设置默认保存在当前浏览器的 IndexedDB 中。清理浏览器网站数据、卸载扩展、删除浏览器配置文件或系统回收存储空间，都可能影响仅存在本机的数据。请定期使用完整 JSON 备份。</p>
       <p>WhyNavo 不会对 IndexedDB 中的应用内容额外实施端到端或字段级加密。本机数据的静态保护依赖浏览器配置文件、操作系统账号、设备锁和磁盘加密；请勿在共享或未受保护的设备上保存敏感内容。</p>
+      <p>当你主动为固定任务启用提醒时，扩展会把该任务的标题、周期和提醒时间复制到浏览器扩展的本机存储，并使用浏览器的定时与通知能力在设定时间提醒。该提醒副本不会发送给额外的提醒服务；关闭通知权限或删除任务会停止相应提醒。</p>
 
       <h2>账号与云同步</h2>
       <p>当你注册或登录时，密码会从当前表单通过 HTTPS 直接提交给 Supabase Auth。WhyNavo 不会把密码写入持久化应用数据、IndexedDB、导出备份或同步快照；Supabase Auth 负责验证凭据，并在当前浏览器中保存维持登录所需的访问与刷新会话令牌。这些令牌不进入 WhyNavo 数据备份或同步快照，退出登录会撤销或移除相应会话。可同步的 WhyNavo 数据会写入与账号 ID 绑定的云端快照，并通过 Row Level Security、账号绑定的读写接口和带修订号的原子写入限制账号边界。WhyNavo 的云同步接口还会拒绝创建已超过 90 天或连续 30 天未使用的登录会话；这项限制只控制 WhyNavo 云数据访问，不代表浏览器中的 Supabase 会话令牌会被主动销毁。</p>
@@ -110,12 +111,13 @@
 
       <hr class="divider" />
       <h1 id="english">WhyNavo Privacy and Data Notice</h1>
-      <p class="meta">Effective date: July 26, 2026</p>
+      <p class="meta">Effective date: July 28, 2026</p>
       <p class="notice">WhyNavo is local-first. You can use it without an account; signing in is only required for optional cross-device synchronization.</p>
 
       <h2>Data on your device</h2>
       <p>Shortcuts, widgets, notes, todos, countdowns, calendar entries, layout, and settings are stored in the current browser's IndexedDB by default. Clearing site data, removing the extension, deleting the browser profile, or operating-system storage cleanup can remove device-only data. Use the complete JSON backup regularly.</p>
       <p>WhyNavo does not add end-to-end or field-level encryption to application content in IndexedDB. Protection of data at rest depends on the browser profile, operating-system account, device lock, and disk encryption. Do not keep sensitive content on a shared or unprotected device.</p>
+      <p>When you explicitly enable a reminder for a recurring task, the extension copies that task's title, recurrence, and reminder time to local extension storage and uses the browser's alarm and notification APIs at the scheduled time. This reminder copy is not sent to an additional reminder service. Revoking notification permission or deleting the task stops the corresponding reminder.</p>
 
       <h2>Account and cloud synchronization</h2>
       <p>When you register or sign in, your password is sent directly over HTTPS from the current form to Supabase Auth. WhyNavo does not place passwords in persistent application data, IndexedDB, exported backups, or synchronization snapshots. Supabase Auth stores the access and refresh session tokens needed to remain signed in in the current browser; those tokens are excluded from WhyNavo backups and cloud snapshots and are removed or revoked by the applicable sign-out action. Synchronizable data is stored in an account-scoped cloud snapshot protected by Supabase authentication, Row Level Security, account-bound read and write functions, and revision-checked atomic writes. WhyNavo's cloud-data functions also reject sessions created more than 90 days ago or unused for 30 consecutive days. This restriction controls access to WhyNavo cloud data; it does not claim that the browser's underlying Supabase session token is proactively destroyed.</p>
