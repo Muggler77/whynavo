@@ -24,7 +24,7 @@ export type SortableHomeShortcutItem = {
   content: ReactNode;
 };
 
-function SortableHomeShortcut({ item }: { item: SortableHomeShortcutItem }) {
+function SortableHomeShortcut({ item, language }: { item: SortableHomeShortcutItem; language: "zh-CN" | "en-US" }) {
   const {
     attributes,
     listeners,
@@ -49,8 +49,8 @@ function SortableHomeShortcut({ item }: { item: SortableHomeShortcutItem }) {
         transition,
         zIndex: isDragging ? 20 : undefined
       }}
-      aria-label={`拖动${item.label}`}
-      title={`拖动${item.label}`}
+      aria-label={language === "en-US" ? `Drag ${item.label}` : `拖动${item.label}`}
+      title={language === "en-US" ? `Drag ${item.label}` : `拖动${item.label}`}
       {...attributes}
       {...listeners}
     >
@@ -65,10 +65,12 @@ function SortableHomeShortcut({ item }: { item: SortableHomeShortcutItem }) {
 export default function SortableHomeShortcutGrid({
   items,
   iconSize,
+  language,
   onMove
 }: {
   items: SortableHomeShortcutItem[];
   iconSize: number;
+  language: "zh-CN" | "en-US";
   onMove: (source: string, target: string) => void;
 }) {
   const sensors = useSensors(
@@ -86,12 +88,12 @@ export default function SortableHomeShortcutGrid({
   return (
     <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={finishDrag}>
       <SortableContext items={items.map((item) => item.id)} strategy={rectSortingStrategy}>
-        <section className="home-shortcuts layout-editing" aria-label="主页快捷入口">
+        <section className="home-shortcuts layout-editing" aria-label={language === "en-US" ? "Home shortcuts" : "主页快捷入口"}>
           <div
             className="home-shortcuts-row"
             style={{ "--icon": `${Math.max(48, Math.min(iconSize, 80))}px` } as CSSProperties}
           >
-            {items.map((item) => <SortableHomeShortcut item={item} key={item.id} />)}
+            {items.map((item) => <SortableHomeShortcut item={item} language={language} key={item.id} />)}
           </div>
         </section>
       </SortableContext>

@@ -309,6 +309,25 @@ const widgetNames: Record<WidgetKey, string> = {
   calculator: "计算器"
 };
 
+const widgetEnglishNames: Record<WidgetKey, string> = {
+  weather: "Weather",
+  calendar: "Calendar",
+  countdowns: "Countdowns",
+  todos: "To Do",
+  notes: "Photos",
+  rates: "Exchange rates",
+  quote: "Daily inspiration",
+  focus: "Focus",
+  clock: "World clock",
+  memo: "Memo",
+  year: "Year progress",
+  calculator: "Calculator"
+};
+
+const widgetNameFor = (language: UiLanguage, key: WidgetKey) => (
+  language === "en-US" ? widgetEnglishNames[key] : widgetNames[key]
+);
+
 const widgetLibraryMeta: Record<WidgetKey, {
   category: "信息" | "效率" | "生活";
   preview: string;
@@ -328,6 +347,48 @@ const widgetLibraryMeta: Record<WidgetKey, {
   calculator: { category: "效率", preview: "128", Icon: Calculator }
 };
 
+const widgetEnglishPreviews: Record<WidgetKey, string> = {
+  weather: "21° Clear",
+  calendar: "Today 2",
+  countdowns: "28 days left",
+  todos: "3 tasks",
+  notes: "Photos",
+  rates: "USD 7.18",
+  quote: "Daily quote",
+  focus: "25:00",
+  clock: "13:42",
+  memo: "Write a note",
+  year: "50.1%",
+  calculator: "128"
+};
+
+const widgetPreviewFor = (language: UiLanguage, key: WidgetKey) => (
+  language === "en-US" ? widgetEnglishPreviews[key] : widgetLibraryMeta[key].preview
+);
+
+const widgetCategoryFor = (language: UiLanguage, category: "信息" | "效率" | "生活") => {
+  if (language === "zh-CN") return category;
+  return category === "信息" ? "Information" : category === "效率" ? "Productivity" : "Lifestyle";
+};
+
+const todoTextFor = (language: UiLanguage, value: string) => (
+  value === "添加常用网站快捷方式"
+    ? localized(language, "添加常用网站快捷方式", "Add shortcuts for frequently used sites")
+    : value
+);
+
+const noteTitleFor = (language: UiLanguage, value: string) => (
+  value === "随手笔记" || value === "Quick note"
+    ? localized(language, "随手笔记", "Quick note")
+    : value
+);
+
+const noteBodyFor = (language: UiLanguage, value: string) => (
+  value === "记录临时想法、链接或待整理的信息。" || value === "Capture temporary ideas, links, or information to organize later."
+    ? localized(language, "记录临时想法、链接或待整理的信息。", "Capture temporary ideas, links, or information to organize later.")
+    : value
+);
+
 const widgetSizeLabels: Record<WidgetSize, string> = {
   small: "紧凑",
   medium: "标准",
@@ -338,6 +399,18 @@ const widgetSizeDetails: Record<WidgetSize, string> = {
   small: "快速扫一眼",
   medium: "均衡信息量",
   wide: "显示完整内容"
+};
+
+const widgetEnglishSizeLabels: Record<WidgetSize, string> = {
+  small: "Compact",
+  medium: "Standard",
+  wide: "Expanded"
+};
+
+const widgetEnglishSizeDetails: Record<WidgetSize, string> = {
+  small: "Quick glance",
+  medium: "Balanced detail",
+  wide: "Full content"
 };
 
 const allWidgetSizes: WidgetSize[] = ["small", "medium", "wide"];
@@ -373,6 +446,16 @@ const customNavPageIcons: Record<CustomNavPageIcon, { label: string; Icon: typeo
   sparkles: { label: "灵感", Icon: Sparkles },
   globe: { label: "网络", Icon: Globe2 }
 };
+
+const customNavPageIconEnglishLabels: Record<CustomNavPageIcon, string> = {
+  star: "Favorites", briefcase: "Work", book: "Learning", code: "Development", heart: "Lifestyle",
+  plane: "Travel", home: "Home", grid: "Spaces", search: "Search", file: "Notes", check: "Tasks",
+  compass: "Explore", calendar: "Calendar", sparkles: "Inspiration", globe: "Web"
+};
+
+const customNavPageIconLabelFor = (language: UiLanguage, key: CustomNavPageIcon) => (
+  language === "en-US" ? customNavPageIconEnglishLabels[key] : customNavPageIcons[key].label
+);
 
 const systemNavDefaults: Record<SystemNavPage, {
   label: string;
@@ -445,6 +528,21 @@ const builtInShortcutIcons = [
   { id: "health", label: "健康", Icon: HeartPulse, tone: "#10B981" },
   { id: "news", label: "资讯", Icon: BookOpen, tone: "#F59E0B" },
 ];
+
+const builtInShortcutIconEnglishLabels: Record<string, string> = {
+  general: "General", ai: "AI", tool: "Tools", design: "Design", video: "Video",
+  music: "Music", doc: "Documents", shop: "Shopping", mail: "Mail", server: "Servers",
+  finance: "Finance", learn: "Learning", code: "Development", game: "Games", travel: "Travel",
+  photo: "Photography", chat: "Communication", data: "Data", health: "Health", news: "News"
+};
+
+const builtInShortcutIconLabelFor = (language: UiLanguage, icon: (typeof builtInShortcutIcons)[number]) => (
+  language === "en-US" ? (builtInShortcutIconEnglishLabels[icon.id] || icon.id) : icon.label
+);
+
+const shortcutGroupNameFor = (language: UiLanguage, group: AppState["shortcutGroups"][number]) => (
+  group.id === "default" && group.name === "常用" ? localized(language, "常用", "Common") : group.name
+);
 
 const builtInIconValue = (id: string) => `${builtInIconPrefix}${id}`;
 const builtInShortcutIconFor = (iconUrl?: string) => {
@@ -752,6 +850,10 @@ const searchEngines: Record<SearchEngine, { label: string; url: (query: string) 
   }
 };
 
+const searchEngineLabelFor = (language: UiLanguage, engine: SearchEngine) => (
+  engine === "baidu" ? localized(language, "百度", "Baidu") : searchEngines[engine].label
+);
+
 type CurrencyCode = "CNY" | "USD" | "JPY";
 
 const currencyNames: Record<CurrencyCode, string> = {
@@ -832,6 +934,18 @@ const weatherToneForCode = (code?: number) => {
   return "cloudy";
 };
 
+const weatherLabelFor = (code: number | undefined, language: UiLanguage) => {
+  if (language === "zh-CN") return weatherLabel(code);
+  if (code === undefined) return "Unknown";
+  if (code === 0) return "Clear";
+  if ([1, 2, 3].includes(code)) return "Cloudy";
+  if ([45, 48].includes(code)) return "Fog";
+  if ([51, 53, 55, 61, 63, 65, 80, 81, 82].includes(code)) return "Rain";
+  if ([71, 73, 75, 77, 85, 86].includes(code)) return "Snow";
+  if ([95, 96, 99].includes(code)) return "Thunderstorm";
+  return "Weather";
+};
+
 
 const timeZoneLabels: Record<string, string> = {
   "Asia/Shanghai": "北京时间", "Asia/Hong_Kong": "香港时间", "Asia/Taipei": "台北时间",
@@ -890,9 +1004,9 @@ const calendarDateKey = (value: Date) => {
   return year + "-" + month + "-" + day;
 };
 
-const calendarDateLabel = (key: string) => {
+const calendarDateLabel = (key: string, language: UiLanguage = "zh-CN") => {
   const date = new Date(key + "T00:00:00");
-  return date.toLocaleDateString("zh-CN", { month: "long", day: "numeric", weekday: "long" });
+  return date.toLocaleDateString(language, { month: "long", day: "numeric", weekday: "long" });
 };
 
 export default function App() {
@@ -903,7 +1017,6 @@ export default function App() {
   const [dialog, setDialog] = useState<Dialog>(null);
   const [activePage, setActivePage] = useState<HomePage>("widgets");
   const [activeCustomPageId, setActiveCustomPageId] = useState<string | undefined>();
-  const [activeSecondaryWidget, setActiveSecondaryWidget] = useState<WidgetKey | undefined>();
   const [pageMotion, setPageMotion] = useState<"up" | "down" | undefined>();
   const [editingShortcut, setEditingShortcut] = useState<Shortcut | undefined>();
   const [editingFolder, setEditingFolder] = useState<ShortcutFolder | undefined>();
@@ -1485,10 +1598,14 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    let cancelled = false;
     void (async () => {
       const pendingAccountDeletionIds = await readPendingLocalAccountDeletionIds();
+      if (cancelled) return;
       pendingAccountDeletionIdsRef.current = pendingAccountDeletionIds;
-      setLegacyStateAvailable(await hasLegacyUnscopedState().catch(() => false));
+      const hasLegacyState = await hasLegacyUnscopedState().catch(() => false);
+      if (cancelled) return;
+      setLegacyStateAvailable(hasLegacyState);
       const bootState = defaultState();
       let authVerifiedOnline = false;
       let user = await getCachedUser(bootState.settings.supabaseUrl, bootState.settings.supabaseAnonKey).catch(() => null);
@@ -1613,6 +1730,7 @@ export default function App() {
         window.setTimeout(() => void refreshExternalData(normalized), 450);
       }
     })().catch((error) => {
+      if (cancelled) return;
       const fallback = normalizeState(defaultState());
       accountEpochRef.current += 1;
       activeUserIdRef.current = undefined;
@@ -1632,6 +1750,9 @@ export default function App() {
         ? `本机数据存储初始化失败：${error.message}`
         : "本机数据存储初始化失败，请检查浏览器存储权限");
     });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   useEffect(() => {
@@ -1803,10 +1924,10 @@ export default function App() {
     const requestUserId = activeUserIdRef.current;
     const stillCurrentAccount = () => isCurrentAccountOperation(requestEpoch, requestUserId);
     if (feedback) {
-      showToast("正在刷新天气和汇率...");
+      showToast(text("正在刷新天气和汇率...", "Refreshing weather and exchange rates..."));
       setWeatherRefreshing(true);
       setRatesRefreshing(true);
-      setRatesMessage("正在刷新...");
+      setRatesMessage(text("正在刷新...", "Refreshing..."));
     }
 
     const weatherTask = (async () => {
@@ -1830,15 +1951,15 @@ export default function App() {
       const nextRates = await fetchRates(target.settings.supabaseUrl, target.settings.supabaseAnonKey);
       if (!stillCurrentAccount()) return false;
       setRates(nextRates);
-      setRatesMessage(nextRates.stale ? "云端缓存" : "已更新");
+      setRatesMessage(nextRates.stale ? text("云端缓存", "Cloud cache") : text("已更新", "Updated"));
       return !nextRates.stale;
     })().catch(async (error) => {
       const cached = await getCachedRates().catch(() => undefined);
       if (cached && stillCurrentAccount()) {
         setRates(cached);
-        if (feedback) setRatesMessage("已使用缓存");
+        if (feedback) setRatesMessage(text("已使用缓存", "Using cached data"));
       } else {
-        setRatesMessage(error instanceof Error ? error.message : "汇率暂时不可用");
+        setRatesMessage(error instanceof Error ? error.message : text("汇率暂时不可用", "Exchange rates are temporarily unavailable"));
       }
       return false;
     }).finally(() => {
@@ -2047,11 +2168,6 @@ export default function App() {
   }, [allShortcuts, openFolderId]);
 
   const pinned = useMemo(() => allShortcuts.filter((shortcut) => shortcut.pinned), [allShortcuts]);
-  const activeLayerName = activeLayer === "all"
-    ? text("全部网站", "All sites")
-    : activeLayer === "pinned"
-      ? text("Dock 固定", "Pinned")
-      : groups.find((group) => group.id === activeLayer)?.name || text("快捷导航", "Shortcuts");
   const activeCustomNavPage = customNavPages.find((page) => page.id === activeCustomPageId);
   const today = clock;
   const selectedTimeZone = state.settings.timeZone || "Asia/Shanghai";
@@ -3306,38 +3422,13 @@ export default function App() {
     return {
       id: key,
       size: widgetSizes[key],
-      label: widgetNames[key],
-      sizeLabel: widgetSizeLabels[widgetSizes[key]],
+      label: widgetNameFor(uiLanguage, key),
+      sizeLabel: uiLanguage === "en-US" ? widgetEnglishSizeLabels[widgetSizes[key]] : widgetSizeLabels[widgetSizes[key]],
       icon: <PreviewIcon size={18} />,
       content: widgetRenderers[key]
     };
   });
   const primaryWidgetItems = widgetGridItems.slice(0, 3);
-  const primaryWidgetKeys = primaryWidgetItems.map((item) => item.id);
-  const secondaryWidgetItems = widgetGridItems.filter((item) => !primaryWidgetKeys.includes(item.id));
-  const selectedSecondaryWidget = secondaryWidgetItems.find((item) => item.id === activeSecondaryWidget)
-    || secondaryWidgetItems[0];
-  const staticWidgetsPanel = (
-    <section className="widgets home-widgets" aria-label="主页小组件">
-      {widgetGridItems.map((item) => (
-        <div className={`widget-sortable-shell widget-size-${item.size}`} data-widget-key={item.id} key={item.id}>
-          {item.content}
-        </div>
-      ))}
-    </section>
-  );
-  const widgetsPanel = layoutEditing ? (
-    <Suspense fallback={staticWidgetsPanel}>
-      <SortableWidgetGrid
-        items={widgetGridItems}
-        onMove={(source, target) => {
-          reorderWidget(source, target);
-          showToast(`${widgetNames[source]}已移动`);
-        }}
-        onConfigure={(widgetKey, x, y) => showWidgetMenu(x, y, widgetKey)}
-      />
-    </Suspense>
-  ) : staticWidgetsPanel;
 
   const leaveAccount = async (everywhere = false) => {
     const signOutEpoch = accountEpochRef.current + 1;
@@ -3471,7 +3562,7 @@ export default function App() {
               <div className="search hero-search">
                 {USE_BROWSER_DEFAULT_SEARCH
                   ? <span className="engine-toggle engine-default">{text("默认", "Default")}</span>
-                  : <button type="button" className="engine-toggle" title={text("切换搜索引擎", "Switch search engine")} onClick={toggleSearchEngine}>{searchEngines[currentSearchEngine].label}</button>}
+                  : <button type="button" className="engine-toggle" title={text("切换搜索引擎", "Switch search engine")} onClick={toggleSearchEngine}>{searchEngineLabelFor(uiLanguage, currentSearchEngine)}</button>}
                 <Search size={20} />
                 <input
                   ref={searchInputRef}
@@ -3618,9 +3709,25 @@ export default function App() {
                 </section>
 
                 {layoutEditing ? (
-                  <section className="sample-a-editing-grid">
-                    {widgetsPanel}
-                  </section>
+                  <Suspense fallback={(
+                    <section className="sample-a-primary-widgets" aria-label={text("主要小组件", "Primary widgets")}>
+                      {primaryWidgetItems.map((item) => (
+                        <div className="widget-sortable-shell widget-size-wide" data-widget-key={item.id} key={item.id}>{item.content}</div>
+                      ))}
+                    </section>
+                  )}>
+                    <SortableWidgetGrid
+                      items={primaryWidgetItems}
+                      className="sample-a-primary-widgets"
+                      forceWide
+                      language={uiLanguage}
+                      onMove={(source, target) => {
+                        reorderWidget(source, target);
+                        showToast(text(`${widgetNameFor(uiLanguage, source)}已移动`, `${widgetNameFor(uiLanguage, source)} moved`));
+                      }}
+                      onConfigure={(widgetKey, x, y) => showWidgetMenu(x, y, widgetKey)}
+                    />
+                  </Suspense>
                 ) : (
                   <section className="sample-a-primary-widgets" aria-label={text("主要小组件", "Primary widgets")}>
                     {primaryWidgetItems.map((item) => (
@@ -3632,51 +3739,10 @@ export default function App() {
                 )}
               </div>
 
-              {!layoutEditing && secondaryWidgetItems.length > 0 && (
-                <section className="sample-a-widget-shelf" aria-label={text("更多小组件", "More widgets")}>
-                  <header>
-                    <div>
-                      <span>{text("更多小组件", "More widgets")}</span>
-                      <h2>{text("按需展开，不挤占主页空间", "Open only what you need")}</h2>
-                    </div>
-                    <div className="sample-a-section-actions">
-                      <button type="button" aria-label={text("资源中心", "Resource center")} title={text("资源中心", "Resource center")} onClick={() => setDialog("library")}><Palette size={17} /></button>
-                      <button type="button" aria-label={text("刷新数据", "Refresh data")} title={text("刷新数据", "Refresh data")} onClick={() => void refreshExternalData(state, true)}><RefreshCcw size={17} /></button>
-                    </div>
-                  </header>
-                  <div className="sample-a-widget-tabs" role="tablist" aria-label="选择小组件">
-                    {secondaryWidgetItems.map((item) => (
-                      <button
-                        type="button"
-                        role="tab"
-                        aria-selected={selectedSecondaryWidget?.id === item.id}
-                        className={selectedSecondaryWidget?.id === item.id ? "active" : ""}
-                        onClick={() => setActiveSecondaryWidget(item.id)}
-                        key={item.id}
-                      >
-                        {item.icon}
-                        <span>{item.label}</span>
-                      </button>
-                    ))}
-                  </div>
-                  <div className="sample-a-widget-stage">
-                    {selectedSecondaryWidget && (
-                      <div className={`widget-sortable-shell widget-size-${selectedSecondaryWidget.size}`} data-widget-key={selectedSecondaryWidget.id}>
-                        {selectedSecondaryWidget.content}
-                      </div>
-                    )}
-                  </div>
-                </section>
-              )}
-
               <footer className="sample-a-local-note">
                 <ShieldCheck size={15} />
                 <span>{text("本地优先。未登录时，数据只保存在你的设备上。", "Local-first. Signed-out data stays on your device.")}</span>
               </footer>
-              <div className="sample-a-corner-actions" aria-label={text("主页快捷操作", "Home quick actions")}>
-                <button type="button" aria-label={text("壁纸与组件", "Wallpapers and widgets")} title={text("壁纸与组件", "Wallpapers and widgets")} onClick={() => setDialog("library")}><ImageIcon size={17} /></button>
-                <button type="button" aria-label={text("添加网站", "Add site")} title={text("添加网站", "Add site")} onClick={() => openNewShortcut()}><Plus size={19} /></button>
-              </div>
             </section>
           ) : activePage === "search" ? (
             <SearchWorkspace
@@ -3684,10 +3750,11 @@ export default function App() {
               onQueryChange={setSearchText}
               onWebSearch={runSearch}
               onToggleEngine={toggleSearchEngine}
-              engineLabel={USE_BROWSER_DEFAULT_SEARCH ? "Browser" : searchEngines[currentSearchEngine].label}
+              engineLabel={USE_BROWSER_DEFAULT_SEARCH ? text("浏览器", "Browser") : searchEngineLabelFor(uiLanguage, currentSearchEngine)}
               shortcuts={allShortcuts}
               notes={state.notes}
               todos={state.todos}
+              onAddShortcut={() => openNewShortcut()}
               onOpenNotes={() => goToPage("notes")}
               onOpenTasks={() => goToPage("tasks")}
             />
@@ -3713,34 +3780,12 @@ export default function App() {
             />
           ) : (
             <section className="shortcut-stage">
-              <header className="shortcut-stage-head">
-                <div className="shortcut-stage-title">
-                  <span>{activeCustomNavPage ? (() => {
-                    const ActivePageIcon = customNavPageIcons[activeCustomNavPage.icon]?.Icon || Star;
-                    return <ActivePageIcon size={19} />;
-                  })() : <Layers size={19} />}</span>
-                  <div>
-                    <h2>{activeCustomNavPage?.name || activeLayerName}</h2>
-                    <p>{text(`${filteredShortcutTiles.length} 个入口`, `${filteredShortcutTiles.length} items`)}</p>
-                  </div>
-                </div>
-                <div className="shortcut-stage-actions">
-                  <button type="button" title={text("添加网站", "Add site")} aria-label={text("添加网站", "Add site")} onClick={() => openNewShortcut(activeCustomNavPage?.groupId)}><Plus size={17} /></button>
-                  <button type="button" title={text("新建文件夹", "New folder")} aria-label={text("新建文件夹", "New folder")} onClick={() => openNewFolder(activeCustomNavPage?.groupId)}><FolderPlus size={17} /></button>
-                  <button type="button" title={text("管理页面", "Manage pages")} aria-label={text("管理页面", "Manage pages")} onClick={() => setDialog("pages")}><Settings size={17} /></button>
-                </div>
-              </header>
-              {!activeCustomNavPage && (
-                <LayerRail
-                  activeLayer={activeLayer}
-                  groups={groups}
-                  shortcuts={allShortcuts}
-                  onSelect={setActiveLayer}
-                  onAddGroup={addGroup}
-                  onRenameGroup={renameGroup}
-                  onDeleteGroup={deleteGroup}
-                />
-              )}
+              <div className="spaces-canvas-toolbar">
+                <button type="button" className="space-add-site" onClick={() => openNewShortcut(activeCustomNavPage?.groupId)}>
+                  <Plus size={17} />
+                  <span>{text("添加网站", "Add site")}</span>
+                </button>
+              </div>
               <section className="shortcuts-panel">
                 <div className={"shortcut-grid " + state.settings.gridDensity} style={{ "--icon": state.settings.iconSize + "px" } as React.CSSProperties}>
                   {renderedShortcutTiles.map((item) => {
@@ -3791,7 +3836,7 @@ export default function App() {
                   {!filteredShortcutTiles.length && (
                     spaceSearchText
                       ? <div className="empty-shortcut search-empty"><Search size={22} />{text("没有匹配的网站或文件夹", "No matching sites or folders")}</div>
-                      : <button className="empty-shortcut" onClick={() => openNewShortcut(activeCustomNavPage?.groupId)}><Plus size={22} />{text("添加网站", "Add site")}</button>
+                      : null
                   )}
                 </div>
               </section>
@@ -3839,12 +3884,19 @@ export default function App() {
           onClose={() => setWidgetMenu(null)}
           onResize={(key, size) => {
             setWidgetSize(key, size);
-            showToast(`${widgetNames[key]}已切换为${widgetSizeLabels[size]}尺寸`);
+            showToast(text(
+              `${widgetNames[key]}已切换为${widgetSizeLabels[size]}尺寸`,
+              `${widgetEnglishNames[key]} changed to ${widgetEnglishSizeLabels[size]}`
+            ));
           }}
           onOpenLibrary={() => { setDialog("library"); setWidgetMenu(null); }}
           onRefresh={() => { void refreshExternalData(state, true); setWidgetMenu(null); }}
           onRotateWallpaper={() => { rotateMainWallpaper(); setWidgetMenu(null); }}
-          onHide={(key) => { setWidgetEnabled(key, false); setWidgetMenu(null); showToast("已隐藏" + widgetNames[key]); }}
+          onHide={(key) => {
+            setWidgetEnabled(key, false);
+            setWidgetMenu(null);
+            showToast(text(`已隐藏${widgetNames[key]}`, `${widgetEnglishNames[key]} hidden`));
+          }}
         />
       )}
       {dialog === "shortcut" && (
@@ -4290,6 +4342,8 @@ function HomeShortcuts({ tiles, iconSize, editing, onOpenFolder, onMoveTile }: {
   onOpenFolder: (folderId: string) => void;
   onMoveTile: (source?: HomeTileRef | string, target?: HomeTileRef | string) => void;
 }) {
+  const language = useUiLanguage();
+  const text = (zh: string, en: string) => localized(language, zh, en);
   const tileKey = (item: { kind: "folder"; folder: ShortcutFolder } | { kind: "shortcut"; shortcut: Shortcut }): HomeTileRef => (
     item.kind === "folder" ? `folder:${item.folder.id}` : `shortcut:${item.shortcut.id}`
   );
@@ -4329,13 +4383,14 @@ function HomeShortcuts({ tiles, iconSize, editing, onOpenFolder, onMoveTile }: {
         <SortableHomeShortcutGrid
           items={sortableItems}
           iconSize={iconSize}
+          language={language}
           onMove={(source, target) => onMoveTile(source, target)}
         />
       </Suspense>
     );
   }
   return (
-    <section className="home-shortcuts" aria-label="主页快捷入口">
+    <section className="home-shortcuts" aria-label={text("主页快捷入口", "Home shortcuts")}>
       <div className="home-shortcuts-row" style={{ "--icon": Math.max(48, Math.min(iconSize, 80)) + "px" } as React.CSSProperties}>
         {tiles.map((item, index) => {
           return item.kind === "folder" ? (
@@ -4397,7 +4452,7 @@ function StarterSites() {
   );
 }
 
-function SearchWorkspace({ query, onQueryChange, onWebSearch, onToggleEngine, engineLabel, shortcuts, notes, todos, onOpenNotes, onOpenTasks }: {
+function SearchWorkspace({ query, onQueryChange, onWebSearch, onToggleEngine, engineLabel, shortcuts, notes, todos, onAddShortcut, onOpenNotes, onOpenTasks }: {
   query: string;
   onQueryChange: (value: string) => void;
   onWebSearch: () => void;
@@ -4406,6 +4461,7 @@ function SearchWorkspace({ query, onQueryChange, onWebSearch, onToggleEngine, en
   shortcuts: Shortcut[];
   notes: Note[];
   todos: Todo[];
+  onAddShortcut: () => void;
   onOpenNotes: () => void;
   onOpenTasks: () => void;
 }) {
@@ -4417,7 +4473,7 @@ function SearchWorkspace({ query, onQueryChange, onWebSearch, onToggleEngine, en
     .slice(0, normalizedQuery ? 12 : 8);
   const matchedNotes = notes
     .filter((note) => !note.deletedAt)
-    .filter((note) => !normalizedQuery || `${note.title} ${note.body}`.toLowerCase().includes(normalizedQuery))
+    .filter((note) => !normalizedQuery || `${noteTitleFor(language, note.title)} ${noteBodyFor(language, note.body)}`.toLowerCase().includes(normalizedQuery))
     .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt))
     .slice(0, normalizedQuery ? 8 : 3);
   const matchedTodos = todos
@@ -4445,11 +4501,12 @@ function SearchWorkspace({ query, onQueryChange, onWebSearch, onToggleEngine, en
       <div className="lucid-search-summary">
         <span>{normalizedQuery ? text(`${resultCount} 个本地结果`, `${resultCount} local results`) : text("最近使用", "Recently used")}</span>
         <p>{normalizedQuery ? text("本地结果即时显示；按回车可继续搜索网络。", "Local results appear instantly; press Enter to search the web.") : text("先从设备本地内容开始，不上传搜索词。", "Start with local device content without uploading your query.")}</p>
+        <button type="button" className="lucid-page-add" onClick={onAddShortcut}><Plus size={16} /><span>{text("添加网站", "Add site")}</span></button>
       </div>
 
       <div className="lucid-search-results">
         <section className="lucid-result-group">
-          <header><span><Globe2 size={16} />Sites</span><small>{matchedShortcuts.length}</small></header>
+          <header><span><Globe2 size={16} />{text("网站", "Sites")}</span><small>{matchedShortcuts.length}</small></header>
           <div className="lucid-site-results">
             {matchedShortcuts.map((shortcut, index) => (
               <a href={safeHttpHref(shortcut.url)} target="_blank" rel="noreferrer" key={shortcut.id}>
@@ -4468,7 +4525,7 @@ function SearchWorkspace({ query, onQueryChange, onWebSearch, onToggleEngine, en
           <div className="lucid-text-results">
             {matchedNotes.map((note) => (
               <button type="button" onClick={onOpenNotes} key={note.id}>
-                <span><strong>{note.title || text("未命名笔记", "Untitled note")}</strong><small>{note.body || text("空白笔记", "Empty note")}</small></span>
+                <span><strong>{noteTitleFor(language, note.title) || text("未命名笔记", "Untitled note")}</strong><small>{noteBodyFor(language, note.body) || text("空白笔记", "Empty note")}</small></span>
                 <FileText size={15} />
               </button>
             ))}
@@ -4481,7 +4538,7 @@ function SearchWorkspace({ query, onQueryChange, onWebSearch, onToggleEngine, en
           <div className="lucid-text-results">
             {matchedTodos.map((todo) => (
               <button type="button" className={todo.done ? "is-done" : ""} onClick={onOpenTasks} key={todo.id}>
-                <span><strong>{todo.text}</strong><small>{todo.done ? text("已完成", "Completed") : text("待处理", "Open")}</small></span>
+                <span><strong>{todoTextFor(language, todo.text)}</strong><small>{todo.done ? text("已完成", "Completed") : text("待处理", "Open")}</small></span>
                 <Check size={15} />
               </button>
             ))}
@@ -4530,7 +4587,7 @@ function NotesWorkspace({ state, updateState }: {
     }));
   };
   const deleteNote = () => {
-    if (!selected || !window.confirm(text(`删除“${selected.title || "未命名笔记"}”？`, `Delete "${selected.title || "Untitled note"}"?`))) return;
+    if (!selected || !window.confirm(text(`删除“${noteTitleFor(language, selected.title) || "未命名笔记"}”？`, `Delete "${noteTitleFor(language, selected.title) || "Untitled note"}"?`))) return;
     const deletedAt = nowIso();
     updateState((current) => ({
       ...current,
@@ -4551,8 +4608,8 @@ function NotesWorkspace({ state, updateState }: {
         <div className="lucid-note-list">
           {notes.map((note) => (
             <button type="button" className={note.id === selected?.id ? "active" : ""} onClick={() => setSelectedId(note.id)} key={note.id}>
-              <strong>{note.title || text("未命名笔记", "Untitled note")}</strong>
-              <span>{note.body || text("空白笔记", "Empty note")}</span>
+              <strong>{noteTitleFor(language, note.title) || text("未命名笔记", "Untitled note")}</strong>
+              <span>{noteBodyFor(language, note.body) || text("空白笔记", "Empty note")}</span>
               <small>{new Date(note.updatedAt).toLocaleDateString(language, { month: "short", day: "numeric" })}</small>
             </button>
           ))}
@@ -4570,7 +4627,7 @@ function NotesWorkspace({ state, updateState }: {
             <input
               className="lucid-note-title"
               maxLength={MAX_ENTITY_NAME_CHARS}
-              value={selected.title}
+              value={noteTitleFor(language, selected.title)}
               onChange={(event) => updateNote({ title: event.target.value })}
               placeholder={text("标题", "Title")}
               aria-label={text("笔记标题", "Note title")}
@@ -4578,7 +4635,7 @@ function NotesWorkspace({ state, updateState }: {
             <textarea
               className="lucid-note-body"
               maxLength={MAX_QUICK_NOTE_CHARS}
-              value={selected.body}
+              value={noteBodyFor(language, selected.body)}
               onChange={(event) => updateNote({ body: event.target.value })}
               placeholder={text("写下想法、链接或下一步…", "Write down an idea, link, or next step...")}
               aria-label={text("笔记内容", "Note content")}
@@ -4665,7 +4722,7 @@ function TasksWorkspace({ state, updateState }: {
           <div className={todo.done ? "is-done" : ""} key={todo.id}>
             <label>
               <input type="checkbox" checked={todo.done} onChange={() => toggleTodo(todo.id)} />
-              <span>{todo.text}</span>
+              <span>{todoTextFor(language, todo.text)}</span>
             </label>
             <small>{todo.done ? textFor("已完成", "Completed") : textFor("待处理", "Open")}</small>
             <button type="button" title={textFor("删除任务", "Delete task")} aria-label={textFor("删除任务", "Delete task")} onClick={() => deleteTodo(todo.id)}><X size={15} /></button>
@@ -4825,10 +4882,12 @@ function WidgetSizePicker({ widgetKey, value, onChange, disabled = false, compac
   disabled?: boolean;
   compact?: boolean;
 }) {
+  const language = useUiLanguage();
+  const text = (zh: string, en: string) => localized(language, zh, en);
   const meta = widgetLibraryMeta[widgetKey];
   const PreviewIcon = meta.Icon;
   return (
-    <div className={`widget-size-picker ${compact ? "compact" : ""}`} role="radiogroup" aria-label={`${widgetNames[widgetKey]}尺寸`}>
+    <div className={`widget-size-picker ${compact ? "compact" : ""}`} role="radiogroup" aria-label={text(`${widgetNames[widgetKey]}尺寸`, `${widgetEnglishNames[widgetKey]} size`)}>
       {widgetSizeOptions[widgetKey].map((size) => (
         <button
           type="button"
@@ -4841,12 +4900,12 @@ function WidgetSizePicker({ widgetKey, value, onChange, disabled = false, compac
         >
           <span className={`widget-size-thumbnail widget-tone-${widgetKey}`} aria-hidden="true">
             <span className="widget-size-thumbnail-head"><PreviewIcon size={compact ? 11 : 13} /><i /></span>
-            <strong>{meta.preview}</strong>
+            <strong>{widgetPreviewFor(language, widgetKey)}</strong>
             <span className="widget-size-thumbnail-lines"><i /><i /><i /></span>
           </span>
           <span className="widget-size-option-copy">
-            <strong>{widgetSizeLabels[size]}</strong>
-            {!compact && <small>{widgetSizeDetails[size]}</small>}
+            <strong>{language === "en-US" ? widgetEnglishSizeLabels[size] : widgetSizeLabels[size]}</strong>
+            {!compact && <small>{language === "en-US" ? widgetEnglishSizeDetails[size] : widgetSizeDetails[size]}</small>}
           </span>
           <span className="widget-size-check"><Check size={13} /></span>
         </button>
@@ -4869,7 +4928,7 @@ function WidgetContextMenu({ menu, size, onClose, onResize, onOpenLibrary, onRef
   const text = (zh: string, en: string) => localized(language, zh, en);
   const surfaceRef = useContextMenuSurface<HTMLDivElement>(onClose);
   const position = contextMenuPosition(menu.x, menu.y, 344, menu.widgetKey ? 560 : 250);
-  const widgetName = menu.widgetKey ? widgetNames[menu.widgetKey] : text("主页", "Home");
+  const widgetName = menu.widgetKey ? widgetNameFor(language, menu.widgetKey) : text("主页", "Home");
   const WidgetIcon = menu.widgetKey ? widgetLibraryMeta[menu.widgetKey].Icon : Palette;
   return createPortal(
     <div ref={surfaceRef} className="shortcut-menu page-menu widget-menu" role="dialog" aria-label={text(`${widgetName}设置`, `${widgetName} settings`)} tabIndex={-1} style={position} onContextMenu={(event) => event.preventDefault()}>
@@ -4882,7 +4941,7 @@ function WidgetContextMenu({ menu, size, onClose, onResize, onOpenLibrary, onRef
         <WidgetSizePicker widgetKey={menu.widgetKey} value={size} onChange={(nextSize) => onResize(menu.widgetKey!, nextSize)} />
       )}
       <div className="widget-menu-actions">
-        <button onClick={onOpenLibrary}><Palette size={14} /> {text("小组件库", "Widget library")}</button>
+        <button onClick={onOpenLibrary}><Palette size={14} /> {text("更多小组件", "More widgets")}</button>
         <button onClick={onRefresh}><RefreshCcw size={14} /> {text("刷新数据", "Refresh data")}</button>
         <button onClick={onRotateWallpaper}><Shuffle size={14} /> {text("更换壁纸", "Change wallpaper")}</button>
         {menu.widgetKey && <button className="danger" onClick={() => onHide(menu.widgetKey!)}><EyeOff size={14} /> {text("隐藏组件", "Hide widget")}</button>}
@@ -4969,10 +5028,14 @@ function Widget({ title, meta, action, children, tone = "default", size = "mediu
 }
 
 function WeatherWidget({ widgetKey, size, weather, city, useLocation, refreshing, onRefresh }: { widgetKey: WidgetKey; size: WidgetSize; weather?: WeatherState; city: string; useLocation: boolean; refreshing: boolean; onRefresh: () => Promise<void> }) {
+  const language = useUiLanguage();
+  const text = (zh: string, en: string) => localized(language, zh, en);
   const source = safeHttpHref(weather?.sourceUrl || "https://open-meteo.com/");
   const dayLimit = size === "small" ? 0 : size === "medium" ? 4 : 6;
   const days = weather?.forecast?.slice(0, dayLimit) || [];
-  const placeLabel = weather ? weather.city : city;
+  const placeLabel = language === "en-US"
+    ? (useLocation ? "Current location" : city)
+    : (weather ? weather.city : city);
   const compactPlace = placeLabel
     .replace(/\s*,\s*(China|中国)$/i, "")
     .split(/[，,]/)
@@ -4983,50 +5046,51 @@ function WeatherWidget({ widgetKey, size, weather, city, useLocation, refreshing
   const precipitation = weather?.forecast?.[0]?.precipitationProbability;
   return (
     <Widget
-      title="Weather"
+      title={text("天气", "Weather")}
       meta={<><MapPin size={10} />{compactPlace || "Shanghai"}</>}
       widgetKey={widgetKey}
       tone={`weather weather-${weatherToneForCode(weather?.weatherCode)}`}
       size={size}
-      action={<button className="weather-unit" title={refreshing ? "正在刷新" : "刷新天气"} disabled={refreshing} onClick={() => void onRefresh()}>°C<ChevronRight size={12} className={refreshing ? "spin" : undefined} /></button>}
+      action={<button className="weather-unit" title={refreshing ? text("正在刷新", "Refreshing") : text("刷新天气", "Refresh weather")} disabled={refreshing} onClick={() => void onRefresh()}>°C<RefreshCcw size={11} className={refreshing ? "spin" : undefined} /></button>}
     >
-      <a className={`sample-weather ${weather ? "" : "is-loading"}`} href={source} target="_blank" rel="noreferrer" title="打开天气数据来源">
+      <a className={`sample-weather ${weather ? "" : "is-loading"}`} href={source} target="_blank" rel="noreferrer" title={text("打开天气数据来源", "Open weather data source")}>
         {weather ? (
           <>
             <div className="sample-weather-current">
               <div className="sample-weather-copy">
                 <strong>{Math.round(weather.temperature)}°</strong>
-                <span>{weatherLabel(weather.weatherCode)}</span>
-                <small>Feels like {Math.round(weather.temperature + Math.min(3, weather.windSpeed / 12))}°</small>
+                <span>{weatherLabelFor(weather.weatherCode, language)}</span>
+                <small>{text("体感温度", "Feels like")} {Math.round(weather.temperature + Math.min(3, weather.windSpeed / 12))}°</small>
               </div>
-              <div className="sample-weather-orbit" aria-hidden="true">
-                <span><CloudSun size={34} /></span>
+              <div className="sample-weather-status" aria-hidden="true">
+                <CloudSun size={42} />
+                <span>{text("当前天气", "Current")}</span>
               </div>
             </div>
             {size !== "small" && (
-              <div className="sample-weather-facts" aria-label="当前天气详情">
-                <span><Wind size={13} /><strong>{Math.round(weather.windSpeed)} km/h</strong></span>
-                <span><Droplets size={13} /><strong>{precipitation ?? 0}%</strong></span>
-                <span><CloudSun size={13} /><strong>{useLocation ? "Live" : "City"}</strong></span>
+              <div className="sample-weather-facts" aria-label={text("当前天气详情", "Current weather details")}>
+                <span><Wind size={13} /><small>{text("风速", "Wind")}</small><strong>{Math.round(weather.windSpeed)} km/h</strong></span>
+                <span><Droplets size={13} /><small>{text("降水", "Rain")}</small><strong>{precipitation ?? 0}%</strong></span>
+                <span><MapPin size={13} /><small>{text("位置", "Location")}</small><strong>{useLocation ? text("实时", "Live") : text("城市", "City")}</strong></span>
               </div>
             )}
           </>
         ) : (
           <div className="sample-weather-loading">
             <span><CloudSun size={25} /></span>
-            <strong>正在准备天气</strong>
-            <small>{useLocation ? "读取设备位置" : `查询 ${city}`}</small>
+            <strong>{text("正在准备天气", "Preparing weather")}</strong>
+            <small>{useLocation ? text("读取设备位置", "Reading device location") : text(`查询 ${city}`, `Looking up ${city}`)}</small>
           </div>
         )}
       </a>
       {days.length > 0 && (
-        <div className="sample-weather-forecast" aria-label={`${days.length} 天天气预报`}>
+        <div className="sample-weather-forecast" aria-label={text(`${days.length} 天天气预报`, `${days.length}-day forecast`)}>
           {days.map((day) => {
             const date = new Date(`${day.date}T00:00:00`);
             const dayTone = weatherToneForCode(day.weatherCode);
             return (
-              <a className={`forecast-${dayTone}`} href={source} target="_blank" rel="noreferrer" key={day.date} title={`${day.date} ${weatherLabel(day.weatherCode)}`}>
-                <span>{date.toLocaleDateString("en-US", { weekday: "short" })}</span>
+              <a className={`forecast-${dayTone}`} href={source} target="_blank" rel="noreferrer" key={day.date} title={`${day.date} ${weatherLabelFor(day.weatherCode, language)}`}>
+                <span>{date.toLocaleDateString(language, { weekday: "short" })}</span>
                 <i className="forecast-mark" aria-hidden="true" />
                 <strong>{Math.round(day.temperatureMax)}° <small>{Math.round(day.temperatureMin)}°</small></strong>
               </a>
@@ -5039,6 +5103,8 @@ function WeatherWidget({ widgetKey, size, weather, city, useLocation, refreshing
 }
 
 function CalendarWidget({ widgetKey, size, date, state, updateState }: { widgetKey: WidgetKey; size: WidgetSize; date: Date; state: AppState; updateState: (updater: (state: AppState) => AppState) => void }) {
+  const language = useUiLanguage();
+  const textFor = (zh: string, en: string) => localized(language, zh, en);
   const [editingDate, setEditingDate] = useState<string | undefined>();
   const [draft, setDraft] = useState("");
   const [monthOffset, setMonthOffset] = useState(0);
@@ -5067,11 +5133,11 @@ function CalendarWidget({ widgetKey, size, date, state, updateState }: { widgetK
     if (!editingDate) return;
     const text = draft.trim();
     if (text.length > MAX_CALENDAR_RECORD_CHARS) {
-      window.alert("单条日历记录不能超过 10000 个字符");
+      window.alert(textFor("单条日历记录不能超过 10000 个字符", "A calendar entry cannot exceed 10,000 characters."));
       return;
     }
     if (text && !records[editingDate] && Object.keys(records).length >= MAX_ENTITY_RECORDS) {
-      window.alert("日历记录已达到 5000 条安全上限，请先删除不再需要的记录");
+      window.alert(textFor("日历记录已达到 5000 条安全上限，请先删除不再需要的记录", "Calendar entries reached the 5,000 item safety limit. Remove entries you no longer need."));
       return;
     }
     updateState((current) => {
@@ -5100,7 +5166,7 @@ function CalendarWidget({ widgetKey, size, date, state, updateState }: { widgetK
   };
 
   const todayKey = calendarDateKey(date);
-  const weekdayLabel = date.toLocaleDateString("zh-CN", { weekday: "long" });
+  const weekdayLabel = date.toLocaleDateString(language, { weekday: "long" });
   const monthPrefix = `${viewDate.getFullYear()}-${String(viewDate.getMonth() + 1).padStart(2, "0")}`;
   const monthRecordCount = Object.keys(records).filter((key) => key.startsWith(monthPrefix)).length;
   const sampleWeekDays = useMemo(() => {
@@ -5111,10 +5177,10 @@ function CalendarWidget({ widgetKey, size, date, state, updateState }: { widgetK
       return {
         date: value,
         key: calendarDateKey(value),
-        label: value.toLocaleDateString("en-US", { weekday: "short" }).toUpperCase()
+        label: value.toLocaleDateString(language, { weekday: "short" }).toUpperCase()
       };
     });
-  }, [viewDate]);
+  }, [language, viewDate]);
   const agendaEntries = Object.entries(records)
     .filter(([, text]) => Boolean(text.trim()))
     .sort(([left], [right]) => left.localeCompare(right))
@@ -5123,20 +5189,20 @@ function CalendarWidget({ widgetKey, size, date, state, updateState }: { widgetK
 
   if (size === "small") {
     return (
-      <Widget title={(viewDate.getMonth() + 1) + " 月"} meta={viewDate.getFullYear()} widgetKey={widgetKey} tone="calendar" size={size} action={<button type="button" title="记录今天" onClick={() => openDate(todayKey)}><CalendarDays size={16} /></button>}>
-        <button type="button" className="calendar-mini-card" onClick={() => openDate(todayKey)} title={records[todayKey] || "点击记录今天"}>
-          <span className="calendar-mini-month">{date.toLocaleDateString("zh-CN", { month: "short" })}</span>
+      <Widget title={viewDate.toLocaleDateString(language, { month: "long" })} meta={viewDate.getFullYear()} widgetKey={widgetKey} tone="calendar" size={size} action={<button type="button" title={textFor("记录今天", "Add today's entry")} onClick={() => openDate(todayKey)}><CalendarDays size={16} /></button>}>
+        <button type="button" className="calendar-mini-card" onClick={() => openDate(todayKey)} title={records[todayKey] || textFor("点击记录今天", "Add today's entry")}>
+          <span className="calendar-mini-month">{date.toLocaleDateString(language, { month: "short" })}</span>
           <strong>{date.getDate()}</strong>
           <span className="calendar-mini-weekday">{weekdayLabel}</span>
-          <small>{records[todayKey] || "今天"}</small>
+          <small>{records[todayKey] || textFor("今天", "Today")}</small>
         </button>
         {editingDate && (
-          <DialogShell title={calendarDateLabel(editingDate)} onClose={() => setEditingDate(undefined)} className="widget-popover calendar-popover">
+          <DialogShell title={calendarDateLabel(editingDate, language)} onClose={() => setEditingDate(undefined)} className="widget-popover calendar-popover">
             <div className="calendar-editor">
-              <textarea maxLength={MAX_CALENDAR_RECORD_CHARS} value={draft} onChange={(event) => setDraft(event.target.value)} placeholder="记录这一天要做的事" autoFocus />
+              <textarea maxLength={MAX_CALENDAR_RECORD_CHARS} value={draft} onChange={(event) => setDraft(event.target.value)} placeholder={textFor("记录这一天要做的事", "Write down plans for this day")} autoFocus />
               <div className="calendar-editor-actions">
-                <button type="button" onClick={clearRecord}>清除</button>
-                <button type="button" className="primary-mini" onClick={saveRecord}>保存</button>
+                <button type="button" onClick={clearRecord}>{textFor("清除", "Clear")}</button>
+                <button type="button" className="primary-mini" onClick={saveRecord}>{textFor("保存", "Save")}</button>
               </div>
             </div>
           </DialogShell>
@@ -5148,28 +5214,28 @@ function CalendarWidget({ widgetKey, size, date, state, updateState }: { widgetK
   if (size === "wide") {
     return (
       <Widget
-        title="Calendar"
+        title={textFor("日历", "Calendar")}
         widgetKey={widgetKey}
         tone="calendar"
         size={size}
         action={(
           <div className="sample-calendar-controls">
-            <button type="button" title="回到今天" onClick={() => setMonthOffset(0)}>Today</button>
-            <button type="button" title="上个月" aria-label="上个月" onClick={() => setMonthOffset((value) => value - 1)}><ChevronLeft size={13} /></button>
-            <button type="button" title="下个月" aria-label="下个月" onClick={() => setMonthOffset((value) => value + 1)}><ChevronRight size={13} /></button>
+            <button type="button" title={textFor("回到今天", "Go to today")} onClick={() => setMonthOffset(0)}>{textFor("今天", "Today")}</button>
+            <button type="button" title={textFor("上个月", "Previous month")} aria-label={textFor("上个月", "Previous month")} onClick={() => setMonthOffset((value) => value - 1)}><ChevronLeft size={13} /></button>
+            <button type="button" title={textFor("下个月", "Next month")} aria-label={textFor("下个月", "Next month")} onClick={() => setMonthOffset((value) => value + 1)}><ChevronRight size={13} /></button>
           </div>
         )}
       >
         <div className="sample-calendar">
-          <strong className="sample-calendar-month">{viewDate.toLocaleDateString("en-US", { month: "long", year: "numeric" })}</strong>
-          <div className="sample-calendar-week" aria-label="本周日期">
+          <strong className="sample-calendar-month">{viewDate.toLocaleDateString(language, { month: "long", year: "numeric" })}</strong>
+          <div className="sample-calendar-week" aria-label={textFor("本周日期", "Dates this week")}>
             {sampleWeekDays.map((item) => (
               <button
                 type="button"
                 className={item.key === todayKey ? "today" : ""}
                 key={item.key}
                 onClick={() => openDate(item.key)}
-                title={records[item.key] || "点击记录当天事项"}
+                title={records[item.key] || textFor("点击记录当天事项", "Add an entry for this day")}
               >
                 <span>{item.label}</span>
                 <strong>{item.date.getDate()}</strong>
@@ -5178,31 +5244,31 @@ function CalendarWidget({ widgetKey, size, date, state, updateState }: { widgetK
           </div>
           <div className="sample-calendar-agenda">
             {agendaEntries.map(([key, text], index) => (
-              <button type="button" key={key} onClick={() => openDate(key)} title={calendarDateLabel(key)}>
-                <span>{index === 0 ? "Today" : calendarDateLabel(key)}</span>
+              <button type="button" key={key} onClick={() => openDate(key)} title={calendarDateLabel(key, language)}>
+                <span>{index === 0 ? textFor("今天", "Today") : calendarDateLabel(key, language)}</span>
                 <strong>{text}</strong>
               </button>
             ))}
             {!agendaEntries.length && (
               <>
                 <button type="button" className="empty-event" onClick={() => openDate(todayKey)}>
-                  <span>Today</span>
-                  <strong>New event</strong>
+                  <span>{textFor("今天", "Today")}</span>
+                  <strong>{textFor("新日程", "New event")}</strong>
                 </button>
                 <span className="sample-calendar-placeholder" aria-hidden="true" />
                 <span className="sample-calendar-placeholder" aria-hidden="true" />
               </>
             )}
           </div>
-          <button type="button" className="sample-calendar-add" onClick={() => openDate(todayKey)}><Plus size={14} /> New event</button>
+          <button type="button" className="sample-calendar-add" onClick={() => openDate(todayKey)}><Plus size={14} /> {textFor("新日程", "New event")}</button>
         </div>
         {editingDate && (
-          <DialogShell title={calendarDateLabel(editingDate)} onClose={() => setEditingDate(undefined)} className="widget-popover calendar-popover">
+          <DialogShell title={calendarDateLabel(editingDate, language)} onClose={() => setEditingDate(undefined)} className="widget-popover calendar-popover">
             <div className="calendar-editor">
-              <textarea maxLength={MAX_CALENDAR_RECORD_CHARS} value={draft} onChange={(event) => setDraft(event.target.value)} placeholder="记录这一天要做的事" autoFocus />
+              <textarea maxLength={MAX_CALENDAR_RECORD_CHARS} value={draft} onChange={(event) => setDraft(event.target.value)} placeholder={textFor("记录这一天要做的事", "Write down plans for this day")} autoFocus />
               <div className="calendar-editor-actions">
-                <button type="button" onClick={clearRecord}>清除</button>
-                <button type="button" className="primary-mini" onClick={saveRecord}>保存</button>
+                <button type="button" onClick={clearRecord}>{textFor("清除", "Clear")}</button>
+                <button type="button" className="primary-mini" onClick={saveRecord}>{textFor("保存", "Save")}</button>
               </div>
             </div>
           </DialogShell>
@@ -5212,10 +5278,10 @@ function CalendarWidget({ widgetKey, size, date, state, updateState }: { widgetK
   }
 
   return (
-    <Widget title={(viewDate.getMonth() + 1) + " 月"} meta={`${monthRecordCount} 条记录`} widgetKey={widgetKey} tone="calendar" size={size} action={<button type="button" title="记录今天" onClick={() => openDate(todayKey)}><CalendarDays size={16} /></button>}>
+    <Widget title={viewDate.toLocaleDateString(language, { month: "long" })} meta={textFor(`${monthRecordCount} 条记录`, `${monthRecordCount} entries`)} widgetKey={widgetKey} tone="calendar" size={size} action={<button type="button" title={textFor("记录今天", "Add today's entry")} onClick={() => openDate(todayKey)}><CalendarDays size={16} /></button>}>
       <div className={`calendar-layout calendar-layout-${size}`}>
         <div className="calendar-grid calendar-clickable">
-          {["日", "一", "二", "三", "四", "五", "六"].map((day) => <span key={day} className="muted calendar-weekday">{day}</span>)}
+          {Array.from({ length: 7 }, (_, index) => new Date(2024, 0, 7 + index).toLocaleDateString(language, { weekday: "narrow" })).map((day, index) => <span key={`${day}-${index}`} className="muted calendar-weekday">{day}</span>)}
           {days.map((item, index) => item ? (
             <button
               type="button"
@@ -5225,7 +5291,7 @@ function CalendarWidget({ widgetKey, size, date, state, updateState }: { widgetK
                 records[item.key] ? "has-record" : ""
               ].filter(Boolean).join(" ")}
               onClick={() => openDate(item.key)}
-              title={records[item.key] || "点击记录当天事项"}
+              title={records[item.key] || textFor("点击记录当天事项", "Add an entry for this day")}
             >
               <span>{item.day}</span>
             </button>
@@ -5233,12 +5299,12 @@ function CalendarWidget({ widgetKey, size, date, state, updateState }: { widgetK
         </div>
       </div>
       {editingDate && (
-        <DialogShell title={calendarDateLabel(editingDate)} onClose={() => setEditingDate(undefined)} className="widget-popover calendar-popover">
+        <DialogShell title={calendarDateLabel(editingDate, language)} onClose={() => setEditingDate(undefined)} className="widget-popover calendar-popover">
           <div className="calendar-editor">
-            <textarea maxLength={MAX_CALENDAR_RECORD_CHARS} value={draft} onChange={(event) => setDraft(event.target.value)} placeholder="记录这一天要做的事" autoFocus />
+            <textarea maxLength={MAX_CALENDAR_RECORD_CHARS} value={draft} onChange={(event) => setDraft(event.target.value)} placeholder={textFor("记录这一天要做的事", "Write down plans for this day")} autoFocus />
             <div className="calendar-editor-actions">
-              <button type="button" onClick={clearRecord}>清除</button>
-              <button type="button" className="primary-mini" onClick={saveRecord}>保存</button>
+              <button type="button" onClick={clearRecord}>{textFor("清除", "Clear")}</button>
+              <button type="button" className="primary-mini" onClick={saveRecord}>{textFor("保存", "Save")}</button>
             </div>
           </div>
         </DialogShell>
@@ -5335,6 +5401,8 @@ function CountdownWidget({ widgetKey, size, state, updateState }: { widgetKey: W
 }
 
 function TodoWidget({ widgetKey, size, state, updateState }: { widgetKey: WidgetKey; size: WidgetSize; state: AppState; updateState: (updater: (state: AppState) => AppState) => void }) {
+  const language = useUiLanguage();
+  const textFor = (zh: string, en: string) => localized(language, zh, en);
   const [text, setText] = useState("");
   const [panelOpen, setPanelOpen] = useState(false);
   const todos = state.todos.filter((item) => !item.deletedAt).sort((a, b) => a.order - b.order);
@@ -5345,11 +5413,11 @@ function TodoWidget({ widgetKey, size, state, updateState }: { widgetKey: Widget
   const add = () => {
     if (!text.trim()) return;
     if (text.trim().length > MAX_TODO_TEXT_CHARS) {
-      window.alert("单条待办不能超过 10000 个字符");
+      window.alert(textFor("单条待办不能超过 10000 个字符", "A task cannot exceed 10,000 characters."));
       return;
     }
     if (state.todos.length >= MAX_ENTITY_RECORDS) {
-      window.alert("待办记录已达到 5000 条安全上限，请先删除不再需要的记录");
+      window.alert(textFor("待办记录已达到 5000 条安全上限，请先删除不再需要的记录", "Tasks reached the 5,000 item safety limit. Remove tasks you no longer need."));
       return;
     }
     const todo: Todo = {
@@ -5383,8 +5451,8 @@ function TodoWidget({ widgetKey, size, state, updateState }: { widgetKey: Widget
   const todoRows = (items: Todo[]) => items.map((todo) => (
     <label className="todo" key={todo.id}>
       <input type="checkbox" checked={todo.done} onChange={() => toggleTodo(todo.id)} />
-      <span>{todo.text}</span>
-      <button type="button" title="删除" onClick={(event) => { event.preventDefault(); event.stopPropagation(); deleteTodo(todo.id); }}>
+      <span>{todoTextFor(language, todo.text)}</span>
+      <button type="button" title={textFor("删除", "Delete")} onClick={(event) => { event.preventDefault(); event.stopPropagation(); deleteTodo(todo.id); }}>
         <X size={13} />
       </button>
     </label>
@@ -5392,37 +5460,37 @@ function TodoWidget({ widgetKey, size, state, updateState }: { widgetKey: Widget
   return (
     <Widget
       title="To Do"
-      meta={`${activeCount} 待处理`}
+      meta={textFor(`${activeCount} 待处理`, `${activeCount} open`)}
       widgetKey={widgetKey}
       tone="todo"
       size={size}
-      action={<button type="button" className="todo-count" title="管理任务" onClick={() => setPanelOpen(true)}>{activeCount}/{todos.length}</button>}
+      action={<button type="button" className="todo-count" title={textFor("管理任务", "Manage tasks")} onClick={() => setPanelOpen(true)}>{activeCount}/{todos.length}</button>}
     >
       <div className={`todo-dashboard todo-dashboard-${size}`}>
-        <div className="todo-overview" aria-label={`已完成 ${doneCount} 项，共 ${todos.length} 项`}>
+        <div className="todo-overview" aria-label={textFor(`已完成 ${doneCount} 项，共 ${todos.length} 项`, `${doneCount} of ${todos.length} completed`)}>
           <button
             type="button"
             className="todo-progress-dial"
             style={{ "--todo-progress": `${completionPercent * 3.6}deg` } as React.CSSProperties}
             onClick={() => setPanelOpen(true)}
-            title="管理全部任务"
+            title={textFor("管理全部任务", "Manage all tasks")}
           >
             <strong>{completionPercent}</strong><span>%</span>
           </button>
           <div>
-            <small>今日进度</small>
+            <small>{textFor("今日进度", "Today's progress")}</small>
             <strong>{doneCount} / {todos.length}</strong>
-            <span>{activeCount ? `还有 ${activeCount} 项` : "全部完成"}</span>
+            <span>{activeCount ? textFor(`还有 ${activeCount} 项`, `${activeCount} remaining`) : textFor("全部完成", "All complete")}</span>
           </div>
         </div>
         <div className="todo-workspace">
           <div className="input-row">
-            <input maxLength={MAX_TODO_TEXT_CHARS} value={text} onChange={(event) => setText(event.target.value)} onKeyDown={(event) => event.key === "Enter" && add()} placeholder="新增任务" />
-            <button type="button" title="添加" onMouseDown={(event) => event.stopPropagation()} onClick={(event) => { event.stopPropagation(); add(); }}><Plus size={14} /></button>
+            <input maxLength={MAX_TODO_TEXT_CHARS} value={text} onChange={(event) => setText(event.target.value)} onKeyDown={(event) => event.key === "Enter" && add()} placeholder={textFor("新增任务", "New task")} />
+            <button type="button" title={textFor("添加", "Add")} onMouseDown={(event) => event.stopPropagation()} onClick={(event) => { event.stopPropagation(); add(); }}><Plus size={14} /></button>
           </div>
           <div className="todo-preview">
-            {visibleTodos.length ? todoRows(visibleTodos) : <button type="button" className="todo-empty" onClick={() => setPanelOpen(true)}>今天还没有任务</button>}
-            {todos.length > visibleTodos.length && <button type="button" className="todo-more" onClick={() => setPanelOpen(true)}>还有 {todos.length - visibleTodos.length} 条，点击管理</button>}
+            {visibleTodos.length ? todoRows(visibleTodos) : <button type="button" className="todo-empty" onClick={() => setPanelOpen(true)}>{textFor("今天还没有任务", "No tasks today")}</button>}
+            {todos.length > visibleTodos.length && <button type="button" className="todo-more" onClick={() => setPanelOpen(true)}>{textFor(`还有 ${todos.length - visibleTodos.length} 条，点击管理`, `${todos.length - visibleTodos.length} more · Manage`)}</button>}
           </div>
         </div>
       </div>
@@ -5430,13 +5498,13 @@ function TodoWidget({ widgetKey, size, state, updateState }: { widgetKey: Widget
         <DialogShell title="To Do" onClose={() => setPanelOpen(false)} className="widget-popover todo-popover">
           <div className="todo-panel">
             <div className="input-row">
-              <input maxLength={MAX_TODO_TEXT_CHARS} value={text} onChange={(event) => setText(event.target.value)} onKeyDown={(event) => event.key === "Enter" && add()} placeholder="新增任务" autoFocus />
-              <button type="button" title="添加" onMouseDown={(event) => event.stopPropagation()} onClick={(event) => { event.stopPropagation(); add(); }}><Plus size={14} /></button>
+              <input maxLength={MAX_TODO_TEXT_CHARS} value={text} onChange={(event) => setText(event.target.value)} onKeyDown={(event) => event.key === "Enter" && add()} placeholder={textFor("新增任务", "New task")} autoFocus />
+              <button type="button" title={textFor("添加", "Add")} onMouseDown={(event) => event.stopPropagation()} onClick={(event) => { event.stopPropagation(); add(); }}><Plus size={14} /></button>
             </div>
             <div className="todo-panel-list">
-              {todos.length ? todoRows(todos) : <p className="empty-state">还没有任务</p>}
+              {todos.length ? todoRows(todos) : <p className="empty-state">{textFor("还没有任务", "No tasks yet")}</p>}
             </div>
-            {doneCount > 0 && <button type="button" className="clear-done" onClick={clearDone}>清除已完成</button>}
+            {doneCount > 0 && <button type="button" className="clear-done" onClick={clearDone}>{textFor("清除已完成", "Clear completed")}</button>}
           </div>
         </DialogShell>
       )}
@@ -5519,6 +5587,8 @@ function FocusWidget({ widgetKey, size, state, updateState, onOpenTasks }: {
   updateState: (updater: (state: AppState) => AppState) => void;
   onOpenTasks: () => void;
 }) {
+  const language = useUiLanguage();
+  const text = (zh: string, en: string) => localized(language, zh, en);
   const [seconds, setSeconds] = useState(25 * 60);
   const [running, setRunning] = useState(false);
   const todos = state.todos
@@ -5530,7 +5600,7 @@ function FocusWidget({ widgetKey, size, state, updateState, onOpenTasks }: {
     ?.split(/\r?\n/)
     .map((line) => line.trim())
     .find(Boolean)
-    ?.slice(0, 90) || "Make today count.";
+    ?.slice(0, 90) || text("让今天值得。", "Make today count.");
   useEffect(() => {
     if (!running) return;
     const timer = window.setInterval(() => {
@@ -5554,13 +5624,13 @@ function FocusWidget({ widgetKey, size, state, updateState, onOpenTasks }: {
   }));
   return (
     <Widget
-      title="Focus"
-      meta={running ? "In progress" : undefined}
+      title={text("专注", "Focus")}
+      meta={running ? text("进行中", "In progress") : undefined}
       widgetKey={widgetKey}
       tone="focus"
       size={size}
       action={(
-        <button type="button" title="打开任务工作区" aria-label="打开任务工作区" onClick={onOpenTasks}>
+        <button type="button" title={text("打开任务页", "Open Tasks")} aria-label={text("打开任务页", "Open Tasks")} onClick={onOpenTasks}>
           <MoreHorizontal size={15} />
         </button>
       )}
@@ -5574,25 +5644,25 @@ function FocusWidget({ widgetKey, size, state, updateState, onOpenTasks }: {
           {detailTodos.map((todo) => (
             <label key={todo.id}>
               <input type="checkbox" checked={todo.done} onChange={() => toggleTodo(todo.id)} />
-              <span>{todo.text}</span>
+              <span>{todoTextFor(language, todo.text)}</span>
             </label>
           ))}
           {!detailTodos.length && (
-            <p>写下一件值得专注完成的事。</p>
+            <p>{text("写下一件值得专注完成的事。", "Write down one thing worth focusing on.")}</p>
           )}
         </div>
         <div className="sample-focus-footer">
-          <span>Today · {todos.length} items</span>
+          <span>{text(`今天 · ${todos.length} 项`, `Today · ${todos.length} items`)}</span>
           <button
             type="button"
             className={running ? "is-running" : ""}
             style={{ "--progress": `${progress * 360}deg` } as React.CSSProperties}
             onClick={() => setRunning((value) => !value)}
             onDoubleClick={() => { setRunning(false); setSeconds(25 * 60); }}
-            title={running ? "暂停专注；双击重置" : "开始 25 分钟专注"}
+            title={running ? text("暂停专注；双击重置", "Pause focus; double-click to reset") : text("开始 25 分钟专注", "Start a 25-minute focus session")}
           >
             <b>{minutes}:{rest}</b>
-            <small>{running ? "Pause" : "Start"}</small>
+            <small>{running ? text("暂停", "Pause") : text("开始", "Start")}</small>
           </button>
         </div>
       </div>
@@ -5918,14 +5988,16 @@ function FolderDialog({ folder, groups, onClose, onSave, onDelete }: {
   onSave: (folder: Partial<ShortcutFolder>) => void;
   onDelete?: () => void;
 }) {
+  const language = useUiLanguage();
+  const text = (zh: string, en: string) => localized(language, zh, en);
   const [draft, setDraft] = useState<Partial<ShortcutFolder>>(folder || { iconColor: "#14B8A6", groupId: groups[0]?.id });
   return (
-    <DialogShell title={folder ? "编辑文件夹" : "新建文件夹"} onClose={onClose}>
-      <label>文件夹名称<input maxLength={MAX_ENTITY_NAME_CHARS} value={draft.name || ""} onChange={(event) => setDraft({ ...draft, name: event.target.value })} placeholder="例如：工作、AI、购物" /></label>
-      <label>所在分类<select value={draft.groupId || groups[0]?.id} onChange={(event) => setDraft({ ...draft, groupId: event.target.value })}>{groups.map((group) => <option value={group.id} key={group.id}>{group.name}</option>)}</select></label>
-      <label>图片 URL（可选）<input maxLength={4 * 1024 * 1024} value={draft.iconUrl || ""} onChange={(event) => setDraft({ ...draft, iconUrl: event.target.value })} placeholder="留空使用文件夹图标" /></label>
+    <DialogShell title={folder ? text("编辑文件夹", "Edit folder") : text("新建文件夹", "New folder")} onClose={onClose}>
+      <label>{text("文件夹名称", "Folder name")}<input maxLength={MAX_ENTITY_NAME_CHARS} value={draft.name || ""} onChange={(event) => setDraft({ ...draft, name: event.target.value })} placeholder={text("例如：工作、AI、购物", "For example: Work, AI, Shopping")} /></label>
+      <label>{text("所在分类", "Category")}<select value={draft.groupId || groups[0]?.id} onChange={(event) => setDraft({ ...draft, groupId: event.target.value })}>{groups.map((group) => <option value={group.id} key={group.id}>{shortcutGroupNameFor(language, group)}</option>)}</select></label>
+      <label>{text("图片 URL（可选）", "Image URL (optional)")}<input maxLength={4 * 1024 * 1024} value={draft.iconUrl || ""} onChange={(event) => setDraft({ ...draft, iconUrl: event.target.value })} placeholder={text("留空使用文件夹图标", "Leave blank to use the folder icon")} /></label>
       <label className="file-pick">
-        <Upload size={16} /> 上传文件夹图片
+        <Upload size={16} /> {text("上传文件夹图片", "Upload folder image")}
         <input
           type="file"
           accept="image/*"
@@ -5936,7 +6008,7 @@ function FolderDialog({ folder, groups, onClose, onSave, onDelete }: {
               const dataUrl = await shrinkImage(file, 384, 0.84);
               setDraft({ ...draft, iconUrl: dataUrl });
             } catch (error) {
-              window.alert(error instanceof Error ? error.message : "图片处理失败");
+              window.alert(error instanceof Error ? error.message : text("图片处理失败", "Image processing failed"));
             }
           }}
         />
@@ -5945,11 +6017,11 @@ function FolderDialog({ folder, groups, onClose, onSave, onDelete }: {
         <span className={`shortcut-icon folder-icon ${draft.iconUrl ? "has-image" : ""}`} style={{ "--folder-color": draft.iconColor || "#14B8A6", "--icon": "64px" } as React.CSSProperties}>
           <FolderIconContent iconUrl={draft.iconUrl} size={30} />
         </span>
-        <span>{draft.name || "文件夹预览"}</span>
+        <span>{draft.name || text("文件夹预览", "Folder preview")}</span>
       </div>
       <div className="button-row split-row">
-        {onDelete && <button className="danger-button" onClick={onDelete}><Trash2 size={16} /> 删除文件夹</button>}
-        <button className="primary" onClick={() => onSave(draft)}><Save size={16} /> 保存</button>
+        {onDelete && <button className="danger-button" onClick={onDelete}><Trash2 size={16} /> {text("删除文件夹", "Delete folder")}</button>}
+        <button className="primary" onClick={() => onSave(draft)}><Save size={16} /> {text("保存", "Save")}</button>
       </div>
     </DialogShell>
   );
@@ -6031,10 +6103,10 @@ function ShortcutDialog({ shortcut, groups, folders, onClose, onSave }: {
                 key={icon.id}
                 onClick={() => setDraft({ ...draft, iconUrl: value })}
                 style={{ "--icon-tone": icon.tone } as React.CSSProperties}
-                title={icon.label}
+                title={builtInShortcutIconLabelFor(language, icon)}
               >
                 <span><Icon size={20} strokeWidth={2.35} /></span>
-                <em>{icon.label}</em>
+                <em>{builtInShortcutIconLabelFor(language, icon)}</em>
               </button>
             );
           })}
@@ -6046,7 +6118,7 @@ function ShortcutDialog({ shortcut, groups, folders, onClose, onSave }: {
         </span>
         <span>{draft.title || text("预览", "Preview")}</span>
       </div>
-      <label>{text("分组", "Category")}<select value={draft.groupId || groups[0]?.id} onChange={(event) => setDraft({ ...draft, groupId: event.target.value })}>{groups.map((group) => <option value={group.id} key={group.id}>{group.name}</option>)}</select></label>
+      <label>{text("分组", "Category")}<select value={draft.groupId || groups[0]?.id} onChange={(event) => setDraft({ ...draft, groupId: event.target.value })}>{groups.map((group) => <option value={group.id} key={group.id}>{shortcutGroupNameFor(language, group)}</option>)}</select></label>
       <label>{text("文件夹", "Folder")}<select value={draft.folderId || ""} onChange={(event) => setDraft({ ...draft, folderId: event.target.value || undefined })}><option value="">{text("不放入文件夹", "No folder")}</option>{folders.map((folder) => <option value={folder.id} key={folder.id}>{folder.name}</option>)}</select></label>
       <label className="check-row"><input type="checkbox" checked={Boolean(draft.pinned)} onChange={(event) => setDraft({ ...draft, pinned: event.target.checked })} /> {text("固定到 Dock", "Pin to Dock")}</label>
       <button className="primary" onClick={() => onSave(draft)}><Save size={16} /> {text("保存", "Save")}</button>
@@ -6059,6 +6131,8 @@ function ImportDialog({ existingShortcuts, onClose, onImport }: {
   onClose: () => void;
   onImport: (text: string, mode: "append" | "replace") => void;
 }) {
+  const language = useUiLanguage();
+  const label = (zh: string, en: string) => localized(language, zh, en);
   const [text, setText] = useState("");
   const [importError, setImportError] = useState("");
   const rows = useMemo(() => parseImportText(text), [text]);
@@ -6070,10 +6144,10 @@ function ImportDialog({ existingShortcuts, onClose, onImport }: {
     return rows.filter((row) => !existing.has(comparableUrl(row.url))).length;
   }, [existingShortcuts, rows]);
   return (
-    <DialogShell title="导入快捷导航" onClose={onClose}>
-      <p className="hint">支持 WhyNavo JSON、浏览器书签 HTML、CSV。CSV 格式：名称,网址,图标URL,分组,文件夹。</p>
+    <DialogShell title={label("导入快捷导航", "Import shortcuts")} onClose={onClose}>
+      <p className="hint">{label("支持 WhyNavo JSON、浏览器书签 HTML、CSV。CSV 格式：名称,网址,图标URL,分组,文件夹。", "Supports WhyNavo JSON, browser bookmark HTML, and CSV. CSV format: name, URL, icon URL, category, folder.")}</p>
       <label className="file-pick">
-        <Upload size={16} /> 选择文件
+        <Upload size={16} /> {label("选择文件", "Choose file")}
         <input
           type="file"
           accept=".json,.csv,.html,.htm,.txt"
@@ -6082,7 +6156,7 @@ function ImportDialog({ existingShortcuts, onClose, onImport }: {
             const file = event.target.files?.[0];
             if (!file) return;
             if (file.size > MAX_IMPORT_TEXT_CHARS) {
-              setImportError("导入文件超过 8 MB，请拆分后再导入");
+              setImportError(label("导入文件超过 8 MB，请拆分后再导入", "The import file exceeds 8 MB. Split it before importing."));
               input.value = "";
               return;
             }
@@ -6090,7 +6164,7 @@ function ImportDialog({ existingShortcuts, onClose, onImport }: {
             try {
               setText(await file.text());
             } catch {
-              setImportError("文件读取失败，请重新选择文件");
+              setImportError(label("文件读取失败，请重新选择文件", "The file could not be read. Choose it again."));
             }
             input.value = "";
           }}
@@ -6104,20 +6178,20 @@ function ImportDialog({ existingShortcuts, onClose, onImport }: {
           setImportError("");
           setText(event.target.value);
         }}
-        placeholder="也可以直接粘贴导入内容"
+        placeholder={label("也可以直接粘贴导入内容", "You can also paste import content here")}
       />
       {importError && <p className="warning">{importError}</p>}
       <div className="import-summary">
-        <span>文件内：{count} 个</span>
-        <span>当前已有：{existingShortcuts.length} 个</span>
-        <span>按网址缺失：{missingCount} 个</span>
-        <span>文件夹：{folderCount} 个</span>
+        <span>{label(`文件内：${count} 个`, `In file: ${count}`)}</span>
+        <span>{label(`当前已有：${existingShortcuts.length} 个`, `Current: ${existingShortcuts.length}`)}</span>
+        <span>{label(`按网址缺失：${missingCount} 个`, `Missing by URL: ${missingCount}`)}</span>
+        <span>{label(`文件夹：${folderCount} 个`, `Folders: ${folderCount}`)}</span>
       </div>
       <div className="button-row split-row">
-        <button disabled={!count} onClick={() => onImport(text, "append")}><Plus size={16} /> 追加导入</button>
-        <button className="primary" disabled={!count} onClick={() => onImport(text, "replace")}><Check size={16} /> 按文件重建</button>
+        <button disabled={!count} onClick={() => onImport(text, "append")}><Plus size={16} /> {label("追加导入", "Append")}</button>
+        <button className="primary" disabled={!count} onClick={() => onImport(text, "replace")}><Check size={16} /> {label("按文件重建", "Rebuild from file")}</button>
       </div>
-      <p className="hint">想按导入文件的顺序重建时，用“按文件重建”。它会保留旧数据墓碑用于同步防回流，并按文件顺序重新生成快捷导航。</p>
+      <p className="hint">{label("想按导入文件的顺序重建时，用“按文件重建”。它会保留旧数据墓碑用于同步防回流，并按文件顺序重新生成快捷导航。", "Use Rebuild from file to match the file order. Existing tombstones are retained to prevent deleted items from returning during sync.")}</p>
     </DialogShell>
   );
 }
@@ -6129,6 +6203,8 @@ function ResourceCenterDialog({ state, shortcuts, updateState, onEditShortcut, o
   onEditShortcut: (shortcut: Shortcut) => void;
   onClose: () => void;
 }) {
+  const language = useUiLanguage();
+  const text = (zh: string, en: string) => localized(language, zh, en);
   const [tab, setTab] = useState<"widgets" | "wallpapers" | "icons">("widgets");
   const [category, setCategory] = useState<"全部" | "信息" | "效率" | "生活">("全部");
   const [wallpaperCategory, setWallpaperCategory] = useState<"全部" | WallpaperCategory | "我的">("全部");
@@ -6141,7 +6217,8 @@ function ResourceCenterDialog({ state, shortcuts, updateState, onEditShortcut, o
   const visibleWidgets = (Object.keys(widgetNames) as WidgetKey[]).filter((key) => {
     const meta = widgetLibraryMeta[key];
     const matchesCategory = category === "全部" || meta.category === category;
-    const matchesQuery = !normalizedQuery || widgetNames[key].toLowerCase().includes(normalizedQuery) || meta.category.includes(query.trim());
+    const searchText = `${widgetNameFor(language, key)} ${widgetCategoryFor(language, meta.category)}`.toLowerCase();
+    const matchesQuery = !normalizedQuery || searchText.includes(normalizedQuery);
     return matchesCategory && matchesQuery;
   });
   const normalizedIconQuery = iconQuery.trim().toLowerCase();
@@ -6169,6 +6246,12 @@ function ResourceCenterDialog({ state, shortcuts, updateState, onEditShortcut, o
       settings: {
         ...current.settings,
         widgets: { ...current.settings.widgets, [key]: enabled },
+        widgetOrder: enabled
+          ? [
+              key,
+              ...(current.settings.widgetOrder || defaultWidgetOrder).filter((item) => item !== key)
+            ]
+          : current.settings.widgetOrder,
         updatedAt: nowIso()
       }
     }));
@@ -6217,19 +6300,19 @@ function ResourceCenterDialog({ state, shortcuts, updateState, onEditShortcut, o
     if (!files?.length) return;
     const remaining = Math.max(0, MAX_CUSTOM_WALLPAPERS - customWallpapers.length);
     if (!remaining) {
-      window.alert(`最多保存 ${MAX_CUSTOM_WALLPAPERS} 张自定义壁纸，请先删除旧壁纸。`);
+      window.alert(text(`最多保存 ${MAX_CUSTOM_WALLPAPERS} 张自定义壁纸，请先删除旧壁纸。`, `You can save up to ${MAX_CUSTOM_WALLPAPERS} custom wallpapers. Remove an older one first.`));
       return;
     }
     let additions: NonNullable<AppState["settings"]["customWallpapers"]>;
     try {
       additions = await Promise.all(Array.from(files).slice(0, remaining).map(async (file) => ({
         id: `custom-${uid()}`,
-        name: (file.name.replace(/\.[^.]+$/, "") || "我的壁纸").slice(0, 500),
+        name: (file.name.replace(/\.[^.]+$/, "") || text("我的壁纸", "My wallpaper")).slice(0, 500),
         dataUrl: await shrinkImage(file, 1600, 0.82),
         createdAt: nowIso()
       })));
     } catch (error) {
-      window.alert(error instanceof Error ? error.message : "壁纸处理失败");
+      window.alert(error instanceof Error ? error.message : text("壁纸处理失败", "Wallpaper processing failed"));
       return;
     }
     updateState((current) => ({
@@ -6260,20 +6343,20 @@ function ResourceCenterDialog({ state, shortcuts, updateState, onEditShortcut, o
 
 
   return (
-    <DialogShell title="资源中心" onClose={onClose} className="resource-center-overlay">
-      <div className="resource-tabs" role="tablist" aria-label="资源分类">
-        <button type="button" className={tab === "widgets" ? "active" : ""} onClick={() => setTab("widgets")}><Palette size={16} />小组件</button>
-        <button type="button" className={tab === "wallpapers" ? "active" : ""} onClick={() => setTab("wallpapers")}><ImageIcon size={16} />壁纸</button>
-        <button type="button" className={tab === "icons" ? "active" : ""} onClick={() => setTab("icons")}><Sparkles size={16} />图标</button>
+    <DialogShell title={text("资源中心", "Resource center")} onClose={onClose} className="resource-center-overlay">
+      <div className="resource-tabs" role="tablist" aria-label={text("资源分类", "Resource categories")}>
+        <button type="button" className={tab === "widgets" ? "active" : ""} onClick={() => setTab("widgets")}><Palette size={16} />{text("小组件", "Widgets")}</button>
+        <button type="button" className={tab === "wallpapers" ? "active" : ""} onClick={() => setTab("wallpapers")}><ImageIcon size={16} />{text("壁纸", "Wallpapers")}</button>
+        <button type="button" className={tab === "icons" ? "active" : ""} onClick={() => setTab("icons")}><Sparkles size={16} />{text("图标", "Icons")}</button>
       </div>
 
       {tab === "widgets" && (
         <>
           <div className="resource-toolbar">
-            <label className="resource-search"><Search size={16} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="搜索小组件" /></label>
+            <label className="resource-search"><Search size={16} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={text("搜索小组件", "Search widgets")} /></label>
             <div className="resource-filters">
               {(["全部", "信息", "效率", "生活"] as const).map((item) => (
-                <button type="button" className={category === item ? "active" : ""} key={item} onClick={() => setCategory(item)}>{item}</button>
+                <button type="button" className={category === item ? "active" : ""} key={item} onClick={() => setCategory(item)}>{item === "全部" ? text("全部", "All") : widgetCategoryFor(language, item)}</button>
               ))}
             </div>
           </div>
@@ -6286,11 +6369,11 @@ function ResourceCenterDialog({ state, shortcuts, updateState, onEditShortcut, o
                 <section className={`resource-widget-card ${enabled ? "enabled" : ""}`} key={key}>
                   <div className="resource-widget-preview">
                     <span><Icon size={19} /></span>
-                    <strong>{meta.preview}</strong>
-                    <small>{meta.category}</small>
+                    <strong>{widgetPreviewFor(language, key)}</strong>
+                    <small>{widgetCategoryFor(language, meta.category)}</small>
                   </div>
                   <div className="resource-widget-row">
-                    <strong>{widgetNames[key]}</strong>
+                    <strong>{widgetNameFor(language, key)}</strong>
                     <button type="button" className={`resource-toggle ${enabled ? "active" : ""}`} onClick={() => setWidgetEnabled(key, !enabled)} aria-pressed={enabled}>
                       {enabled ? <Check size={15} /> : <Plus size={15} />}
                     </button>
@@ -6306,10 +6389,10 @@ function ResourceCenterDialog({ state, shortcuts, updateState, onEditShortcut, o
       {tab === "wallpapers" && (
         <>
           <div className="resource-section-head">
-            <div><strong>我的壁纸集</strong><small>已选择 {selectedWallpaperCount} 张 · 自定义壁纸仅保存在本机</small></div>
+            <div><strong>{text("我的壁纸集", "My wallpaper collection")}</strong><small>{text(`已选择 ${selectedWallpaperCount} 张 · 自定义壁纸仅保存在本机`, `${selectedWallpaperCount} selected · Custom wallpapers stay on this device`)}</small></div>
             <div className="wallpaper-actions">
               <label className="file-pick compact-upload">
-                <Upload size={15} />上传多张
+                <Upload size={15} />{text("上传多张", "Upload images")}
                 <input type="file" accept="image/*" multiple onChange={(event) => { void addCustomWallpapers(event.target.files); event.currentTarget.value = ""; }} />
               </label>
               <label className="resource-switch">
@@ -6326,13 +6409,13 @@ function ResourceCenterDialog({ state, shortcuts, updateState, onEditShortcut, o
                     }
                   }))}
                 />
-                每日轮换
+                {text("每日轮换", "Daily rotation")}
               </label>
             </div>
           </div>
-          <div className="resource-filters wallpaper-filters" aria-label="壁纸风格">
+          <div className="resource-filters wallpaper-filters" aria-label={text("壁纸风格", "Wallpaper styles")}>
             {(["全部", "精选", "日系", "动漫", "猫咪", "酷感", "我的"] as const).map((item) => (
-              <button type="button" className={wallpaperCategory === item ? "active" : ""} key={item} onClick={() => setWallpaperCategory(item)}>{item}</button>
+              <button type="button" className={wallpaperCategory === item ? "active" : ""} key={item} onClick={() => setWallpaperCategory(item)}>{language === "zh-CN" ? item : ({ "全部": "All", "精选": "Featured", "日系": "Japanese", "动漫": "Anime", "猫咪": "Cats", "酷感": "Bold", "我的": "Mine" } as const)[item]}</button>
             ))}
           </div>
           <div className="resource-wallpaper-grid">
@@ -6344,18 +6427,18 @@ function ResourceCenterDialog({ state, shortcuts, updateState, onEditShortcut, o
                   onClick={() => chooseWallpaper(wallpaper.id)}
                 >
                   <img src={wallpaper.url} alt="" loading="lazy" decoding="async" />
-                  <span>{wallpaper.name}</span>
+                  <span>{language === "zh-CN" || wallpaper.custom ? wallpaper.name : wallpaper.id.split("-").map((part) => part.charAt(0).toUpperCase() + part.slice(1)).join(" ")}</span>
                 </button>
                 <button
                   type="button"
                   className={`wallpaper-collection-check ${wallpaperCollection.includes(wallpaper.id) ? "active" : ""}`}
                   onClick={() => toggleWallpaperCollection(wallpaper.id)}
-                  title={wallpaperCollection.includes(wallpaper.id) ? "从壁纸集移除" : "加入壁纸集"}
+                  title={wallpaperCollection.includes(wallpaper.id) ? text("从壁纸集移除", "Remove from collection") : text("加入壁纸集", "Add to collection")}
                 >
                   {wallpaperCollection.includes(wallpaper.id) ? <Check size={14} /> : <Plus size={14} />}
                 </button>
                 {wallpaper.custom && (
-                  <button type="button" className="wallpaper-remove" onClick={() => removeCustomWallpaper(wallpaper.id)} title="删除上传壁纸"><X size={13} /></button>
+                  <button type="button" className="wallpaper-remove" onClick={() => removeCustomWallpaper(wallpaper.id)} title={text("删除上传壁纸", "Delete uploaded wallpaper")}><X size={13} /></button>
                 )}
               </div>
             ))}
@@ -6366,20 +6449,23 @@ function ResourceCenterDialog({ state, shortcuts, updateState, onEditShortcut, o
       {tab === "icons" && (
         <div className="resource-icon-section">
           <div className="resource-section-head">
-            <div><strong>图标管理</strong><small>{curatedIconCount} 个品牌匹配 · {builtInShortcutIcons.length} 个默认图标</small></div>
+            <div><strong>{text("图标管理", "Icon manager")}</strong><small>{text(`${curatedIconCount} 个品牌匹配 · ${builtInShortcutIcons.length} 个默认图标`, `${curatedIconCount} brand matches · ${builtInShortcutIcons.length} default icons`)}</small></div>
           </div>
           <div className="resource-icon-grid">
-            {builtInShortcutIcons.map(({ id, label, Icon, tone }) => (
+            {builtInShortcutIcons.map((icon) => {
+              const { id, Icon, tone } = icon;
+              return (
               <div key={id}>
                 <span style={{ color: tone }}><Icon size={23} /></span>
-                <small>{label}</small>
+                <small>{builtInShortcutIconLabelFor(language, icon)}</small>
               </div>
-            ))}
+              );
+            })}
           </div>
           <div className="resource-shortcut-icons">
             <div className="resource-shortcut-icon-toolbar">
-              <div className="resource-subtitle"><strong>逐个选择</strong><small>{matchingIconShortcuts.length} 个网站</small></div>
-              <label className="resource-search"><Search size={16} /><input value={iconQuery} onChange={(event) => setIconQuery(event.target.value)} placeholder="搜索网站或网址" /></label>
+              <div className="resource-subtitle"><strong>{text("逐个选择", "Choose individually")}</strong><small>{text(`${matchingIconShortcuts.length} 个网站`, `${matchingIconShortcuts.length} sites`)}</small></div>
+              <label className="resource-search"><Search size={16} /><input value={iconQuery} onChange={(event) => setIconQuery(event.target.value)} placeholder={text("搜索网站或网址", "Search sites or URLs")} /></label>
             </div>
             <div className="resource-shortcut-icon-list">
               {visibleIconShortcuts.map((shortcut) => (
@@ -6389,20 +6475,20 @@ function ResourceCenterDialog({ state, shortcuts, updateState, onEditShortcut, o
                   </span>
                   <span>
                     <strong>{shortcut.title}</strong>
-                    <small>选择品牌图标或默认图标</small>
+                    <small>{text("选择品牌图标或默认图标", "Choose a brand or default icon")}</small>
                   </span>
                   <Edit3 size={15} />
                 </button>
               ))}
             </div>
-            {!matchingIconShortcuts.length && <p className="resource-icon-empty">没有匹配的网站</p>}
+            {!matchingIconShortcuts.length && <p className="resource-icon-empty">{text("没有匹配的网站", "No matching sites")}</p>}
             {visibleIconShortcuts.length < matchingIconShortcuts.length && (
               <button
                 type="button"
                 className="resource-icon-load-more"
                 onClick={() => setIconRenderLimit((current) => Math.min(matchingIconShortcuts.length, current + ICON_MANAGER_RENDER_BATCH))}
               >
-                再显示 {Math.min(ICON_MANAGER_RENDER_BATCH, matchingIconShortcuts.length - visibleIconShortcuts.length)} 个
+                {text(`再显示 ${Math.min(ICON_MANAGER_RENDER_BATCH, matchingIconShortcuts.length - visibleIconShortcuts.length)} 个`, `Show ${Math.min(ICON_MANAGER_RENDER_BATCH, matchingIconShortcuts.length - visibleIconShortcuts.length)} more`)}
               </button>
             )}
           </div>
@@ -6443,6 +6529,8 @@ function PageManagerDialog({
   onOpenPage: (page: CustomNavPage) => void;
   onClose: () => void;
 }) {
+  const language = useUiLanguage();
+  const text = (zh: string, en: string) => localized(language, zh, en);
   const [name, setName] = useState("");
   const [icon, setIcon] = useState<CustomNavPageIcon>("star");
   const [systemDrafts, setSystemDrafts] = useState(() => Object.fromEntries(
@@ -6460,13 +6548,13 @@ function PageManagerDialog({
   };
 
   return (
-    <DialogShell title="导航与页面" onClose={onClose} className="page-manager-dialog lucid-page-manager">
+    <DialogShell title={text("导航与页面", "Navigation and pages")} onClose={onClose} className="page-manager-dialog lucid-page-manager">
       <div className="lucid-dialog-intro">
         <SlidersHorizontal size={19} />
-        <div><strong>让左侧导航只保留真正需要的入口</strong><span>名称、图标、顺序和显示状态都会同步到你的其他设备。</span></div>
+        <div><strong>{text("让导航只保留真正需要的入口", "Keep only the navigation entries you need")}</strong><span>{text("名称、图标、顺序和显示状态都会同步到你的其他设备。", "Names, icons, order, and visibility sync to your other devices.")}</span></div>
       </div>
-      <section className="page-manager-list" aria-label="系统页面">
-        <div className="page-manager-section-title"><span>系统页面</span><small>{systemOrder.length} 个</small></div>
+      <section className="page-manager-list" aria-label={text("系统页面", "System pages")}>
+        <div className="page-manager-section-title"><span>{text("系统页面", "System pages")}</span><small>{text(`${systemOrder.length} 个`, `${systemOrder.length} pages`)}</small></div>
         {systemOrder.map((page, index) => {
           const draft = systemDrafts[page] || { name: systemNavDefaults[page].label, icon: systemNavDefaults[page].icon };
           const hidden = page !== "widgets" && hiddenPages.has(page);
@@ -6475,26 +6563,26 @@ function PageManagerDialog({
             <div className={`page-manager-row lucid-page-row ${hidden ? "is-hidden" : ""}`} key={page}>
               <span className="page-manager-icon"><SystemPageIcon size={18} /></span>
               <input
-                aria-label={`${systemNavDefaults[page].title}导航名称`}
+                aria-label={text(`${systemNavDefaults[page].title}导航名称`, `${systemNavDefaults[page].label} navigation name`)}
                 maxLength={24}
                 value={draft.name}
                 onChange={(event) => setSystemDrafts((current) => ({ ...current, [page]: { ...draft, name: event.target.value } }))}
               />
               <select
-                aria-label={`${systemNavDefaults[page].title}导航图标`}
+                aria-label={text(`${systemNavDefaults[page].title}导航图标`, `${systemNavDefaults[page].label} navigation icon`)}
                 value={draft.icon}
                 onChange={(event) => setSystemDrafts((current) => ({ ...current, [page]: { ...draft, icon: event.target.value as CustomNavPageIcon } }))}
               >
                 {(Object.entries(customNavPageIcons) as Array<[CustomNavPageIcon, (typeof customNavPageIcons)[CustomNavPageIcon]]>).map(([key, meta]) => (
-                  <option value={key} key={key}>{meta.label}</option>
+                  <option value={key} key={key}>{customNavPageIconLabelFor(language, key)}</option>
                 ))}
               </select>
               <div className="lucid-page-row-actions">
-                <button type="button" disabled={index === 0} title="向上移动" aria-label="向上移动" onClick={() => onMoveSystem(page, -1)}><ArrowUp size={15} /></button>
-                <button type="button" disabled={index === systemOrder.length - 1} title="向下移动" aria-label="向下移动" onClick={() => onMoveSystem(page, 1)}><ArrowDown size={15} /></button>
-                <button type="button" title="保存入口" aria-label="保存入口" onClick={() => onUpdateSystem(page, draft.name, draft.icon)}><Save size={15} /></button>
-                {page === "widgets" ? <span className="page-manager-locked" title="主页固定显示"><Pin size={14} /></span> : (
-                  <button type="button" title={hidden ? `显示${draft.name}` : `隐藏${draft.name}`} onClick={() => onToggleSystem(page)}>
+                <button type="button" disabled={index === 0} title={text("向上移动", "Move up")} aria-label={text("向上移动", "Move up")} onClick={() => onMoveSystem(page, -1)}><ArrowUp size={15} /></button>
+                <button type="button" disabled={index === systemOrder.length - 1} title={text("向下移动", "Move down")} aria-label={text("向下移动", "Move down")} onClick={() => onMoveSystem(page, 1)}><ArrowDown size={15} /></button>
+                <button type="button" title={text("保存入口", "Save entry")} aria-label={text("保存入口", "Save entry")} onClick={() => onUpdateSystem(page, draft.name, draft.icon)}><Save size={15} /></button>
+                {page === "widgets" ? <span className="page-manager-locked" title={text("主页固定显示", "Home is always visible")}><Pin size={14} /></span> : (
+                  <button type="button" title={hidden ? text(`显示${draft.name}`, `Show ${draft.name}`) : text(`隐藏${draft.name}`, `Hide ${draft.name}`)} onClick={() => onToggleSystem(page)}>
                   {hidden ? <Plus size={16} /> : <EyeOff size={16} />}
                   </button>
                 )}
@@ -6504,59 +6592,59 @@ function PageManagerDialog({
         })}
       </section>
 
-      <section className="page-manager-list" aria-label="自定义页面">
-        <div className="page-manager-section-title"><span>我的页面</span><small>{customPages.length} 个</small></div>
+      <section className="page-manager-list" aria-label={text("自定义页面", "Custom pages")}>
+        <div className="page-manager-section-title"><span>{text("我的页面", "My pages")}</span><small>{text(`${customPages.length} 个`, `${customPages.length} pages`)}</small></div>
         {customPages.map((page, index) => {
           const draft = customDrafts[page.id] || { name: page.name, icon: page.icon };
           const PageIcon = customNavPageIcons[draft.icon]?.Icon || Star;
           return (
             <div className="page-manager-row lucid-page-row" key={page.id}>
-              <button type="button" className="page-manager-icon" title="打开页面" aria-label={`打开${page.name}`} onClick={() => onOpenPage(page)}><PageIcon size={18} /></button>
+              <button type="button" className="page-manager-icon" title={text("打开页面", "Open page")} aria-label={text(`打开${page.name}`, `Open ${page.name}`)} onClick={() => onOpenPage(page)}><PageIcon size={18} /></button>
               <input
-                aria-label={`${page.name}页面名称`}
+                aria-label={text(`${page.name}页面名称`, `${page.name} page name`)}
                 maxLength={24}
                 value={draft.name}
                 onChange={(event) => setCustomDrafts((current) => ({ ...current, [page.id]: { ...draft, name: event.target.value } }))}
               />
               <select
-                aria-label={`${page.name}页面图标`}
+                aria-label={text(`${page.name}页面图标`, `${page.name} page icon`)}
                 value={draft.icon}
                 onChange={(event) => setCustomDrafts((current) => ({ ...current, [page.id]: { ...draft, icon: event.target.value as CustomNavPageIcon } }))}
               >
                 {(Object.entries(customNavPageIcons) as Array<[CustomNavPageIcon, (typeof customNavPageIcons)[CustomNavPageIcon]]>).map(([key, meta]) => (
-                  <option value={key} key={key}>{meta.label}</option>
+                  <option value={key} key={key}>{customNavPageIconLabelFor(language, key)}</option>
                 ))}
               </select>
               <div className="lucid-page-row-actions">
-                <button type="button" disabled={index === 0} title="向上移动" aria-label="向上移动" onClick={() => onMoveCustom(page, -1)}><ArrowUp size={15} /></button>
-                <button type="button" disabled={index === customPages.length - 1} title="向下移动" aria-label="向下移动" onClick={() => onMoveCustom(page, 1)}><ArrowDown size={15} /></button>
-                <button type="button" title="保存页面" aria-label="保存页面" onClick={() => onUpdateCustom(page, draft.name, draft.icon)}><Save size={15} /></button>
-                <button type="button" className="page-manager-delete" title={`删除${page.name}页面`} onClick={() => onDelete(page)}><Trash2 size={16} /></button>
+                <button type="button" disabled={index === 0} title={text("向上移动", "Move up")} aria-label={text("向上移动", "Move up")} onClick={() => onMoveCustom(page, -1)}><ArrowUp size={15} /></button>
+                <button type="button" disabled={index === customPages.length - 1} title={text("向下移动", "Move down")} aria-label={text("向下移动", "Move down")} onClick={() => onMoveCustom(page, 1)}><ArrowDown size={15} /></button>
+                <button type="button" title={text("保存页面", "Save page")} aria-label={text("保存页面", "Save page")} onClick={() => onUpdateCustom(page, draft.name, draft.icon)}><Save size={15} /></button>
+                <button type="button" className="page-manager-delete" title={text(`删除${page.name}页面`, `Delete ${page.name}`)} onClick={() => onDelete(page)}><Trash2 size={16} /></button>
               </div>
             </div>
           );
         })}
-        {!customPages.length && <p className="page-manager-empty">还没有自定义页面</p>}
+        {!customPages.length && <p className="page-manager-empty">{text("还没有自定义页面", "No custom pages yet")}</p>}
       </section>
 
       <form className="page-create-form" onSubmit={(event) => { event.preventDefault(); createPage(); }}>
         <label>
-          <span>新页面名称</span>
-          <input value={name} maxLength={24} onChange={(event) => setName(event.target.value)} placeholder="例如：工作" />
+          <span>{text("新页面名称", "New page name")}</span>
+          <input value={name} maxLength={24} onChange={(event) => setName(event.target.value)} placeholder={text("例如：工作", "For example: Work")} />
         </label>
-        <div className="page-icon-picker" role="radiogroup" aria-label="页面图标">
+        <div className="page-icon-picker" role="radiogroup" aria-label={text("页面图标", "Page icon")}>
           {(Object.entries(customNavPageIcons) as Array<[CustomNavPageIcon, (typeof customNavPageIcons)[CustomNavPageIcon]]>).map(([key, meta]) => {
             const Icon = meta.Icon;
             return (
-              <button type="button" role="radio" aria-checked={icon === key} className={icon === key ? "active" : ""} title={meta.label} onClick={() => setIcon(key)} key={key}>
+              <button type="button" role="radio" aria-checked={icon === key} className={icon === key ? "active" : ""} title={customNavPageIconLabelFor(language, key)} onClick={() => setIcon(key)} key={key}>
                 <Icon size={18} />
               </button>
             );
           })}
         </div>
-        <button type="submit" className="primary" disabled={!name.trim()}><Plus size={16} /> 新建页面</button>
+        <button type="submit" className="primary" disabled={!name.trim()}><Plus size={16} /> {text("新建页面", "Create page")}</button>
       </form>
-      <p className="page-manager-safety"><ShieldCheck size={14} /> 删除自定义页面只移除导航入口，页面内的网站仍保留在“空间”分类中。</p>
+      <p className="page-manager-safety"><ShieldCheck size={14} /> {text("删除自定义页面只移除导航入口，页面内的网站仍保留在“空间”分类中。", "Deleting a custom page removes only its navigation entry; its sites remain available in Spaces.")}</p>
     </DialogShell>
   );
 }
@@ -6618,7 +6706,7 @@ function SettingsDialog({ state, updateCheck, migrationBackupAvailable, updateSt
         <div className="lucid-settings-content">
           {section === "appearance" && (
             <section className="lucid-settings-section">
-              <header><span>Appearance</span><h3>{text("克制、清晰，并与你的壁纸协调", "Quiet, clear, and balanced with your wallpaper")}</h3></header>
+              <header><span>{text("外观", "Appearance")}</span><h3>{text("克制、清晰，并与你的壁纸协调", "Quiet, clear, and balanced with your wallpaper")}</h3></header>
               <div className="lucid-setting-row">
                 <div><strong>{text("界面语言", "Language")}</strong><span>{text("立即切换，并随账号同步到其他设备", "Switch instantly and sync across devices")}</span></div>
                 <div className="settings-segments" role="radiogroup" aria-label={text("界面语言", "Interface language")}>
@@ -6655,14 +6743,14 @@ function SettingsDialog({ state, updateCheck, migrationBackupAvailable, updateSt
               </div>
               <div className="lucid-setting-row">
                 <div><strong>{text("时间显示", "Time display")}</strong><span>{settings.timeZone || "Asia/Shanghai"}</span></div>
-                <button type="button" className="lucid-inline-button" onClick={onOpenTimeZone}><Clock3 size={15} />{timeZoneLabels[settings.timeZone || "Asia/Shanghai"] || text("选择时区", "Choose time zone")}</button>
+                <button type="button" className="lucid-inline-button" onClick={onOpenTimeZone}><Clock3 size={15} />{language === "zh-CN" ? (timeZoneLabels[settings.timeZone || "Asia/Shanghai"] || text("选择时区", "Choose time zone")) : (settings.timeZone || "Choose time zone").replace(/_/g, " ")}</button>
               </div>
             </section>
           )}
 
           {section === "navigation" && (
             <section className="lucid-settings-section">
-              <header><span>Navigation</span><h3>{text("导航固定在边缘，不改变内容中心", "Navigation stays at the edge without shifting the content")}</h3></header>
+              <header><span>{text("导航", "Navigation")}</span><h3>{text("导航固定在边缘，不改变内容中心", "Navigation stays at the edge without shifting the content")}</h3></header>
               <div className="lucid-setting-row">
                 <div><strong>{text("位置", "Position")}</strong><span>{text("桌面端固定到屏幕左侧或右侧", "Pin to the left or right edge on desktop")}</span></div>
                 <div className="settings-segments" role="radiogroup" aria-label={text("桌面导航位置", "Desktop navigation position")}>
@@ -6688,7 +6776,7 @@ function SettingsDialog({ state, updateCheck, migrationBackupAvailable, updateSt
 
           {section === "data" && (
             <section className="lucid-settings-section">
-              <header><span>Local-first data</span><h3>{text("备份、恢复和迁移都由你控制", "You control backup, restore, and migration")}</h3></header>
+              <header><span>{text("本机优先数据", "Local-first data")}</span><h3>{text("备份、恢复和迁移都由你控制", "You control backup, restore, and migration")}</h3></header>
               <div className="lucid-data-actions">
                 <button type="button" onClick={onImport}><Import size={17} /><span><strong>{text("导入网站", "Import sites")}</strong><small>{text("支持浏览器书签与文本", "Supports browser bookmarks and text")}</small></span></button>
                 <button type="button" onClick={onExport}><Download size={17} /><span><strong>{text("导出完整备份", "Export complete backup")}</strong><small>{text("包含网站、笔记、任务和设置", "Includes sites, notes, tasks, and settings")}</small></span></button>
@@ -6698,10 +6786,10 @@ function SettingsDialog({ state, updateCheck, migrationBackupAvailable, updateSt
               <p className="lucid-data-notice"><ShieldCheck size={15} /> {text("备份可能包含私人便签、待办、照片和壁纸，请像保护私人文件一样保管。", "Backups may contain private notes, tasks, photos, and wallpapers. Protect them like private files.")}</p>
               {noteConflicts.length > 0 && (
                 <div className="lucid-conflict-panel">
-                  <strong>{noteConflicts.length} 条笔记包含同步冲突副本</strong>
+                  <strong>{text(`${noteConflicts.length} 条笔记包含同步冲突副本`, `${noteConflicts.length} notes contain sync conflict copies`)}</strong>
                   <div>
-                    <button type="button" onClick={() => downloadJson(`whynavo-note-conflicts-${new Date().toISOString().slice(0, 10)}.json`, noteConflicts)}><Download size={15} />导出</button>
-                    <button type="button" onClick={() => updateState((current) => ({ ...current, notes: current.notes.map((note) => note.conflictBody ? { ...note, conflictBody: undefined, updatedAt: nowIso() } : note) }))}><Check size={15} />保留当前</button>
+                    <button type="button" onClick={() => downloadJson(`whynavo-note-conflicts-${new Date().toISOString().slice(0, 10)}.json`, noteConflicts)}><Download size={15} />{text("导出", "Export")}</button>
+                    <button type="button" onClick={() => updateState((current) => ({ ...current, notes: current.notes.map((note) => note.conflictBody ? { ...note, conflictBody: undefined, updatedAt: nowIso() } : note) }))}><Check size={15} />{text("保留当前", "Keep current")}</button>
                   </div>
                 </div>
               )}
@@ -6711,7 +6799,7 @@ function SettingsDialog({ state, updateCheck, migrationBackupAvailable, updateSt
           {section === "about" && (
             <section className="lucid-settings-section">
               <header><span>WhyNavo</span><h3>{text("版本与兼容状态", "Version and compatibility")}</h3></header>
-              <div className="lucid-version-mark"><Compass size={30} /><div><strong>WhyNavo {APP_VERSION}</strong><span>Local-first new tab workspace</span></div></div>
+              <div className="lucid-version-mark"><Compass size={30} /><div><strong>WhyNavo {APP_VERSION}</strong><span>{text("本机优先的新标签页工作空间", "Local-first new tab workspace")}</span></div></div>
               <dl className="lucid-version-list">
                 <div><dt>{text("应用版本", "App version")}</dt><dd>{APP_VERSION}</dd></div>
                 <div><dt>{text("数据版本", "Data version")}</dt><dd>{state.dataSchemaVersion || DATA_SCHEMA_VERSION}</dd></div>
@@ -6731,19 +6819,23 @@ function SettingsDialog({ state, updateCheck, migrationBackupAvailable, updateSt
 }
 
 function TimeZoneDialog({ current, onClose, onChoose }: { current: string; onClose: () => void; onChoose: (timeZone: string) => void }) {
+  const language = useUiLanguage();
+  const text = (zh: string, en: string) => localized(language, zh, en);
   const [query, setQuery] = useState("");
   const normalizedQuery = query.trim().toLowerCase();
+  const localizedZones = useMemo(() => timeZoneOptions.map((zone) => ({ ...zone, label: language === "zh-CN" ? zone.label : zone.value.replace(/_/g, " ") })), [language]);
+  const localizedPriorityZones = useMemo(() => priorityTimeZoneOptions.map((zone) => ({ ...zone, label: language === "zh-CN" ? zone.label : zone.value.replace(/_/g, " ") })), [language]);
   const matchingTimeZones = useMemo(() => normalizedQuery
-    ? timeZoneOptions.filter((zone) => zone.label.toLowerCase().includes(normalizedQuery) || zone.value.toLowerCase().includes(normalizedQuery))
-    : priorityTimeZoneOptions, [normalizedQuery]);
+    ? localizedZones.filter((zone) => zone.label.toLowerCase().includes(normalizedQuery) || zone.value.toLowerCase().includes(normalizedQuery))
+    : localizedPriorityZones, [localizedPriorityZones, localizedZones, normalizedQuery]);
   const filteredTimeZones = matchingTimeZones.slice(0, 100);
   return (
-    <DialogShell title="选择时区" onClose={onClose} className="timezone-popover">
-      <label className="timezone-search"><Search size={17} /><input autoFocus value={query} onChange={(event) => setQuery(event.target.value)} placeholder="搜索城市或时区，例如 Shanghai" /></label>
+    <DialogShell title={text("选择时区", "Choose time zone")} onClose={onClose} className="timezone-popover">
+      <label className="timezone-search"><Search size={17} /><input autoFocus value={query} onChange={(event) => setQuery(event.target.value)} placeholder={text("搜索城市或时区，例如 Shanghai", "Search a city or time zone, such as Shanghai")} /></label>
       <div className="timezone-result-count">
         {normalizedQuery
-          ? `${matchingTimeZones.length} 个匹配时区${matchingTimeZones.length > filteredTimeZones.length ? "，请继续输入以缩小范围" : ""}`
-          : "常用时区"}
+          ? text(`${matchingTimeZones.length} 个匹配时区${matchingTimeZones.length > filteredTimeZones.length ? "，请继续输入以缩小范围" : ""}`, `${matchingTimeZones.length} matching time zones${matchingTimeZones.length > filteredTimeZones.length ? "; keep typing to narrow the list" : ""}`)
+          : text("常用时区", "Common time zones")}
       </div>
       <div className="timezone-list">
         {filteredTimeZones.map((zone) => (
@@ -6757,7 +6849,7 @@ function TimeZoneDialog({ current, onClose, onChoose }: { current: string; onClo
             <span>{zone.value}</span>
           </button>
         ))}
-        {!filteredTimeZones.length && <div className="timezone-empty">没有找到匹配的时区</div>}
+        {!filteredTimeZones.length && <div className="timezone-empty">{text("没有找到匹配的时区", "No matching time zone found")}</div>}
       </div>
     </DialogShell>
   );
@@ -6783,6 +6875,12 @@ function SyncDialog({ state, sync, updateState, legacyStateAvailable, onAdoptLeg
   restoreAvailable: boolean;
   onRestore: () => Promise<void>;
 }) {
+  const language = useUiLanguage();
+  const text = (zh: string, en: string) => localized(language, zh, en);
+  const passwordRequirement = text(PASSWORD_REQUIREMENT, `at least ${MIN_PASSWORD_LENGTH} characters with uppercase and lowercase letters and a number`);
+  const authError = (error: unknown, zhFallback: string, enFallback: string) => (
+    language === "zh-CN" ? friendlyAuthError(error, zhFallback) : enFallback
+  );
   const [authMode, setAuthMode] = useState<"login" | "signup">("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -6811,15 +6909,15 @@ function SyncDialog({ state, sync, updateState, legacyStateAvailable, onAdoptLeg
   const submit = async (mode: "login" | "signup") => {
     const normalizedEmail = email.trim().toLowerCase();
     if (!normalizedEmail || normalizedEmail.length > 320) {
-      setError("请输入有效的邮箱地址");
+      setError(text("请输入有效的邮箱地址", "Enter a valid email address."));
       return;
     }
     if (mode === "signup" && !isStrongPassword(password)) {
-      setError(`密码需要${PASSWORD_REQUIREMENT}`);
+      setError(text(`密码需要${PASSWORD_REQUIREMENT}`, `The password must contain ${passwordRequirement}.`));
       return;
     }
     if (mode === "signup" && !legalConsent) {
-      setError("请先确认已阅读并同意隐私与数据说明和服务条款");
+      setError(text("请先确认已阅读并同意隐私与数据说明和服务条款", "Read and accept the Privacy and Data Notice and Terms of Service first."));
       return;
     }
     setBusy(true);
@@ -6835,7 +6933,7 @@ function SyncDialog({ state, sync, updateState, legacyStateAvailable, onAdoptLeg
         setLegalConsent(false);
       }
     } catch (err) {
-      setError(friendlyAuthError(err, mode === "signup" ? "注册失败，请稍后重试" : "登录失败，请检查邮箱和密码"));
+      setError(authError(err, mode === "signup" ? "注册失败，请稍后重试" : "登录失败，请检查邮箱和密码", mode === "signup" ? "Sign-up failed. Try again later." : "Sign-in failed. Check your email and password."));
     } finally {
       authChallengeRef.current?.reset();
       setBusy(false);
@@ -6844,7 +6942,7 @@ function SyncDialog({ state, sync, updateState, legacyStateAvailable, onAdoptLeg
   const resetPassword = async () => {
     const normalizedEmail = email.trim().toLowerCase();
     if (!normalizedEmail || normalizedEmail.length > 320) {
-      setError("请先填写邮箱地址");
+      setError(text("请先填写邮箱地址", "Enter your email address first."));
       return;
     }
     setBusy(true);
@@ -6853,9 +6951,9 @@ function SyncDialog({ state, sync, updateState, legacyStateAvailable, onAdoptLeg
     try {
       setEmail(normalizedEmail);
       await onResetPassword(normalizedEmail, captchaToken);
-      setNotice("密码重置邮件已发送，请前往邮箱继续操作。");
+      setNotice(text("密码重置邮件已发送，请前往邮箱继续操作。", "The password reset email has been sent. Continue from your inbox."));
     } catch (err) {
-      setError(friendlyAuthError(err, "重置邮件发送失败，请稍后重试"));
+      setError(authError(err, "重置邮件发送失败，请稍后重试", "The reset email could not be sent. Try again later."));
     } finally {
       authChallengeRef.current?.reset();
       setBusy(false);
@@ -6864,11 +6962,11 @@ function SyncDialog({ state, sync, updateState, legacyStateAvailable, onAdoptLeg
   const resendVerification = async () => {
     const normalizedEmail = email.trim().toLowerCase();
     if (!normalizedEmail || normalizedEmail.length > 320) {
-      setError("请先填写邮箱地址");
+      setError(text("请先填写邮箱地址", "Enter your email address first."));
       return;
     }
     if (!captchaToken) {
-      setError("请先完成安全验证");
+      setError(text("请先完成安全验证", "Complete the security check first."));
       return;
     }
     setBusy(true);
@@ -6877,9 +6975,9 @@ function SyncDialog({ state, sync, updateState, legacyStateAvailable, onAdoptLeg
     try {
       setEmail(normalizedEmail);
       await onResendVerification(normalizedEmail, captchaToken);
-      setNotice("如果该邮箱存在待验证注册，验证邮件已重新发送，请同时检查垃圾邮件。");
+      setNotice(text("如果该邮箱存在待验证注册，验证邮件已重新发送，请同时检查垃圾邮件。", "If this email has a pending registration, a new verification email was sent. Check your spam folder too."));
     } catch (err) {
-      setError(friendlyAuthError(err, "验证邮件暂时无法重新发送，请稍后重试"));
+      setError(authError(err, "验证邮件暂时无法重新发送，请稍后重试", "The verification email could not be resent. Try again later."));
     } finally {
       authChallengeRef.current?.reset();
       setBusy(false);
@@ -6887,19 +6985,19 @@ function SyncDialog({ state, sync, updateState, legacyStateAvailable, onAdoptLeg
   };
   const changePassword = async () => {
     if (!passwordRecovery && !currentPassword) {
-      setError("请输入当前密码");
+      setError(text("请输入当前密码", "Enter your current password."));
       return;
     }
     if (!passwordRecovery && !passwordCaptchaToken) {
-      setError("请先完成安全验证");
+      setError(text("请先完成安全验证", "Complete the security check first."));
       return;
     }
     if (!isStrongPassword(newPassword)) {
-      setError(`新密码需要${PASSWORD_REQUIREMENT}`);
+      setError(text(`新密码需要${PASSWORD_REQUIREMENT}`, `The new password must contain ${passwordRequirement}.`));
       return;
     }
     if (newPassword !== confirmNewPassword) {
-      setError("两次输入的新密码不一致");
+      setError(text("两次输入的新密码不一致", "The new passwords do not match."));
       return;
     }
     setBusy(true);
@@ -6917,9 +7015,9 @@ function SyncDialog({ state, sync, updateState, legacyStateAvailable, onAdoptLeg
       setPasswordCaptchaToken("");
       setShowPasswordUpdate(false);
       if (passwordRecovery) onPasswordRecoveryComplete();
-      setNotice("密码已更新。");
+      setNotice(text("密码已更新。", "Password updated."));
     } catch (err) {
-      setError(friendlyAuthError(err, "密码更新失败，请稍后重试"));
+      setError(authError(err, "密码更新失败，请稍后重试", "The password could not be updated. Try again later."));
     } finally {
       passwordChallengeRef.current?.reset();
       setBusy(false);
@@ -6927,7 +7025,7 @@ function SyncDialog({ state, sync, updateState, legacyStateAvailable, onAdoptLeg
   };
   const deleteCurrentAccount = async () => {
     if (!sync.user?.email || deleteConfirmText.trim().toLowerCase() !== sync.user.email.toLowerCase()) {
-      setError("请输入当前账号邮箱以确认永久删除");
+      setError(text("请输入当前账号邮箱以确认永久删除", "Enter the current account email to confirm permanent deletion."));
       return;
     }
     setBusy(true);
@@ -6935,13 +7033,13 @@ function SyncDialog({ state, sync, updateState, legacyStateAvailable, onAdoptLeg
     setNotice("");
     try {
       if (!deletePassword) {
-        setError("请输入当前账号密码");
+        setError(text("请输入当前账号密码", "Enter the current account password."));
         setBusy(false);
         return;
       }
       await onDeleteAccount(deletePassword, deleteCaptchaToken);
     } catch (err) {
-      setError(friendlyAuthError(err, "账号删除失败，请稍后重试"));
+      setError(authError(err, "账号删除失败，请稍后重试", "The account could not be deleted. Try again later."));
       deleteChallengeRef.current?.reset();
       setBusy(false);
     }
@@ -6953,20 +7051,20 @@ function SyncDialog({ state, sync, updateState, legacyStateAvailable, onAdoptLeg
     try {
       await onSignOut();
     } catch (err) {
-      setError(friendlyAuthError(err, "退出登录失败；账号数据仍保留在当前页面，请先导出备份后重试"));
+      setError(authError(err, "退出登录失败；账号数据仍保留在当前页面，请先导出备份后重试", "Sign-out failed. Account data remains on this page; export a backup before trying again."));
     } finally {
       setBusy(false);
     }
   };
   const signOutAllDevices = async () => {
-    if (!window.confirm("退出所有设备？其他设备会在会话刷新后退出，未同步的修改可能暂时留在对应设备本机。")) return;
+    if (!window.confirm(text("退出所有设备？其他设备会在会话刷新后退出，未同步的修改可能暂时留在对应设备本机。", "Sign out on every device? Other devices will sign out after their sessions refresh, and unsynced changes may remain locally on those devices."))) return;
     setBusy(true);
     setError("");
     setNotice("");
     try {
       await onSignOutAll();
     } catch (err) {
-      setError(friendlyAuthError(err, "退出所有设备失败；账号数据仍保留在当前页面"));
+      setError(authError(err, "退出所有设备失败；账号数据仍保留在当前页面", "Could not sign out all devices. Account data remains on this page."));
     } finally {
       setBusy(false);
     }
@@ -6982,22 +7080,22 @@ function SyncDialog({ state, sync, updateState, legacyStateAvailable, onAdoptLeg
     setNotice("");
     try {
       await onAdoptLegacyData();
-      setNotice("旧版本本机数据已导入当前账号，请执行一次合并同步。");
+      setNotice(text("旧版本本机数据已导入当前账号，请执行一次合并同步。", "Legacy local data was imported into this account. Run a merge sync once."));
     } catch (err) {
-      setError(err instanceof Error ? err.message : "旧版本本机数据导入失败，请重试");
+      setError(language === "zh-CN" && err instanceof Error ? err.message : text("旧版本本机数据导入失败，请重试", "Legacy local data could not be imported. Try again."));
     } finally {
       setLegacyBusy(false);
     }
   };
 
   return (
-    <DialogShell title="账号与云同步" onClose={onClose} className="sync-dialog-overlay" scrollResetKey={authMode}>
+    <DialogShell title={text("账号与云同步", "Account and cloud sync")} onClose={onClose} className="sync-dialog-overlay" scrollResetKey={authMode}>
       <div className="sync-hero">
         <div className="sync-hero-icon"><Database size={24} /></div>
         <div>
           <span>WHYNAVO CLOUD</span>
-          <h3>{sync.user ? "账号已连接" : authMode === "login" ? "登录 WhyNavo 账号" : "创建 WhyNavo 账号"}</h3>
-          <p>{sync.user ? "当前设备可以和云端数据保持一致。" : "登录后可在电脑、手机和 iPad 间同步快捷方式、小组件、笔记和设置。"}</p>
+          <h3>{sync.user ? text("账号已连接", "Account connected") : authMode === "login" ? text("登录 WhyNavo 账号", "Sign in to WhyNavo") : text("创建 WhyNavo 账号", "Create a WhyNavo account")}</h3>
+          <p>{sync.user ? text("当前设备可以和云端数据保持一致。", "This device can stay in sync with your cloud data.") : text("登录后可在电脑、手机和 iPad 间同步快捷方式、小组件、笔记和设置。", "Sign in to sync shortcuts, widgets, notes, and settings across computers, phones, and iPad.")}</p>
         </div>
       </div>
 
@@ -7005,24 +7103,24 @@ function SyncDialog({ state, sync, updateState, legacyStateAvailable, onAdoptLeg
         <>
           <div className="sync-status-grid">
             <div>
-              <small>账号</small>
+              <small>{text("账号", "Account")}</small>
               <strong>{sync.user.email}</strong>
             </div>
             <div>
-              <small>同步状态</small>
-              <strong>{sync.message}</strong>
+              <small>{text("同步状态", "Sync status")}</small>
+              <strong>{language === "zh-CN" ? sync.message : sync.syncing ? "Syncing" : sync.lastSyncedAt ? "Up to date" : "Ready"}</strong>
             </div>
             <div>
-              <small>最近同步</small>
-              <strong>{sync.lastSyncedAt ? new Date(sync.lastSyncedAt).toLocaleString("zh-CN") : "暂无记录"}</strong>
+              <small>{text("最近同步", "Last sync")}</small>
+              <strong>{sync.lastSyncedAt ? new Date(sync.lastSyncedAt).toLocaleString(language) : text("暂无记录", "No record yet")}</strong>
             </div>
           </div>
 
           <div className="sync-settings-panel">
             <label className="sync-toggle-row">
               <span>
-                <strong>自动同步</strong>
-                <small>打开新标签页和数据变化后自动更新云端。</small>
+                <strong>{text("自动同步", "Automatic sync")}</strong>
+                <small>{text("打开新标签页和数据变化后自动更新云端。", "Update the cloud after opening a new tab or changing data.")}</small>
               </span>
               <input
                 type="checkbox"
@@ -7038,8 +7136,8 @@ function SyncDialog({ state, sync, updateState, legacyStateAvailable, onAdoptLeg
             </label>
             <label className="sync-interval-row">
               <span>
-                <strong>同步间隔</strong>
-                <small>最低 30 秒</small>
+                <strong>{text("同步间隔", "Sync interval")}</strong>
+                <small>{text("最低 30 秒", "Minimum 30 seconds")}</small>
               </span>
               <input
                 type="number"
@@ -7061,26 +7159,26 @@ function SyncDialog({ state, sync, updateState, legacyStateAvailable, onAdoptLeg
 
       {legacyStateAvailable && (
         <div className="sync-legacy-import">
-          <strong>检测到更新前本机数据</strong>
-          <p>旧版本把数据保存在未绑定账号的本机区域。为防止不同账号串数据，WhyNavo 不会自动导入。</p>
+          <strong>{text("检测到更新前本机数据", "Legacy local data detected")}</strong>
+          <p>{text("旧版本把数据保存在未绑定账号的本机区域。为防止不同账号串数据，WhyNavo 不会自动导入。", "An older version stored this data outside an account. WhyNavo will not import it automatically, preventing data from crossing between accounts.")}</p>
           {sync.user ? (
             <button type="button" disabled={busy || legacyBusy || sync.syncing} onClick={() => void importLegacyData()}>
-              <Download size={16} /> 确认属于当前账号并导入
+              <Download size={16} /> {text("确认属于当前账号并导入", "Confirm ownership and import")}
             </button>
           ) : (
-            <small>请先登录你在更新前使用的账号，再确认导入。</small>
+            <small>{text("请先登录你在更新前使用的账号，再确认导入。", "Sign in to the account you used before the update, then confirm the import.")}</small>
           )}
         </div>
       )}
 
       {!sync.user && (
         <div className="sync-auth-panel">
-          <div className="sync-auth-tabs" role="tablist" aria-label="账号操作">
-            <button type="button" role="tab" aria-selected={authMode === "login"} className={authMode === "login" ? "active" : ""} onClick={() => { setAuthMode("login"); setCaptchaToken(""); setError(""); setNotice(""); }}>登录</button>
-            <button type="button" role="tab" aria-selected={authMode === "signup"} className={authMode === "signup" ? "active" : ""} onClick={() => { setAuthMode("signup"); setCaptchaToken(""); setError(""); setNotice(""); }}>注册</button>
+          <div className="sync-auth-tabs" role="tablist" aria-label={text("账号操作", "Account actions")}>
+            <button type="button" role="tab" aria-selected={authMode === "login"} className={authMode === "login" ? "active" : ""} onClick={() => { setAuthMode("login"); setCaptchaToken(""); setError(""); setNotice(""); }}>{text("登录", "Sign in")}</button>
+            <button type="button" role="tab" aria-selected={authMode === "signup"} className={authMode === "signup" ? "active" : ""} onClick={() => { setAuthMode("signup"); setCaptchaToken(""); setError(""); setNotice(""); }}>{text("注册", "Sign up")}</button>
           </div>
           <label className="sync-field">
-            <span>邮箱</span>
+            <span>{text("邮箱", "Email")}</span>
             <div>
               <Mail size={17} />
               <input
@@ -7094,7 +7192,7 @@ function SyncDialog({ state, sync, updateState, legacyStateAvailable, onAdoptLeg
             </div>
           </label>
           <label className="sync-field">
-            <span>密码</span>
+            <span>{text("密码", "Password")}</span>
             <div>
               <KeyRound size={17} />
               <input
@@ -7105,13 +7203,13 @@ function SyncDialog({ state, sync, updateState, legacyStateAvailable, onAdoptLeg
                 value={password}
                 onChange={(event) => setPassword(event.target.value)}
                 onKeyDown={handlePasswordKeyDown}
-                placeholder={authMode === "login" ? "输入账号密码" : "设置登录密码"}
+                placeholder={authMode === "login" ? text("输入账号密码", "Enter your password") : text("设置登录密码", "Create a password")}
               />
               <button
                 type="button"
                 className="sync-password-toggle"
-                aria-label={showPassword ? "隐藏密码" : "显示密码"}
-                title={showPassword ? "隐藏密码" : "显示密码"}
+                aria-label={showPassword ? text("隐藏密码", "Hide password") : text("显示密码", "Show password")}
+                title={showPassword ? text("隐藏密码", "Hide password") : text("显示密码", "Show password")}
                 onClick={() => setShowPassword((value) => !value)}
               >
                 {showPassword ? <EyeOff size={17} /> : <Eye size={17} />}
@@ -7120,15 +7218,15 @@ function SyncDialog({ state, sync, updateState, legacyStateAvailable, onAdoptLeg
           </label>
           <p className="sync-auth-note">
             {authMode === "login"
-              ? "使用同一个账号登录其他设备，即可合并同步你的 WhyNavo 数据。未登录时在本机整理的内容也会自动带入当前账号。"
-              : `注册密码需要${PASSWORD_REQUIREMENT}。验证邮箱后，即可在其他设备登录并同步。`}
+              ? text("使用同一个账号登录其他设备，即可合并同步你的 WhyNavo 数据。未登录时在本机整理的内容也会自动带入当前账号。", "Sign in with the same account on other devices to merge and sync your WhyNavo data. Local data created before signing in is carried into this account.")
+              : text(`注册密码需要${PASSWORD_REQUIREMENT}。验证邮箱后，即可在其他设备登录并同步。`, `Your password must contain ${passwordRequirement}. Verify your email before signing in and syncing on other devices.`)}
           </p>
           <p className="sync-legal-note">
-            请阅读
-            <a href="./privacy.html" target="_blank" rel="noreferrer">隐私与数据说明</a>
-            和
-            <a href="./terms.html" target="_blank" rel="noreferrer">服务条款</a>
-            。本机数据默认保存在当前浏览器，登录后才会同步可同步字段。
+            {text("请阅读", "Read the ")}
+            <a href="./privacy.html" target="_blank" rel="noreferrer">{text("隐私与数据说明", "Privacy and Data Notice")}</a>
+            {text("和", " and ")}
+            <a href="./terms.html" target="_blank" rel="noreferrer">{text("服务条款", "Terms of Service")}</a>
+            {text("。本机数据默认保存在当前浏览器，登录后才会同步可同步字段。", ". Local data stays in this browser by default; supported fields sync only after sign-in.")}
           </p>
           {authMode === "signup" && (
             <label className="sync-legal-consent">
@@ -7137,7 +7235,7 @@ function SyncDialog({ state, sync, updateState, legacyStateAvailable, onAdoptLeg
                 checked={legalConsent}
                 onChange={(event) => setLegalConsent(event.target.checked)}
               />
-              <span>我已阅读并同意隐私与数据说明和服务条款，并确认已达到所在地可独立同意网络服务的年龄。</span>
+              <span>{text("我已阅读并同意隐私与数据说明和服务条款，并确认已达到所在地可独立同意网络服务的年龄。", "I accept the Privacy and Data Notice and Terms of Service, and confirm I meet the age required to consent to online services where I live.")}</span>
             </label>
           )}
           {CAPTCHA_CONFIGURED ? (
@@ -7145,20 +7243,21 @@ function SyncDialog({ state, sync, updateState, legacyStateAvailable, onAdoptLeg
               key={authMode}
               ref={authChallengeRef}
               action={authMode}
+              language={language}
               onToken={setCaptchaToken}
             />
           ) : (
-            <p className="warning">安全验证暂未配置，账号服务已暂停，请稍后再试。</p>
+            <p className="warning">{text("安全验证暂未配置，账号服务已暂停，请稍后再试。", "Security verification is not configured. Account services are temporarily unavailable.")}</p>
           )}
           {notice && <p className="sync-auth-success">{notice}</p>}
           {error && <p className="warning">{error}</p>}
           <button className="primary sync-submit" disabled={busy || !email || !password || !captchaToken || !CAPTCHA_CONFIGURED || (authMode === "signup" && !legalConsent)} onClick={() => submit(authMode)}>
-            {busy ? "处理中" : authMode === "login" ? "登录并同步" : "注册并同步"}
+            {busy ? text("处理中", "Processing") : authMode === "login" ? text("登录并同步", "Sign in and sync") : text("注册并同步", "Sign up and sync")}
           </button>
           {authMode === "login" && (
             <div className="sync-auth-secondary-actions">
-              <button type="button" className="sync-reset-password" disabled={busy || !email || !captchaToken || !CAPTCHA_CONFIGURED} onClick={() => void resetPassword()}>忘记密码</button>
-              <button type="button" className="sync-reset-password" disabled={busy || !email || !captchaToken || !CAPTCHA_CONFIGURED} onClick={() => void resendVerification()}>重新发送验证邮件</button>
+              <button type="button" className="sync-reset-password" disabled={busy || !email || !captchaToken || !CAPTCHA_CONFIGURED} onClick={() => void resetPassword()}>{text("忘记密码", "Forgot password")}</button>
+              <button type="button" className="sync-reset-password" disabled={busy || !email || !captchaToken || !CAPTCHA_CONFIGURED} onClick={() => void resendVerification()}>{text("重新发送验证邮件", "Resend verification email")}</button>
             </div>
           )}
         </div>
@@ -7166,17 +7265,17 @@ function SyncDialog({ state, sync, updateState, legacyStateAvailable, onAdoptLeg
       {sync.user && (
         <div className="sync-connected-panel">
           <div className="sync-meta">
-            <small>设备 ID：{state.sync?.deviceId || "未生成"}</small>
-            {state.sync?.lastPulledAt && <small>上次拉取：{new Date(state.sync.lastPulledAt).toLocaleString("zh-CN")}</small>}
-            {state.sync?.lastPushedAt && <small>上次上传：{new Date(state.sync.lastPushedAt).toLocaleString("zh-CN")}</small>}
+            <small>{text("设备 ID", "Device ID")}: {state.sync?.deviceId || text("未生成", "Not generated")}</small>
+            {state.sync?.lastPulledAt && <small>{text("上次拉取", "Last pull")}: {new Date(state.sync.lastPulledAt).toLocaleString(language)}</small>}
+            {state.sync?.lastPushedAt && <small>{text("上次上传", "Last push")}: {new Date(state.sync.lastPushedAt).toLocaleString(language)}</small>}
           </div>
           <div className="sync-choice-panel">
-            <button className="primary" disabled={sync.syncing} onClick={() => onSync("merge")}><RefreshCcw size={16} /> 合并同步</button>
-            <button disabled={sync.syncing} onClick={() => onSync("push")}><Upload size={16} /> 本机覆盖云端</button>
-            <button disabled={sync.syncing} onClick={() => onSync("pull")}><Download size={16} /> 云端覆盖本机</button>
+            <button className="primary" disabled={sync.syncing} onClick={() => onSync("merge")}><RefreshCcw size={16} /> {text("合并同步", "Merge and sync")}</button>
+            <button disabled={sync.syncing} onClick={() => onSync("push")}><Upload size={16} /> {text("本机覆盖云端", "Replace cloud with this device")}</button>
+            <button disabled={sync.syncing} onClick={() => onSync("pull")}><Download size={16} /> {text("云端覆盖本机", "Replace this device with cloud")}</button>
           </div>
-          <p className="sync-hint">合并同步会保留两端新增内容；同一项冲突时保留更新时间较新的版本。覆盖操作会先保存本机回退点。</p>
-          {passwordRecovery && <p className="sync-auth-success">密码重置链接已验证。请在下方设置{PASSWORD_REQUIREMENT}的新密码。</p>}
+          <p className="sync-hint">{text("合并同步会保留两端新增内容；同一项冲突时保留更新时间较新的版本。覆盖操作会先保存本机回退点。", "Merge sync keeps new content from both sides and keeps the newer version of a conflicting item. Replace operations save a local restore point first.")}</p>
+          {passwordRecovery && <p className="sync-auth-success">{text(`密码重置链接已验证。请在下方设置${PASSWORD_REQUIREMENT}的新密码。`, `The reset link is verified. Create a new password with ${passwordRequirement} below.`)}</p>}
           {showPasswordUpdate && (
             <div className="sync-password-update">
               {!passwordRecovery && (
@@ -7186,19 +7285,20 @@ function SyncDialog({ state, sync, updateState, legacyStateAvailable, onAdoptLeg
                   maxLength={256}
                   value={currentPassword}
                   onChange={(event) => setCurrentPassword(event.target.value)}
-                  placeholder="输入当前密码"
+                  placeholder={text("输入当前密码", "Enter current password")}
                 />
               )}
-              <input type="password" minLength={MIN_PASSWORD_LENGTH} maxLength={256} autoComplete="new-password" value={newPassword} onChange={(event) => setNewPassword(event.target.value)} placeholder="输入符合安全要求的新密码" />
-              <input type="password" minLength={MIN_PASSWORD_LENGTH} maxLength={256} autoComplete="new-password" value={confirmNewPassword} onChange={(event) => setConfirmNewPassword(event.target.value)} placeholder="再次输入新密码" />
+              <input type="password" minLength={MIN_PASSWORD_LENGTH} maxLength={256} autoComplete="new-password" value={newPassword} onChange={(event) => setNewPassword(event.target.value)} placeholder={text("输入符合安全要求的新密码", "Enter a secure new password")} />
+              <input type="password" minLength={MIN_PASSWORD_LENGTH} maxLength={256} autoComplete="new-password" value={confirmNewPassword} onChange={(event) => setConfirmNewPassword(event.target.value)} placeholder={text("再次输入新密码", "Enter the new password again")} />
               {!passwordRecovery && (CAPTCHA_CONFIGURED ? (
                 <TurnstileChallenge
                   ref={passwordChallengeRef}
                   action="password-change"
+                  language={language}
                   onToken={setPasswordCaptchaToken}
                 />
               ) : (
-                <p className="warning">安全验证暂不可用，暂时无法修改密码。</p>
+                <p className="warning">{text("安全验证暂不可用，暂时无法修改密码。", "Security verification is unavailable, so the password cannot be changed right now.")}</p>
               ))}
               <button
                 type="button"
@@ -7210,21 +7310,21 @@ function SyncDialog({ state, sync, updateState, legacyStateAvailable, onAdoptLeg
                 }
                 onClick={() => void changePassword()}
               >
-                <Save size={16} /> 保存新密码
+                <Save size={16} /> {text("保存新密码", "Save new password")}
               </button>
             </div>
           )}
           {showDeleteAccount && (
             <div className="sync-delete-account">
-              <strong>永久删除账号与云端数据</strong>
-              <p>此操作会删除账号、云端同步数据和此设备上的账号数据，且无法恢复。请先导出完整备份。</p>
+              <strong>{text("永久删除账号与云端数据", "Permanently delete account and cloud data")}</strong>
+              <p>{text("此操作会删除账号、云端同步数据和此设备上的账号数据，且无法恢复。请先导出完整备份。", "This permanently deletes the account, cloud sync data, and account data on this device. Export a complete backup first.")}</p>
               <input
                 type="email"
                 autoComplete="off"
                 maxLength={320}
                 value={deleteConfirmText}
                 onChange={(event) => setDeleteConfirmText(event.target.value)}
-                placeholder={sync.user.email || "输入当前账号邮箱"}
+                placeholder={sync.user.email || text("输入当前账号邮箱", "Enter the current account email")}
               />
               <input
                 type="password"
@@ -7232,16 +7332,17 @@ function SyncDialog({ state, sync, updateState, legacyStateAvailable, onAdoptLeg
                 maxLength={256}
                 value={deletePassword}
                 onChange={(event) => setDeletePassword(event.target.value)}
-                placeholder="输入当前账号密码"
+                placeholder={text("输入当前账号密码", "Enter the current account password")}
               />
               {CAPTCHA_CONFIGURED ? (
                 <TurnstileChallenge
                   ref={deleteChallengeRef}
                   action="delete-account"
+                  language={language}
                   onToken={setDeleteCaptchaToken}
                 />
               ) : (
-                <p className="warning">安全验证暂不可用，暂时无法删除账号。</p>
+                <p className="warning">{text("安全验证暂不可用，暂时无法删除账号。", "Security verification is unavailable, so the account cannot be deleted right now.")}</p>
               )}
               <button
                 type="button"
@@ -7249,18 +7350,18 @@ function SyncDialog({ state, sync, updateState, legacyStateAvailable, onAdoptLeg
                 disabled={busy || !deletePassword || !deleteCaptchaToken || !CAPTCHA_CONFIGURED || deleteConfirmText.trim().toLowerCase() !== sync.user.email?.toLowerCase()}
                 onClick={() => void deleteCurrentAccount()}
               >
-                <Trash2 size={16} /> 永久删除
+                <Trash2 size={16} /> {text("永久删除", "Delete permanently")}
               </button>
             </div>
           )}
           {notice && <p className="sync-auth-success">{notice}</p>}
           {error && <p className="warning">{error}</p>}
           <div className="button-row">
-            <button disabled={!restoreAvailable || sync.syncing} onClick={() => void onRestore()}>回到同步前版本</button>
-            <button type="button" onClick={() => { setShowPasswordUpdate((value) => !value); setCurrentPassword(""); setNewPassword(""); setConfirmNewPassword(""); setPasswordCaptchaToken(""); setError(""); setNotice(""); }}><KeyRound size={16} /> 修改密码</button>
-            <button disabled={busy || sync.syncing} onClick={() => void signOutCurrent()}><LogOut size={16} /> 退出登录</button>
-            <button disabled={busy || sync.syncing} onClick={() => void signOutAllDevices()}><LogOut size={16} /> 退出所有设备</button>
-            <button type="button" className="danger" onClick={() => { setShowDeleteAccount((value) => !value); setDeleteConfirmText(""); setDeletePassword(""); setDeleteCaptchaToken(""); setError(""); setNotice(""); }}><Trash2 size={16} /> 删除账号</button>
+            <button disabled={!restoreAvailable || sync.syncing} onClick={() => void onRestore()}>{text("回到同步前版本", "Restore pre-sync version")}</button>
+            <button type="button" onClick={() => { setShowPasswordUpdate((value) => !value); setCurrentPassword(""); setNewPassword(""); setConfirmNewPassword(""); setPasswordCaptchaToken(""); setError(""); setNotice(""); }}><KeyRound size={16} /> {text("修改密码", "Change password")}</button>
+            <button disabled={busy || sync.syncing} onClick={() => void signOutCurrent()}><LogOut size={16} /> {text("退出登录", "Sign out")}</button>
+            <button disabled={busy || sync.syncing} onClick={() => void signOutAllDevices()}><LogOut size={16} /> {text("退出所有设备", "Sign out all devices")}</button>
+            <button type="button" className="danger" onClick={() => { setShowDeleteAccount((value) => !value); setDeleteConfirmText(""); setDeletePassword(""); setDeleteCaptchaToken(""); setError(""); setNotice(""); }}><Trash2 size={16} /> {text("删除账号", "Delete account")}</button>
           </div>
         </div>
       )}

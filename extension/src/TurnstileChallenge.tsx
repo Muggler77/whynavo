@@ -14,6 +14,7 @@ export type TurnstileChallengeHandle = {
 
 type TurnstileChallengeProps = {
   action: "login" | "signup" | "recovery" | "password-change" | "delete-account";
+  language: "zh-CN" | "en-US";
   onToken: (token: string) => void;
 };
 
@@ -25,18 +26,19 @@ const createInstanceId = () => {
 };
 
 const TurnstileChallenge = forwardRef<TurnstileChallengeHandle, TurnstileChallengeProps>(
-  function TurnstileChallenge({ action, onToken }, ref) {
+  function TurnstileChallenge({ action, language, onToken }, ref) {
+    const text = (zh: string, en: string) => language === "en-US" ? en : zh;
     const frameRef = useRef<HTMLIFrameElement>(null);
     const instance = useMemo(createInstanceId, []);
     const [compact, setCompact] = useState(() => window.matchMedia("(max-width: 380px)").matches);
     const [frameVersion, setFrameVersion] = useState(0);
     const [status, setStatus] = useState<"loading" | "ready" | "verified" | "error">("loading");
-    const [message, setMessage] = useState("正在准备安全验证");
+    const [message, setMessage] = useState(() => text("正在准备安全验证", "Preparing security verification"));
 
     const reload = () => {
       onToken("");
       setStatus("loading");
-      setMessage("正在重新加载安全验证");
+      setMessage(text("正在重新加载安全验证", "Reloading security verification"));
       setFrameVersion((value) => value + 1);
     };
 
@@ -67,40 +69,40 @@ const TurnstileChallenge = forwardRef<TurnstileChallengeHandle, TurnstileChallen
 
         if (event.data.type === "whynavo-turnstile-ready") {
           setStatus("ready");
-          setMessage("请完成安全验证");
+          setMessage(text("请完成安全验证", "Complete the security verification"));
           return;
         }
         if (event.data.type === "whynavo-turnstile-success" && event.data.token) {
           onToken(event.data.token);
           setStatus("verified");
-          setMessage("安全验证已完成");
+          setMessage(text("安全验证已完成", "Security verification completed"));
           return;
         }
         if (event.data.type === "whynavo-turnstile-expired") {
           onToken("");
           setStatus("ready");
-          setMessage("验证已过期，请重新完成");
+          setMessage(text("验证已过期，请重新完成", "Verification expired. Complete it again."));
           return;
         }
         if (event.data.type === "whynavo-turnstile-error") {
           onToken("");
           setStatus("error");
-          setMessage(event.data.message || "安全验证暂时不可用，请刷新后重试");
+          setMessage(language === "zh-CN" && event.data.message ? event.data.message : text("安全验证暂时不可用，请刷新后重试", "Security verification is temporarily unavailable. Refresh and try again."));
         }
       };
       window.addEventListener("message", receive);
       return () => window.removeEventListener("message", receive);
-    }, [instance, onToken]);
+    }, [instance, language, onToken]);
 
     useEffect(() => {
       if (status !== "loading") return undefined;
       const timeout = window.setTimeout(() => {
         onToken("");
         setStatus("error");
-        setMessage("安全验证加载超时，请重新加载");
+        setMessage(text("安全验证加载超时，请重新加载", "Security verification timed out. Reload it."));
       }, 15_000);
       return () => window.clearTimeout(timeout);
-    }, [frameVersion, onToken, status]);
+    }, [frameVersion, language, onToken, status]);
 
     const frameUrl = useMemo(() => {
       const params = new URLSearchParams({
@@ -108,25 +110,26 @@ const TurnstileChallenge = forwardRef<TurnstileChallengeHandle, TurnstileChallen
         instance,
         action,
         size: compact ? "compact" : "flexible",
+        language: language === "en-US" ? "en" : "zh-CN",
         parentOrigin: window.location.origin
       });
       return `${CAPTCHA_FRAME_URL}#${params.toString()}`;
-    }, [action, compact, instance]);
+    }, [action, compact, instance, language]);
 
-      return (
+    return (
       <div className={`turnstile-challenge ${status}`} aria-live="polite">
         <iframe
           key={frameVersion}
           ref={frameRef}
           className={compact ? "compact" : ""}
           src={frameUrl}
-          title="Cloudflare 安全验证"
+          title={text("Cloudflare 安全验证", "Cloudflare security verification")}
           sandbox="allow-scripts allow-forms"
           referrerPolicy="no-referrer"
         />
         <small>{message}</small>
         {status === "error" && (
-          <button type="button" onClick={reload}>重新加载安全验证</button>
+          <button type="button" onClick={reload}>{text("重新加载安全验证", "Reload security verification")}</button>
         )}
       </div>
     );

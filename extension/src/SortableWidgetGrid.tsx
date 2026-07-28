@@ -29,9 +29,11 @@ export type SortableWidgetGridItem = {
   content: ReactNode;
 };
 
-function SortableWidgetItem({ item, onConfigure }: {
+function SortableWidgetItem({ item, onConfigure, language, forceWide }: {
   item: SortableWidgetGridItem;
   onConfigure: (widgetKey: WidgetKey, x: number, y: number) => void;
+  language: "zh-CN" | "en-US";
+  forceWide: boolean;
 }) {
   const {
     attributes,
@@ -51,7 +53,7 @@ function SortableWidgetItem({ item, onConfigure }: {
   return (
     <div
       ref={setNodeRef}
-      className={`widget-sortable-shell widget-size-${item.size} ${isDragging ? "is-dragging" : ""}`}
+      className={`widget-sortable-shell widget-size-${forceWide ? "wide" : item.size} ${isDragging ? "is-dragging" : ""}`}
       data-widget-key={item.id}
       style={style}
     >
@@ -60,8 +62,8 @@ function SortableWidgetItem({ item, onConfigure }: {
         ref={setActivatorNodeRef}
         type="button"
         className="widget-sortable-handle"
-        aria-label={`拖动${item.label}小组件`}
-        title={`拖动${item.label}`}
+        aria-label={language === "en-US" ? `Drag ${item.label} widget` : `拖动${item.label}小组件`}
+        title={language === "en-US" ? `Drag ${item.label}` : `拖动${item.label}`}
         {...attributes}
         {...listeners}
       >
@@ -70,8 +72,8 @@ function SortableWidgetItem({ item, onConfigure }: {
       <button
         type="button"
         className="widget-sortable-settings"
-        aria-label={`设置${item.label}小组件`}
-        title={`设置${item.label}`}
+        aria-label={language === "en-US" ? `Configure ${item.label} widget` : `设置${item.label}小组件`}
+        title={language === "en-US" ? `Configure ${item.label}` : `设置${item.label}`}
         onClick={(event) => {
           const rect = event.currentTarget.getBoundingClientRect();
           onConfigure(item.id, rect.left + rect.width / 2, rect.bottom + 8);
@@ -83,10 +85,13 @@ function SortableWidgetItem({ item, onConfigure }: {
   );
 }
 
-export default function SortableWidgetGrid({ items, onMove, onConfigure }: {
+export default function SortableWidgetGrid({ items, onMove, onConfigure, className = "widgets home-widgets", forceWide = false, language = "zh-CN" }: {
   items: SortableWidgetGridItem[];
   onMove: (source: WidgetKey, target: WidgetKey) => void;
   onConfigure: (widgetKey: WidgetKey, x: number, y: number) => void;
+  className?: string;
+  forceWide?: boolean;
+  language?: "zh-CN" | "en-US";
 }) {
   const [activeId, setActiveId] = useState<WidgetKey | undefined>();
   const sensors = useSensors(
@@ -111,8 +116,16 @@ export default function SortableWidgetGrid({ items, onMove, onConfigure }: {
       onDragEnd={finishDrag}
     >
       <SortableContext items={items.map((item) => item.id)} strategy={rectSortingStrategy}>
-        <section className="widgets home-widgets layout-editing" aria-label="主页小组件">
-          {items.map((item) => <SortableWidgetItem item={item} onConfigure={onConfigure} key={item.id} />)}
+        <section className={`${className} layout-editing`} aria-label={language === "en-US" ? "Home widgets" : "主页小组件"}>
+          {items.map((item) => (
+            <SortableWidgetItem
+              item={item}
+              onConfigure={onConfigure}
+              language={language}
+              forceWide={forceWide}
+              key={item.id}
+            />
+          ))}
         </section>
       </SortableContext>
       <DragOverlay dropAnimation={{ duration: 180, easing: "ease" }}>

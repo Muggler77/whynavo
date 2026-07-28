@@ -1379,7 +1379,7 @@ try {
   assert.match(appSource, /maxLength=\{MAX_TODO_TEXT_CHARS\}/, "todo input length must match the persisted data model");
   assert.match(
     appSource,
-    /DialogShell title="账号与云同步"[\s\S]*scrollResetKey=\{authMode\}/,
+    /DialogShell title=\{text\("账号与云同步", "Account and cloud sync"\)\}[\s\S]*scrollResetKey=\{authMode\}/,
     "switching between login and registration must reset the account dialog to the top"
   );
   assert.match(

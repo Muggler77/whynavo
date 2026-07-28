@@ -4,8 +4,10 @@
   const instance = params.get("instance") || "";
   const action = params.get("action") || "login";
   const size = params.get("size") === "compact" ? "compact" : "flexible";
+  const language = params.get("language") === "en" ? "en" : "zh-CN";
   const parentOrigin = params.get("parentOrigin") || "";
   const error = document.getElementById("error");
+  const text = (zh, en) => language === "en" ? en : zh;
 
   const allowedParent = parentOrigin === "https://whynavo.pages.dev"
     || /^chrome-extension:\/\/[a-p]{32}$/.test(parentOrigin);
@@ -24,11 +26,11 @@
 
   window.onWhyNavoTurnstileLoad = () => {
     if (!allowedParent || !/^[A-Za-z0-9_-]{10,128}$/.test(sitekey) || !instance) {
-      showError("安全验证配置无效");
+      showError(text("安全验证配置无效", "Invalid security verification configuration"));
       return;
     }
     if (!window.turnstile) {
-      showError("安全验证加载失败");
+      showError(text("安全验证加载失败", "Security verification failed to load"));
       return;
     }
 
@@ -37,6 +39,7 @@
         sitekey,
         action,
         size,
+        language,
         theme: "auto",
         appearance: "always",
         retry: "auto",
@@ -45,13 +48,13 @@
         "expired-callback": () => send("whynavo-turnstile-expired"),
         "timeout-callback": () => send("whynavo-turnstile-expired"),
         "error-callback": () => {
-          showError("安全验证失败，请稍后重试");
+          showError(text("安全验证失败，请稍后重试", "Security verification failed. Try again later."));
           return true;
         }
       });
       send("whynavo-turnstile-ready");
     } catch {
-      showError("安全验证加载失败");
+      showError(text("安全验证加载失败", "Security verification failed to load"));
     }
   };
 })();
