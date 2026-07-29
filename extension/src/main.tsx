@@ -11,6 +11,7 @@ import "./ui-v094.css";
 import "./ui-v095.css";
 import "./ui-v096.css";
 import "./ui-v097.css";
+import "./ui-v098.css";
 
 type ErrorBoundaryState = { error?: Error };
 
@@ -45,8 +46,10 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
   </React.StrictMode>
 );
 
-const canUseWebAppCache = window.location.protocol === "https:"
-  || ["localhost", "127.0.0.1"].includes(window.location.hostname);
+const canUseWebAppCache = import.meta.env.PROD && (
+  window.location.protocol === "https:"
+  || ["localhost", "127.0.0.1"].includes(window.location.hostname)
+);
 if (canUseWebAppCache && "serviceWorker" in navigator) {
   window.addEventListener("load", () => {
     void navigator.serviceWorker

@@ -1,0 +1,332 @@
+/* WhyNavo 0.9.8: browser-native favicons, a precise clock, and a lucid folder canvas. */
+
+.collected-icon-grid button.is-unavailable {
+  display: none;
+}
+
+.icon-detection-empty {
+  display: flex;
+  min-height: 72px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 14px;
+  gap: 12px;
+  color: var(--wt-muted);
+  background: var(--wt-surface-soft);
+  border: 1px dashed var(--wt-line-strong);
+  border-radius: 8px;
+  font-size: 12px;
+}
+
+.icon-detection-empty button {
+  min-height: 40px;
+  padding: 0 12px;
+  flex: 0 0 auto;
+  color: var(--wt-text-soft);
+  background: var(--wt-surface);
+  border: 1px solid var(--wt-line);
+  border-radius: 6px;
+}
+
+.home-time {
+  min-height: 44px;
+  margin-bottom: 12px;
+  gap: 14px;
+}
+
+.home-time time {
+  font-size: 32px;
+  font-weight: 720;
+  line-height: 1;
+}
+
+.home-time span {
+  font-size: 13px;
+  font-weight: 620;
+}
+
+.lucid-search-idle {
+  display: flex;
+  min-height: 72px;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.folder-overlay {
+  padding: 32px;
+  background: rgba(8, 13, 15, 0.58);
+  backdrop-filter: blur(18px) saturate(82%);
+}
+
+.folder-view {
+  position: relative;
+  display: grid;
+  width: min(980px, calc(100vw - 64px));
+  max-height: min(760px, calc(100dvh - 64px));
+  grid-template-rows: auto minmax(0, 1fr);
+  overflow: visible;
+  color: var(--wt-text);
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  backdrop-filter: none;
+  animation: folder-view-enter 180ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.folder-view::before {
+  display: none;
+}
+
+.folder-view .folder-view-header {
+  position: relative;
+  display: grid;
+  min-height: 84px;
+  padding: 10px 172px 16px;
+  place-items: center;
+  border: 0;
+}
+
+.folder-view-heading {
+  display: grid;
+  min-width: 0;
+  justify-items: center;
+  gap: 3px;
+  text-align: center;
+}
+
+.folder-view-heading h2 {
+  max-width: 100%;
+  margin: 0;
+  overflow: hidden;
+  color: #fff;
+  font-size: 24px;
+  font-weight: 720;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  text-shadow: 0 2px 16px rgba(0, 0, 0, 0.38);
+  white-space: nowrap;
+}
+
+.folder-view-heading span {
+  color: rgba(255, 255, 255, 0.74);
+  font-size: 11px;
+  font-weight: 560;
+}
+
+.folder-view .folder-actions {
+  position: absolute;
+  top: 50%;
+  right: 18px;
+  display: flex;
+  gap: 6px;
+  transform: translateY(-50%);
+}
+
+.folder-view .folder-actions button {
+  display: grid;
+  width: 44px;
+  min-width: 44px;
+  height: 44px;
+  padding: 0;
+  place-items: center;
+  color: rgba(255, 255, 255, 0.82);
+  background: rgba(13, 20, 23, 0.32);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 8px;
+  box-shadow: none;
+  transition: color 160ms ease, background 160ms ease, border-color 160ms ease;
+}
+
+.folder-view .folder-actions button:hover,
+.folder-view .folder-actions button:focus-visible {
+  color: #fff;
+  background: rgba(13, 20, 23, 0.56);
+  border-color: rgba(255, 255, 255, 0.38);
+}
+
+.folder-view .folder-grid {
+  display: grid;
+  max-height: calc(min(760px, 100dvh - 64px) - 84px);
+  padding: 30px 34px 38px;
+  grid-template-columns: repeat(auto-fill, minmax(104px, 1fr));
+  align-items: start;
+  justify-content: center;
+  gap: 24px 18px;
+  overflow-y: auto;
+  color: #172126;
+  background: rgba(247, 249, 249, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.72);
+  border-radius: 8px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.92), 0 34px 90px rgba(4, 12, 15, 0.34);
+  backdrop-filter: blur(30px) saturate(112%);
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+
+.folder-view .shortcut {
+  min-width: 0;
+  min-height: 104px;
+  border-radius: 8px;
+}
+
+.folder-view .shortcut > a {
+  min-height: 104px;
+  padding: 8px 4px 5px;
+  gap: 9px;
+  border-radius: 8px;
+  transition: background 160ms ease;
+}
+
+.folder-view .shortcut > a:hover,
+.folder-view .shortcut > a:focus-visible {
+  background: rgba(23, 33, 38, 0.055);
+}
+
+.folder-view .shortcut > a > span:last-child {
+  display: -webkit-box;
+  width: 100%;
+  overflow: hidden;
+  color: #3d4950;
+  font-size: 12px;
+  font-weight: 570;
+  line-height: 1.35;
+  text-align: center;
+  text-shadow: none;
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.folder-add-shortcut {
+  display: flex;
+  min-width: 0;
+  min-height: 104px;
+  padding: 8px 4px 5px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 9px;
+  color: #69767d;
+  background: transparent;
+  border: 0;
+  border-radius: 8px;
+}
+
+.folder-add-shortcut > span {
+  display: grid;
+  width: 64px;
+  height: 64px;
+  place-items: center;
+  color: #69767d;
+  background: rgba(23, 33, 38, 0.045);
+  border: 1px dashed rgba(23, 33, 38, 0.24);
+  border-radius: 24%;
+  transition: color 160ms ease, background 160ms ease, border-color 160ms ease;
+}
+
+.folder-add-shortcut strong {
+  font-size: 12px;
+  font-weight: 570;
+}
+
+.folder-add-shortcut:hover > span,
+.folder-add-shortcut:focus-visible > span {
+  color: #172126;
+  background: rgba(23, 33, 38, 0.09);
+  border-color: var(--wt-brand);
+}
+
+@keyframes folder-view-enter {
+  from { opacity: 0; transform: translateY(10px) scale(0.985); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@media (max-width: 720px) {
+  .home-time {
+    min-height: 38px;
+    margin-bottom: 10px;
+    gap: 10px;
+  }
+
+  .home-time time { font-size: 25px; }
+  .home-time span { font-size: 11px; }
+
+  .folder-overlay {
+    padding: max(10px, env(safe-area-inset-top)) 0 0;
+    align-items: end;
+  }
+
+  .folder-view {
+    width: 100%;
+    max-height: calc(100dvh - max(10px, env(safe-area-inset-top)));
+    overflow: hidden;
+    color: #172126;
+    background: rgba(247, 249, 249, 0.94);
+    border: 1px solid rgba(255, 255, 255, 0.74);
+    border-bottom: 0;
+    border-radius: 8px 8px 0 0;
+    box-shadow: 0 -18px 56px rgba(4, 12, 15, 0.32);
+    backdrop-filter: blur(28px) saturate(124%);
+  }
+
+  .folder-view .folder-view-header {
+    min-height: 78px;
+    padding: 14px 148px 10px 18px;
+    place-items: center start;
+  }
+
+  .folder-view-heading {
+    justify-items: start;
+    text-align: left;
+  }
+
+  .folder-view-heading h2 { font-size: 18px; }
+  .folder-view-heading h2 {
+    color: #172126;
+    text-shadow: none;
+  }
+
+  .folder-view-heading span { color: #69767d; }
+  .folder-view .folder-actions { right: 10px; }
+
+  .folder-view .folder-actions button {
+    width: 42px;
+    min-width: 42px;
+    height: 42px;
+    color: #5f6d75;
+    background: rgba(23, 33, 38, 0.045);
+    border-color: rgba(23, 33, 38, 0.12);
+  }
+
+  .folder-view .folder-grid {
+    max-height: calc(100dvh - max(10px, env(safe-area-inset-top)) - 78px);
+    padding: 12px 14px calc(24px + env(safe-area-inset-bottom));
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 18px 8px;
+    background: transparent;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+    backdrop-filter: none;
+  }
+
+  .folder-view .shortcut-icon,
+  .folder-add-shortcut > span {
+    width: min(58px, 16vw);
+    height: min(58px, 16vw);
+  }
+}
+
+@media (max-width: 420px) {
+  .icon-detection-empty {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .icon-detection-empty button { width: 100%; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .folder-view { animation: none; }
+}

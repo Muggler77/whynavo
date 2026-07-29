@@ -186,6 +186,20 @@ export const fallbackFaviconFor = (url: string) => {
   return host ? `https://icons.duckduckgo.com/ip3/${host}.ico` : undefined;
 };
 
+export const browserFaviconFor = (url: string, size = 128) => {
+  const pageUrl = cleanUrl(url);
+  if (
+    !pageUrl
+    || typeof globalThis.location === "undefined"
+    || globalThis.location.protocol !== "chrome-extension:"
+    || !globalThis.chrome?.runtime?.getURL
+  ) return undefined;
+  const faviconUrl = new URL(globalThis.chrome.runtime.getURL("/_favicon/"));
+  faviconUrl.searchParams.set("pageUrl", pageUrl);
+  faviconUrl.searchParams.set("size", String(Math.max(16, Math.min(256, Math.round(size)))));
+  return faviconUrl.toString();
+};
+
 export const siteIconCandidatesFor = (url: string) => {
   const host = faviconHostFor(url);
   if (!host) return [];

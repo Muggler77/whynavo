@@ -121,7 +121,7 @@ try {
   const { accountScopedKey } = await import(pathToFileURL(dbOutput).href);
   const { defaultState } = await import(pathToFileURL(defaultStateOutput).href);
   const { normalizeHttpUrl, safeHttpHref } = await import(pathToFileURL(urlsOutput).href);
-  const { MAX_IMPORTED_SHORTCUTS, curatedIconFor, fallbackFaviconFor, faviconFor, faviconHostFor, importedToShortcuts, normalizeIconReference, parseBookmarksHtml, parseImportText, siteIconCandidatesFor } = await import(pathToFileURL(importersOutput).href);
+  const { MAX_IMPORTED_SHORTCUTS, browserFaviconFor, curatedIconFor, fallbackFaviconFor, faviconFor, faviconHostFor, importedToShortcuts, normalizeIconReference, parseBookmarksHtml, parseImportText, siteIconCandidatesFor } = await import(pathToFileURL(importersOutput).href);
   const { isRecurringTodoDueOn, isTodoCompletedForDate, localDateKey, nextTodoCompletion, recurrenceLabel } = await import(pathToFileURL(remindersOutput).href);
   const { checkForUpdate } = await import(pathToFileURL(updatesOutput).href);
   const projectConfigSource = await readFile(join(repoRoot, "extension/src/projectConfig.ts"), "utf8");
@@ -983,6 +983,19 @@ try {
   assert.equal(fallbackFaviconFor("https://github.com/openai"), "https://icons.duckduckgo.com/ip3/github.com.ico", "automatic icon lookup must retain an independent fallback provider");
   assert.equal(siteIconCandidatesFor("https://github.com/openai")[0], "https://github.com/apple-touch-icon.png", "automatic icon lookup must try site-owned high-resolution artwork");
   assert.equal(curatedIconFor("https://github.com/openai", "GitHub"), "https://cdn.simpleicons.org/github", "known brands must retain a vector fallback");
+  const originalLocation = globalThis.location;
+  const originalChrome = globalThis.chrome;
+  globalThis.location = { protocol: "chrome-extension:" };
+  globalThis.chrome = { runtime: { getURL: (path) => `chrome-extension://test-extension${path}` } };
+  const browserFavicon = new URL(browserFaviconFor("http://www.huya.com/", 128));
+  assert.equal(browserFavicon.origin, "null", "Chrome extension favicon URLs must use the opaque extension origin");
+  assert.equal(browserFavicon.protocol, "chrome-extension:", "local favicon lookup must stay inside the Chrome extension origin");
+  assert.equal(browserFavicon.searchParams.get("pageUrl"), "http://www.huya.com/", "local favicon lookup must preserve the exact public page URL");
+  assert.equal(browserFavicon.searchParams.get("size"), "128", "local favicon lookup must request a stable high-resolution render size");
+  if (originalLocation === undefined) delete globalThis.location;
+  else globalThis.location = originalLocation;
+  if (originalChrome === undefined) delete globalThis.chrome;
+  else globalThis.chrome = originalChrome;
   const legacyTabRows = parseImportText(JSON.stringify({
     version: "1",
     data: {
@@ -1164,6 +1177,7 @@ try {
   assert.equal(extensionManifest.permissions.includes("geolocation"), false, "precise location must not be requested from every user at installation");
   assert.equal(extensionManifest.optional_permissions?.includes("geolocation"), true, "precise location must remain available as an explicit optional permission");
   assert.equal(extensionManifest.permissions.includes("search"), true, "new-tab web search must use the browser default provider through the Search API");
+  assert.equal(extensionManifest.permissions.includes("favicon"), true, "site icons must prefer Chrome's local favicon database without requesting arbitrary browsing access");
   assert.equal(extensionManifest.host_permissions.includes("https://api.pwnedpasswords.com/*"), true, "the extension must allow the privacy-preserving leaked-password range check");
   assert.match(
     extensionManifest.content_security_policy?.extension_pages || "",
@@ -1217,7 +1231,14 @@ try {
   assert.match(appSource, /ICON_FAILURE_RETRY_MS = 6 \* 60 \* 60 \* 1000/, "failed icon chains must be cached temporarily instead of refetched on every launch");
   assert.match(appSource, /FAILED_ICON_CACHE_PREFIX[\s\S]*isFreshFailedIconCache/, "failed icon chains must expire and retry instead of becoming permanent");
   assert.match(appSource, /MIN_SHARP_ICON_SIZE = 96/, "raster icons must be large enough to remain sharp at the maximum rendered shortcut size");
-  assert.match(appSource, /function IconChoicePreview[\s\S]*shortestEdge < MIN_SHARP_ICON_SIZE/, "icon candidates shown as selectable must meet the same sharpness threshold as the final canvas");
+  assert.match(appSource, /MIN_USABLE_ICON_SIZE = 24/, "recognizable low-resolution favicons must remain available when a site exposes no sharp artwork");
+  assert.match(appSource, /browserIcon \? \{ url: browserIcon[\s\S]*curated \?[\s\S]*directCandidates[\s\S]*serviceIcon/, "icon resolution must prefer Chrome's local favicon database before curated and remote providers");
+  assert.match(appSource, /item\.url === browserIcon \? item\.url : normalizeIconReference/, "the trusted local Chrome favicon endpoint must survive the HTTPS-only remote icon filter");
+  assert.match(appSource, /usableFallbackUrl[\s\S]*shortestEdge >= MIN_USABLE_ICON_SIZE/, "the icon renderer must retain a usable fallback while continuing to search for sharp artwork");
+  assert.match(appSource, /function IconChoicePreview[\s\S]*shortestEdge < MIN_USABLE_ICON_SIZE/, "the icon editor must hide only genuinely unusable candidates");
+  assert.doesNotMatch(appSource, /最近使用|Recently used/, "Search must not label arbitrary first items as a real usage history");
+  assert.match(appSource, /second: "2-digit"/, "the Home clock must display seconds");
+  assert.match(appSource, /folder-view-heading[\s\S]*folder-add-shortcut/, "folders must render as a dedicated icon canvas with an accessible add action");
   assert.match(appSource, /invalidateResolvedShortcutIcon[\s\S]*resolvedIconCache\.delete/, "saving an icon must invalidate a stale failure cache for that shortcut");
   assert.match(appSource, /iconUpdatedAt: iconUrlProvided \|\| iconTextProvided/, "icon edits must carry a dedicated refresh timestamp without tying image reloads to shortcut reordering");
   assert.match(appSource, /在线图标[\s\S]*纯色图标[\s\S]*本地上传/, "shortcut editing must expose online, text, and local-upload icon modes");

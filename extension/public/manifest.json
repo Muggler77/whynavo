@@ -3,14 +3,15 @@
   "name": "WhyNavo - Local-first New Tab",
   "short_name": "WhyNavo",
   "description": "A local-first new tab dashboard for shortcuts, widgets, notes, todos, weather, and optional sync.",
-  "version": "0.9.7",
+  "version": "0.9.8",
   "chrome_url_overrides": {
     "newtab": "index.html"
   },
   "permissions": [
     "search",
     "alarms",
-    "storage"
+    "storage",
+    "favicon"
   ],
   "optional_permissions": [
     "geolocation",

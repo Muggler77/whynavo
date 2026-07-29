@@ -88,7 +88,7 @@ import { createContext, lazy, Suspense, useCallback, useContext, useEffect, useL
 import { createPortal } from "react-dom";
 import { accountScopedKey, adoptLegacyStateForAccount, clearLocalAccountDeletionPending, clearLocalDeletedAccountMarkerForVerifiedUser, commitAnonymousStateAdoption, deleteKey, deleteLocalAccountData, downloadJson, downloadText, hasLegacyUnscopedState, loadStateForAccount, markLocalAccountDeletionPending, mergeAndSaveStateForAccount, readKey, readPendingLocalAccountDeletionIds, saveStateForAccount, writeKey } from "./db";
 import { defaultNavigationOrder, defaultState, defaultWidgetOrder, defaultWidgetSizes, nowIso, uid } from "./defaultState";
-import { MAX_IMPORTED_SHORTCUTS, MAX_IMPORT_TEXT_CHARS, colorFor, curatedIconCount, curatedIconFor, fallbackFaviconFor, faviconFor, importedToShortcuts, normalizeIconReference, parseImportText, siteIconCandidatesFor } from "./importers";
+import { MAX_IMPORTED_SHORTCUTS, MAX_IMPORT_TEXT_CHARS, browserFaviconFor, colorFor, curatedIconCount, curatedIconFor, fallbackFaviconFor, faviconFor, importedToShortcuts, normalizeIconReference, parseImportText, siteIconCandidatesFor } from "./importers";
 import { MIGRATION_BACKUP_KEY, type StateBackup } from "./migrations";
 import { fetchRates, getCachedRates } from "./rates";
 import { checkWebTaskReminders, isRecurringTodoDueOn, isTodoCompletedForDate, nextTodoCompletion, recurrenceLabel, requestTaskReminderPermission, syncTaskReminders } from "./reminders";
@@ -174,6 +174,7 @@ const RATES_CACHE_MAX_AGE_MS = 6 * 60 * 60 * 1000;
 const ICON_LOAD_TIMEOUT_MS = 5000;
 const ICON_FAILURE_RETRY_MS = 6 * 60 * 60 * 1000;
 const MIN_SHARP_ICON_SIZE = 96;
+const MIN_USABLE_ICON_SIZE = 24;
 const SHORTCUT_RENDER_BATCH = 48;
 const ICON_MANAGER_RENDER_BATCH = 80;
 const MAX_CUSTOM_WALLPAPERS = 12;
@@ -713,22 +714,24 @@ const iconCandidatesFor = (url: string, iconUrl?: string, title = "") => {
   }
   const directCandidates = siteIconCandidatesFor(url);
   const curated = curatedIconFor(url, title);
+  const browserIcon = browserFaviconFor(url);
   const serviceIcon = faviconFor(url);
   const fallbackIcon = fallbackFaviconFor(url);
   const candidates: Array<IconCandidate | undefined> = [
     customIconUrl && !isGeneratedFavicon(customIconUrl)
       ? { url: customIconUrl, kind: isSimpleIconsUrl(customIconUrl) ? "brand-mark" : "site-art", vector: isVectorIconUrl(customIconUrl) }
       : undefined,
+    browserIcon ? { url: browserIcon, kind: "site-art", vector: false } : undefined,
     curated ? { url: curated, kind: "brand-mark", vector: true } : undefined,
-    serviceIcon ? { url: serviceIcon, kind: "site-art", vector: false } : undefined,
     ...directCandidates.map((candidate) => ({ url: candidate, kind: "site-art" as const, vector: false })),
+    serviceIcon ? { url: serviceIcon, kind: "site-art", vector: false } : undefined,
     fallbackIcon ? { url: fallbackIcon, kind: "site-art", vector: false } : undefined,
     customIconUrl && isGeneratedFavicon(customIconUrl) ? { url: customIconUrl, kind: "site-art", vector: false } : undefined
   ];
   const seen = new Set<string>();
   return candidates.filter((item): item is IconCandidate => {
     if (!item) return false;
-    const safeUrl = normalizeIconReference(item.url);
+    const safeUrl = item.url === browserIcon ? item.url : normalizeIconReference(item.url);
     if (!safeUrl || safeUrl.startsWith("whynavo-icon:") || seen.has(safeUrl)) return false;
     item.url = safeUrl;
     seen.add(safeUrl);
@@ -770,11 +773,15 @@ function ShortcutIconImage({ url, iconUrl, iconColor = "#64748B", refreshKey, ti
   const [index, setIndex] = useState(0);
   const [loaded, setLoaded] = useState(false);
   const [shouldLoad, setShouldLoad] = useState(priority);
+  const [usableFallbackUrl, setUsableFallbackUrl] = useState<string | undefined>();
   const imageRef = useRef<HTMLImageElement>(null);
   const loadedRef = useRef(false);
   const hasLocalCandidate = candidates.some((candidate) => candidate.url.startsWith("data:") || candidate.url.startsWith("blob:"));
   const candidateKey = iconCandidateCacheKey(candidates, url, iconUrl);
-  const current = candidates[index];
+  const usingUsableFallback = index >= candidates.length && Boolean(usableFallbackUrl);
+  const current = usingUsableFallback
+    ? candidates.find((candidate) => candidate.url === usableFallbackUrl)
+    : candidates[index];
 
   useEffect(() => {
     const cachedValue = resolvedIconCache.get(candidateKey);
@@ -789,6 +796,7 @@ function ShortcutIconImage({ url, iconUrl, iconColor = "#64748B", refreshKey, ti
       setIndex(cachedIndex >= 0 ? cachedIndex : 0);
     }
     setLoaded(false);
+    setUsableFallbackUrl(undefined);
     loadedRef.current = false;
   }, [candidateKey, refreshKey]);
 
@@ -821,13 +829,14 @@ function ShortcutIconImage({ url, iconUrl, iconColor = "#64748B", refreshKey, ti
       || hasLocalCandidate
       || candidates.length === 0
       || index < candidates.length
+      || usableFallbackUrl
       || isFreshFailedIconCache(resolvedIconCache.get(candidateKey))
     ) return;
     rememberResolvedIcon(candidateKey, `${FAILED_ICON_CACHE_PREFIX}${Date.now()}`);
-  }, [candidateKey, candidates.length, hasLocalCandidate, index, shouldLoad]);
+  }, [candidateKey, candidates.length, hasLocalCandidate, index, shouldLoad, usableFallbackUrl]);
 
   const fallbackText = fallback || "网";
-  if (!current || index >= candidates.length) return <ShortcutTextIcon text={fallbackText} color={iconColor} />;
+  if (!current) return <ShortcutTextIcon text={fallbackText} color={iconColor} />;
   return (
     <>
       {!loaded && <ShortcutTextIcon text={fallbackText} color={iconColor} />}
@@ -843,7 +852,15 @@ function ShortcutIconImage({ url, iconUrl, iconColor = "#64748B", refreshKey, ti
         onLoad={(event) => {
           const image = event.currentTarget;
           const shortestEdge = Math.min(image.naturalWidth, image.naturalHeight);
-          if (!current.vector && shortestEdge < MIN_SHARP_ICON_SIZE) {
+          if (!current.vector && shortestEdge < MIN_SHARP_ICON_SIZE && !usingUsableFallback) {
+            const currentIsUsable = shortestEdge >= MIN_USABLE_ICON_SIZE;
+            if (currentIsUsable && !usableFallbackUrl && index === candidates.length - 1) {
+              loadedRef.current = true;
+              if (!hasLocalCandidate) rememberResolvedIcon(candidateKey, current.url);
+              setLoaded(true);
+              return;
+            }
+            if (currentIsUsable && !usableFallbackUrl) setUsableFallbackUrl(current.url);
             loadedRef.current = false;
             setLoaded(false);
             setIndex((value) => value + 1);
@@ -856,7 +873,8 @@ function ShortcutIconImage({ url, iconUrl, iconColor = "#64748B", refreshKey, ti
         onError={() => {
           loadedRef.current = false;
           setLoaded(false);
-          setIndex((value) => value + 1);
+          if (usingUsableFallback) setUsableFallbackUrl(undefined);
+          else setIndex((value) => value + 1);
         }}
       />
     </>
@@ -879,7 +897,7 @@ function IconChoicePreview({ src, fallback, onStatus }: { src: string; fallback:
       referrerPolicy="no-referrer"
       onLoad={(event) => {
         const shortestEdge = Math.min(event.currentTarget.naturalWidth, event.currentTarget.naturalHeight);
-        if (!isVectorIconUrl(src) && shortestEdge < MIN_SHARP_ICON_SIZE) {
+        if (!isVectorIconUrl(src) && shortestEdge < MIN_USABLE_ICON_SIZE) {
           setFailed(true);
           onStatus?.("failed");
           return;
@@ -2330,6 +2348,7 @@ export default function App() {
     timeZone: selectedTimeZone,
     hour: "2-digit",
     minute: "2-digit",
+    second: "2-digit",
     hour12: false
   }).format(clock);
   const homeDate = new Intl.DateTimeFormat(uiLanguage, {
@@ -2599,8 +2618,8 @@ export default function App() {
       const nextIconUrl = nextIconText
         ? undefined
         : iconUrlProvided
-          ? normalizedIcon || faviconFor(url)
-          : existing?.iconUrl || faviconFor(url);
+          ? normalizedIcon
+          : existing?.iconUrl;
       const next: Shortcut = {
         ...existing,
         id: existing?.id || uid(),
@@ -2641,7 +2660,7 @@ export default function App() {
     if (iconUrlProvided || iconTextProvided) {
       invalidateResolvedShortcutIcon(
         url,
-        normalizedIconText ? undefined : normalizedIcon || faviconFor(url),
+        normalizedIconText ? undefined : normalizedIcon,
         title
       );
     }
@@ -4117,7 +4136,7 @@ export default function App() {
           groups={state.shortcutGroups.filter((group) => !group.deletedAt)}
           onClose={() => { setDialog(null); setEditingFolder(undefined); }}
           onSave={saveFolder}
-          onDelete={editingFolder ? () => deleteFolder(editingFolder.id) : undefined}
+          onDelete={editingFolder?.id ? () => deleteFolder(editingFolder.id) : undefined}
         />
       )}
       {openFolder && (
@@ -4715,19 +4734,23 @@ function SearchWorkspace({ query, onQueryChange, onWebSearch, engineLabel, short
   const language = useUiLanguage();
   const text = (zh: string, en: string) => localized(language, zh, en);
   const normalizedQuery = query.trim().toLowerCase();
-  const matchedShortcuts = shortcuts
-    .filter((shortcut) => !normalizedQuery || `${shortcut.title} ${shortcut.url}`.toLowerCase().includes(normalizedQuery))
-    .slice(0, normalizedQuery ? 12 : 8);
-  const matchedNotes = notes
-    .filter((note) => !note.deletedAt)
-    .filter((note) => !normalizedQuery || `${noteTitleFor(language, note.title)} ${noteBodyFor(language, note.body)}`.toLowerCase().includes(normalizedQuery))
-    .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt))
-    .slice(0, normalizedQuery ? 8 : 3);
-  const matchedTodos = todos
-    .filter((todo) => !todo.deletedAt)
-    .filter((todo) => !normalizedQuery || todo.text.toLowerCase().includes(normalizedQuery))
-    .sort((left, right) => Number(left.done) - Number(right.done) || left.order - right.order)
-    .slice(0, normalizedQuery ? 8 : 5);
+  const matchedShortcuts = normalizedQuery
+    ? shortcuts.filter((shortcut) => `${shortcut.title} ${shortcut.url}`.toLowerCase().includes(normalizedQuery)).slice(0, 12)
+    : [];
+  const matchedNotes = normalizedQuery
+    ? notes
+      .filter((note) => !note.deletedAt)
+      .filter((note) => `${noteTitleFor(language, note.title)} ${noteBodyFor(language, note.body)}`.toLowerCase().includes(normalizedQuery))
+      .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt))
+      .slice(0, 8)
+    : [];
+  const matchedTodos = normalizedQuery
+    ? todos
+      .filter((todo) => !todo.deletedAt)
+      .filter((todo) => todo.text.toLowerCase().includes(normalizedQuery))
+      .sort((left, right) => Number(left.done) - Number(right.done) || left.order - right.order)
+      .slice(0, 8)
+    : [];
   const resultCount = matchedShortcuts.length + matchedNotes.length + matchedTodos.length;
 
   return (
@@ -4745,13 +4768,17 @@ function SearchWorkspace({ query, onQueryChange, onWebSearch, engineLabel, short
         <button type="submit" className="lucid-search-web" title={text("搜索网络", "Search the web")} aria-label={text("搜索网络", "Search the web")}><Navigation size={17} /></button>
       </form>
 
-      <div className="lucid-search-summary">
-        <span>{normalizedQuery ? text(`${resultCount} 个本地结果`, `${resultCount} local results`) : text("最近使用", "Recently used")}</span>
-        <p>{normalizedQuery ? text("本地结果即时显示；按回车可继续搜索网络。", "Local results appear instantly; press Enter to search the web.") : text("先从设备本地内容开始，不上传搜索词。", "Start with local device content without uploading your query.")}</p>
-        <button type="button" className="lucid-page-add" onClick={onAddShortcut}><Plus size={16} /><span>{text("添加网站", "Add site")}</span></button>
-      </div>
+      {!normalizedQuery ? (
+        <div className="lucid-search-idle">
+          <button type="button" className="lucid-page-add" onClick={onAddShortcut}><Plus size={16} /><span>{text("添加网站", "Add site")}</span></button>
+        </div>
+      ) : <>
+        <div className="lucid-search-summary">
+          <span>{text(`${resultCount} 个本地结果`, `${resultCount} local results`)}</span>
+          <p>{text("按回车可继续搜索网络", "Press Enter to continue on the web")}</p>
+        </div>
 
-      <div className="lucid-search-results">
+        <div className="lucid-search-results">
         <section className="lucid-result-group">
           <header><span><Globe2 size={16} />{text("网站", "Sites")}</span><small>{matchedShortcuts.length}</small></header>
           <div className="lucid-site-results">
@@ -4792,7 +4819,8 @@ function SearchWorkspace({ query, onQueryChange, onWebSearch, engineLabel, short
             {!matchedTodos.length && <p className="lucid-result-empty">{text("没有匹配的任务", "No matching tasks")}</p>}
           </div>
         </section>
-      </div>
+        </div>
+      </>}
     </section>
   );
 }
@@ -6326,25 +6354,24 @@ function FolderView({ folder, shortcuts, onClose, onAdd, onEditFolder }: {
   onAdd: () => void;
   onEditFolder: () => void;
 }) {
+  const language = useUiLanguage();
+  const text = (zh: string, en: string) => localized(language, zh, en);
+  const headingId = `folder-view-${folder.id}`;
   return (
     <div className="overlay folder-overlay" role="dialog" aria-modal="true" onClick={onClose}>
-      <section className="folder-view" onClick={(event) => event.stopPropagation()}>
-        <header>
-          <div className="folder-title">
-            <span className={`folder-badge ${folder.iconUrl ? "has-image" : ""}`} style={{ backgroundColor: folder.iconColor }}>
-              <FolderIconContent iconUrl={folder.iconUrl} size={22} />
-            </span>
-            <div>
-              <h2>{folder.name}</h2>
-            </div>
+      <section className="folder-view" style={{ "--folder-accent": folder.iconColor } as React.CSSProperties} aria-labelledby={headingId} onClick={(event) => event.stopPropagation()}>
+        <header className="folder-view-header">
+          <div className="folder-view-heading">
+            <h2 id={headingId}>{folder.name}</h2>
+            <span>{text(`${shortcuts.length} 个网站`, `${shortcuts.length} sites`)}</span>
           </div>
           <div className="folder-actions">
-            <button title="添加到文件夹" onClick={onAdd}><Plus size={16} /></button>
-            <button title="编辑文件夹" onClick={onEditFolder}><Edit3 size={16} /></button>
-            <button title="关闭" onClick={onClose}><X size={18} /></button>
+            <button aria-label={text("添加网站", "Add site")} title={text("添加网站", "Add site")} onClick={onAdd}><Plus size={17} /></button>
+            <button aria-label={text("编辑文件夹", "Edit folder")} title={text("编辑文件夹", "Edit folder")} onClick={onEditFolder}><Edit3 size={17} /></button>
+            <button aria-label={text("关闭文件夹", "Close folder")} title={text("关闭文件夹", "Close folder")} onClick={onClose}><X size={19} /></button>
           </div>
         </header>
-        <div className="folder-grid" style={{ "--icon": "58px" } as React.CSSProperties}>
+        <div className="folder-grid" style={{ "--icon": "64px" } as React.CSSProperties}>
           {shortcuts.map((shortcut) => (
             <article
               className="shortcut"
@@ -6359,7 +6386,10 @@ function FolderView({ folder, shortcuts, onClose, onAdd, onEditFolder }: {
               </a>
             </article>
           ))}
-          {!shortcuts.length && <button className="empty-shortcut" onClick={onAdd}><Plus size={22} /> 添加网站</button>}
+          <button className="folder-add-shortcut" type="button" onClick={onAdd}>
+            <span><Plus size={22} /></span>
+            <strong>{text("添加网站", "Add site")}</strong>
+          </button>
         </div>
       </section>
     </div>
@@ -6375,9 +6405,10 @@ function FolderDialog({ folder, groups, onClose, onSave, onDelete }: {
 }) {
   const language = useUiLanguage();
   const text = (zh: string, en: string) => localized(language, zh, en);
+  const isExistingFolder = Boolean(folder?.id);
   const [draft, setDraft] = useState<Partial<ShortcutFolder>>(folder || { iconColor: "#14B8A6", groupId: groups[0]?.id });
   return (
-    <DialogShell title={folder ? text("编辑文件夹", "Edit folder") : text("新建文件夹", "New folder")} onClose={onClose}>
+    <DialogShell title={isExistingFolder ? text("编辑文件夹", "Edit folder") : text("新建文件夹", "New folder")} onClose={onClose}>
       <label>{text("文件夹名称", "Folder name")}<input maxLength={MAX_ENTITY_NAME_CHARS} value={draft.name || ""} onChange={(event) => setDraft({ ...draft, name: event.target.value })} placeholder={text("例如：工作、AI、购物", "For example: Work, AI, Shopping")} /></label>
       <label>{text("所在分类", "Category")}<select value={draft.groupId || groups[0]?.id} onChange={(event) => setDraft({ ...draft, groupId: event.target.value })}>{groups.map((group) => <option value={group.id} key={group.id}>{shortcutGroupNameFor(language, group)}</option>)}</select></label>
       <label>{text("图片 URL（可选）", "Image URL (optional)")}<input maxLength={4 * 1024 * 1024} value={draft.iconUrl || ""} onChange={(event) => setDraft({ ...draft, iconUrl: event.target.value })} placeholder={text("留空使用文件夹图标", "Leave blank to use the folder icon")} /></label>
@@ -6424,7 +6455,7 @@ function ShortcutDialog({ shortcut, groups, folders, onClose, onSave }: {
   const language = useUiLanguage();
   const text = (zh: string, en: string) => localized(language, zh, en);
   const [draft, setDraft] = useState<Partial<Shortcut>>(shortcut || { iconColor: "#14B8A6", groupId: groups[0]?.id });
-  const initialIconUrl = shortcut?.iconUrl || "";
+  const initialIconUrl = shortcut?.iconUrl && !isGeneratedFavicon(shortcut.iconUrl) ? shortcut.iconUrl : "";
   const [iconMode, setIconMode] = useState<ShortcutIconMode>(shortcut?.iconText
     ? "text"
     : initialIconUrl.startsWith("data:image/")
@@ -6434,6 +6465,7 @@ function ShortcutDialog({ shortcut, groups, folders, onClose, onSave }: {
   const [uploadedIconUrl, setUploadedIconUrl] = useState(initialIconUrl.startsWith("data:image/") ? initialIconUrl : "");
   const [customIconText, setCustomIconText] = useState(normalizeShortcutIconText(shortcut?.iconText || shortcut?.title || "网"));
   const [uploadError, setUploadError] = useState("");
+  const [iconProbe, setIconProbe] = useState(0);
   const [iconChoiceStatus, setIconChoiceStatus] = useState<Record<string, "loading" | "ready" | "failed">>({});
   const iconTitle = draft.title || shortcut?.title || "";
   const iconUrl = draft.url || shortcut?.url || "";
@@ -6441,10 +6473,11 @@ function ShortcutDialog({ shortcut, groups, folders, onClose, onSave }: {
   const collectedIconChoices = useMemo(() => {
     const siteCandidates = siteIconCandidatesFor(iconUrl).slice(0, 2);
     const rows: Array<{ label: string; url?: string }> = [
-      { label: text("当前", "Current"), url: onlineIconUrl && !onlineIconUrl.startsWith(builtInIconPrefix) ? onlineIconUrl : undefined },
-      { label: text("自动", "Auto"), url: faviconFor(iconUrl) },
+      { label: text("当前", "Current"), url: onlineIconUrl && !onlineIconUrl.startsWith(builtInIconPrefix) && !isGeneratedFavicon(onlineIconUrl) ? onlineIconUrl : undefined },
+      { label: text("浏览器", "Browser"), url: browserFaviconFor(iconUrl) },
       { label: text("品牌", "Brand"), url: curatedIconFor(iconUrl, iconTitle) },
       ...siteCandidates.map((url, index) => ({ label: text(`站点 ${index + 1}`, `Site ${index + 1}`), url })),
+      { label: text("在线", "Online"), url: faviconFor(iconUrl) },
       { label: text("备用", "Backup"), url: fallbackFaviconFor(iconUrl) }
     ];
     const availableRows = rows.filter((item): item is { label: string; url: string } => Boolean(item.url));
@@ -6455,6 +6488,7 @@ function ShortcutDialog({ shortcut, groups, folders, onClose, onSave }: {
       return true;
     });
   }, [onlineIconUrl, iconTitle, iconUrl, language]);
+  const visibleCollectedIconCount = collectedIconChoices.filter((choice) => iconChoiceStatus[choice.url] !== "failed").length;
   const previewIconUrl = iconMode === "online" ? onlineIconUrl : iconMode === "upload" ? uploadedIconUrl : undefined;
   const previewIconText = iconMode === "text" ? normalizeShortcutIconText(customIconText) : undefined;
   const canSaveIcon = iconMode !== "text" || Boolean(previewIconText);
@@ -6474,7 +6508,12 @@ function ShortcutDialog({ shortcut, groups, folders, onClose, onSave }: {
       {iconMode === "online" && <div className="shortcut-icon-mode-panel online-icon-panel">
         <label>{text("图标 URL（可选，默认自动获取）", "Icon URL (optional, detected automatically)")}<input maxLength={4 * 1024 * 1024} value={onlineIconUrl} onChange={(event) => setOnlineIconUrl(event.target.value)} placeholder={text("留空会自动使用网站图标", "Leave blank to detect the site icon")} /></label>
         <div className="shortcut-icon-toolbar">
-          <button type="button" onClick={() => setOnlineIconUrl(draft.url ? faviconFor(draft.url) || "" : "")}><RefreshCcw size={15} />{text("重新采集", "Detect again")}</button>
+          <button type="button" onClick={() => {
+            const targetUrl = draft.url || "";
+            setIconChoiceStatus({});
+            setIconProbe((current) => current + 1);
+            setOnlineIconUrl(curatedIconFor(targetUrl, draft.title || "") || "");
+          }}><RefreshCcw size={15} />{text("重新采集", "Detect again")}</button>
           <button type="button" onClick={() => setOnlineIconUrl("")}><X size={15} />{text("使用自动回退", "Use automatic fallback")}</button>
         </div>
       {collectedIconChoices.length > 0 && (
@@ -6483,22 +6522,28 @@ function ShortcutDialog({ shortcut, groups, folders, onClose, onSave }: {
             <span>{text("采集图标", "Collected icons")}</span>
             <small>{text("从网站识别到的候选", "Candidates detected from the site")}</small>
           </div>
-          <div className="collected-icon-grid">
+          {visibleCollectedIconCount > 0 ? <div className="collected-icon-grid">
             {collectedIconChoices.map((choice) => (
               <button
                 type="button"
-                className={`${onlineIconUrl === choice.url ? "active" : ""} ${iconChoiceStatus[choice.url] === "failed" ? "is-unavailable" : ""}`.trim()}
-                aria-pressed={onlineIconUrl === choice.url}
+                className={`${onlineIconUrl === choice.url || (!onlineIconUrl && choice.url === browserFaviconFor(iconUrl)) ? "active" : ""} ${iconChoiceStatus[choice.url] === "failed" ? "is-unavailable" : ""}`.trim()}
+                aria-pressed={onlineIconUrl === choice.url || (!onlineIconUrl && choice.url === browserFaviconFor(iconUrl))}
                 disabled={iconChoiceStatus[choice.url] !== "ready"}
-                key={choice.url}
-                onClick={() => setOnlineIconUrl(choice.url)}
+                key={`${choice.url}:${iconProbe}`}
+                onClick={() => setOnlineIconUrl(choice.url === browserFaviconFor(iconUrl) ? "" : choice.url)}
                 title={iconChoiceStatus[choice.url] === "failed" ? text("该图标无法加载", "This icon could not be loaded") : choice.url}
               >
                 <span><IconChoicePreview src={choice.url} fallback={(draft.title || "网").slice(0, 1)} onStatus={(status) => setIconChoiceStatus((current) => current[choice.url] === status ? current : { ...current, [choice.url]: status })} /></span>
-                <em>{iconChoiceStatus[choice.url] === "failed" ? text("不可用", "Unavailable") : choice.label}</em>
+                <em>{choice.label}</em>
               </button>
             ))}
-          </div>
+          </div> : <div className="icon-detection-empty">
+            <span>{text("没有识别到可用图标", "No usable icon was detected")}</span>
+            <button type="button" onClick={() => {
+              setCustomIconText(normalizeShortcutIconText(draft.title || "网"));
+              setIconMode("text");
+            }}>{text("改用文字图标", "Use a text icon")}</button>
+          </div>}
         </section>
       )}
       <section className="default-icon-picker" aria-label={text("默认图标", "Default icons")}>
