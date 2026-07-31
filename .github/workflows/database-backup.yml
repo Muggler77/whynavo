@@ -120,11 +120,16 @@ jobs:
             --data-only \
             --schema auth \
             -x "auth.audit_log_entries" \
+            -x "auth.custom_oauth_providers" \
             -x "auth.flow_state" \
             -x "auth.instances" \
             -x "auth.mfa_amr_claims" \
             -x "auth.mfa_challenges" \
             -x "auth.mfa_factors" \
+            -x "auth.oauth_authorizations" \
+            -x "auth.oauth_client_states" \
+            -x "auth.oauth_clients" \
+            -x "auth.oauth_consents" \
             -x "auth.one_time_tokens" \
             -x "auth.refresh_tokens" \
             -x "auth.saml_providers" \
@@ -132,7 +137,9 @@ jobs:
             -x "auth.schema_migrations" \
             -x "auth.sessions" \
             -x "auth.sso_domains" \
-            -x "auth.sso_providers"
+            -x "auth.sso_providers" \
+            -x "auth.webauthn_challenges" \
+            -x "auth.webauthn_credentials"
           node scripts/verify-backup-export.mjs .backup-work/database
           tar -C .backup-work/database -czf .backup-work/whynavo-database.tar.gz \
             roles.sql schema.sql auth-data.sql data.sql

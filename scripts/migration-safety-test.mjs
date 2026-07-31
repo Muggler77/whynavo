@@ -1886,7 +1886,8 @@ try {
   assert.match(backupWorkflow, /supabase db dump[\s\S]*--role-only/, "off-site backups must include database roles");
   assert.match(backupWorkflow, /--schema public/, "application backups must explicitly export the public schema");
   assert.match(backupWorkflow, /auth-data\.sql[\s\S]*--schema auth/, "account recovery backups must explicitly export the Auth schema");
-  assert.match(backupWorkflow, /-x "auth\.sessions"[\s\S]*-x "auth\.sso_providers"/, "account recovery backups must exclude active sessions and other unapproved Auth tables");
+  assert.match(backupWorkflow, /-x "auth\.custom_oauth_providers"[\s\S]*-x "auth\.oauth_authorizations"[\s\S]*-x "auth\.oauth_clients"/, "account recovery backups must exclude OAuth providers, clients, and grants");
+  assert.match(backupWorkflow, /-x "auth\.sessions"[\s\S]*-x "auth\.webauthn_challenges"[\s\S]*-x "auth\.webauthn_credentials"/, "account recovery backups must exclude active sessions and WebAuthn credentials");
   assert.match(backupWorkflow, /verify-backup-export\.mjs/, "backup exports must pass the Auth-table allowlist before encryption");
   assert.match(backupWorkflow, /roles\.sql schema\.sql auth-data\.sql data\.sql/, "the encrypted archive must include the verified account and application exports");
   assert.match(backupWorkflow, /backup-envelope\.mjs[\s\S]*encrypt/, "database exports must be encrypted before upload");
