@@ -1867,14 +1867,14 @@ try {
   assert.match(backupWorkflow, /secrets\.SUPABASE_ACCESS_TOKEN/, "database backups must use an encrypted, revocable Supabase access token");
   assert.doesNotMatch(
     backupWorkflow,
-    /^ {6}(?:SUPABASE_ACCESS_TOKEN|BACKUP_ENCRYPTION_PUBLIC_KEY_B64|AWS_ACCESS_KEY_ID|AWS_SECRET_ACCESS_KEY|R2_ENDPOINT|R2_BUCKET):/m,
+    /^ {6}(?:SUPABASE_ACCESS_TOKEN|SUPABASE_DB_PASSWORD|BACKUP_ENCRYPTION_PUBLIC_KEY_B64|AWS_ACCESS_KEY_ID|AWS_SECRET_ACCESS_KEY|R2_ENDPOINT|R2_BUCKET):/m,
     "backup credentials must be scoped to the export, encryption, closure, or upload step that needs them"
   );
-  assert.doesNotMatch(backupWorkflow, /SUPABASE_DB_PASSWORD|SUPABASE_DB_URL/, "database backups must not retain a long-lived database password or connection string");
-  assert.match(backupWorkflow, /database\/jit-access[\s\S]*state":"enabled"/, "database backups must enable the reviewed temporary database-access feature");
-  assert.match(backupWorkflow, /database\/jit[\s\S]*role: "postgres"[\s\S]*runner_ip\/32/, "database backups must bind temporary database access to the runner IP and postgres role");
-  assert.match(backupWorkflow, /db_url="\$\(printf '%s:\/\/%s:%s@%s:%s\/%s\?%s'[\s\S]*"db\.\$\{SUPABASE_PROJECT_REF\}\.supabase\.co" 5432 postgres sslmode=require\)/, "database dumps must use the direct temporary-access connection");
-  assert.match(backupWorkflow, /Revoke temporary database access[\s\S]*database\/jit\/\$\{JIT_USER_ID\}/, "database backups must revoke temporary database access after every run");
+  assert.doesNotMatch(backupWorkflow, /SUPABASE_DB_URL/, "database backups must construct the connection string inside the export step");
+  assert.match(backupWorkflow, /SUPABASE_DB_PASSWORD: \$\{\{ secrets\.SUPABASE_DB_PASSWORD \}\}/, "database backups must read the rotated database password from an encrypted repository secret");
+  assert.match(backupWorkflow, /jq -rn --arg value "\$SUPABASE_DB_PASSWORD" '\$value \| @uri'/, "database backups must percent-encode the database password before constructing the URI");
+  assert.match(backupWorkflow, /"postgres\.\$\{SUPABASE_PROJECT_REF\}"[\s\S]*"aws-1-ap-southeast-1\.pooler\.supabase\.com" 5432 postgres sslmode=require/, "database dumps must use the reviewed IPv4 session pooler");
+  assert.doesNotMatch(backupWorkflow, /database\/jit-access|database\/jit\//, "database backups must not call unavailable temporary-access endpoints");
   assert.match(backupWorkflow, /network-restrictions update[\s\S]*runner_ip\/32/, "database backups must restrict temporary database ingress to the current runner");
   assert.match(backupWorkflow, /trap close_ingress EXIT INT TERM[\s\S]*ingress_open=true[\s\S]*close_ingress[\s\S]*trap - EXIT INT TERM/, "database exports must close temporary ingress inside the export process as well as in the always-run cleanup step");
   assert.match(backupWorkflow, /Close direct database ingress[\s\S]*0\.0\.0\.0\/32/, "database backups must close direct database ingress even after an export failure");
