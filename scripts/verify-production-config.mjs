@@ -56,10 +56,10 @@ if (required.VITE_SUPABASE_ANON_KEY.startsWith("eyJ")) {
   }
 }
 
-if (required.VITE_AUTH_REDIRECT_URL !== "https://whynavo.pages.dev/") {
-  throw new Error("VITE_AUTH_REDIRECT_URL must match the official whynavo Pages origin");
+if (required.VITE_AUTH_REDIRECT_URL !== "https://whynavo.com/") {
+  throw new Error("VITE_AUTH_REDIRECT_URL must match the official WhyNavo origin");
 }
-if (required.VITE_CAPTCHA_FRAME_URL !== "https://whynavo.pages.dev/captcha.html") {
+if (required.VITE_CAPTCHA_FRAME_URL !== "https://whynavo.com/captcha.html") {
   throw new Error("VITE_CAPTCHA_FRAME_URL must use the official isolated CAPTCHA page");
 }
 

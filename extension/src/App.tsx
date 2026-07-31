@@ -166,8 +166,8 @@ const friendlyAuthError = (error: unknown, fallback: string) => {
 };
 
 const SYNC_RESTORE_KEY = "sync-restore-point";
-const PUBLIC_AUTH_REDIRECT_URL = "https://whynavo.pages.dev/";
-const HOSTED_APP_ORIGIN = "https://whynavo.pages.dev";
+const PUBLIC_AUTH_REDIRECT_URL = "https://whynavo.com/";
+const HOSTED_APP_ORIGIN = "https://whynavo.com";
 const homePageOrder: HomePage[] = defaultNavigationOrder;
 const WEATHER_CACHE_MAX_AGE_MS = 60 * 60 * 1000;
 const RATES_CACHE_MAX_AGE_MS = 6 * 60 * 60 * 1000;

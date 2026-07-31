@@ -1,6 +1,6 @@
 (() => {
   const SUPABASE_ORIGIN = "https://keafulupzvfljvbzwgrq.supabase.co";
-  const PUBLIC_APP_ORIGIN = "https://whynavo.pages.dev";
+  const PUBLIC_APP_ORIGIN = "https://whynavo.com";
   const MAX_CONFIRMATION_URL_LENGTH = 4096;
   const VALID_ACTIONS = new Set([
     "signup",

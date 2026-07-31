@@ -5,7 +5,7 @@ import {
 } from "./supabase-management.mjs";
 
 const projectRef = supabaseProjectRef();
-const officialOrigin = "https://whynavo.pages.dev/";
+const officialOrigin = "https://whynavo.com/";
 const desired = {
   site_url: officialOrigin,
   uri_allow_list: officialOrigin,

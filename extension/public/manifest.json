@@ -3,7 +3,7 @@
   "name": "WhyNavo - Local-first New Tab",
   "short_name": "WhyNavo",
   "description": "A local-first new tab dashboard for shortcuts, widgets, notes, todos, weather, and optional sync.",
-  "version": "0.9.16",
+  "version": "0.9.17",
   "chrome_url_overrides": {
     "newtab": "index.html"
   },
@@ -24,10 +24,10 @@
     "https://api.pwnedpasswords.com/*",
     "https://geocoding-api.open-meteo.com/*",
     "https://keafulupzvfljvbzwgrq.supabase.co/*",
-    "https://whynavo.pages.dev/*"
+    "https://whynavo.com/*"
   ],
   "content_security_policy": {
-    "extension_pages": "script-src 'self'; object-src 'none'; base-uri 'self'; frame-src https://whynavo.pages.dev"
+    "extension_pages": "script-src 'self'; object-src 'none'; base-uri 'self'; frame-src https://whynavo.com"
   },
   "icons": {
     "16": "icons/icon16.png",

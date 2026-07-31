@@ -1,6 +1,6 @@
 import { createClient } from "jsr:@supabase/supabase-js@2.110.8";
 
-const OFFICIAL_WEB_ORIGIN = "https://whynavo.pages.dev";
+const OFFICIAL_WEB_ORIGIN = "https://whynavo.com";
 const EXTENSION_ORIGIN = /^chrome-extension:\/\/[a-p]{32}$/;
 const MAX_SOURCE_BYTES = 2 * 1024 * 1024;
 const readNamedKeys = (name: string, legacyName: string) => {

@@ -82,16 +82,16 @@ jobs:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
           VITE_TURNSTILE_SITE_KEY: ${{ secrets.VITE_TURNSTILE_SITE_KEY }}
-          VITE_AUTH_REDIRECT_URL: https://whynavo.pages.dev/
-          VITE_CAPTCHA_FRAME_URL: https://whynavo.pages.dev/captcha.html
+          VITE_AUTH_REDIRECT_URL: https://whynavo.com/
+          VITE_CAPTCHA_FRAME_URL: https://whynavo.com/captcha.html
         run: npm run verify:production-config
       - name: Build
         env:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
           VITE_TURNSTILE_SITE_KEY: ${{ secrets.VITE_TURNSTILE_SITE_KEY }}
-          VITE_AUTH_REDIRECT_URL: https://whynavo.pages.dev/
-          VITE_CAPTCHA_FRAME_URL: https://whynavo.pages.dev/captcha.html
+          VITE_AUTH_REDIRECT_URL: https://whynavo.com/
+          VITE_CAPTCHA_FRAME_URL: https://whynavo.com/captcha.html
         run: npm run build:web
       - name: Preserve the reviewed predecessor update manifest during staged rollout
         if: github.event_name != 'workflow_dispatch' && inputs.activate_public_release != true

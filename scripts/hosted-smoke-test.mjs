@@ -1,6 +1,6 @@
 import { readFile } from "node:fs/promises";
 
-const origin = (process.env.WHYNAVO_ORIGIN || "https://whynavo.pages.dev").replace(/\/$/, "");
+const origin = (process.env.WHYNAVO_ORIGIN || "https://whynavo.com").replace(/\/$/, "");
 const packageJson = JSON.parse(await readFile(new URL("../package.json", import.meta.url), "utf8"));
 const allowPreviousVersionManifest = process.env.ALLOW_PREVIOUS_VERSION_MANIFEST === "1";
 const releasePattern = /^\d+\.\d+\.\d+$/;

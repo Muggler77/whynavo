@@ -10,8 +10,8 @@ promotional or implementation-only text to the extension.
 - Short name: `WhyNavo`
 - Category: Productivity
 - Language: English; Simplified Chinese
-- Primary support page: `https://whynavo.pages.dev/terms.html`
-- Privacy policy: `https://whynavo.pages.dev/privacy.html`
+- Primary support page: `https://whynavo.com/terms.html`
+- Privacy policy: `https://whynavo.com/privacy.html`
 - Release package: the zip produced by `npm run build` from `extension/dist`
 
 ## Short description

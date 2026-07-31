@@ -4,7 +4,7 @@ This document describes how to configure and operate WhyNavo without exposing pr
 
 WhyNavo can be used in two modes:
 
-- Official hosted product: normal users register or sign in at `https://whynavo.pages.dev/` and use the hosted sync service.
+- Official hosted product: normal users register or sign in at `https://whynavo.com/` and use the hosted sync service.
 - Self-hosted framework: developers fork the repository, provide their own frontend configuration, Supabase project, email delivery setup, and deployment target.
 
 ## Local-First Behavior
@@ -55,8 +55,8 @@ Email verification is controlled in the Supabase project, not in the end-user UI
 
 Recommended Auth URL settings:
 
-- Site URL: `https://whynavo.pages.dev/`
-- Redirect URLs / Additional Redirect URLs: `https://whynavo.pages.dev/`
+- Site URL: `https://whynavo.com/`
+- Redirect URLs / Additional Redirect URLs: `https://whynavo.com/`
 - Local development redirect URL, if needed: `http://localhost:5173/`
 
 The app passes `emailRedirectTo` during registration. Hosted web builds redirect back to the current web app URL. Extension builds redirect to the public web app so the verification link can complete in a normal browser page.
@@ -76,7 +76,7 @@ Recommended confirmation email subject:
 Verify your WhyNavo email / 验证 WhyNavo 邮箱
 ```
 
-Use the full HTML body in `docs/supabase-confirm-signup-email.html`. It includes the public WhyNavo logo at `https://whynavo.pages.dev/icons/icon128.png`, explains why the email was sent, and keeps the wording focused on verifying a sync account. Use `docs/supabase-reset-password-email.html` for recovery messages.
+Use the full HTML body in `docs/supabase-confirm-signup-email.html`. It includes the public WhyNavo logo at `https://whynavo.com/icons/icon128.png`, explains why the email was sent, and keeps the wording focused on verifying a sync account. Use `docs/supabase-reset-password-email.html` for recovery messages.
 
 The templates must keep Supabase's `{{ .TokenHash }}` variable unchanged. The token is placed in the URL fragment of `confirm.html`, validated locally, and sent to Supabase only after the user explicitly continues.
 

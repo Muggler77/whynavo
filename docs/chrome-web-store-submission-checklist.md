@@ -14,8 +14,8 @@
 ## Listing
 
 - [ ] Use the exact copy in `docs/chrome-web-store-listing.md`.
-- [ ] Link the privacy policy to `https://whynavo.pages.dev/privacy.html`.
-- [ ] Link support to `https://whynavo.pages.dev/terms.html` until a dedicated
+- [ ] Link the privacy policy to `https://whynavo.com/privacy.html`.
+- [ ] Link support to `https://whynavo.com/terms.html` until a dedicated
   support site exists.
 - [ ] Upload only clean screenshots without personal data.
 - [ ] Use the WhyNavo icon assets from `extension/public/icons/`.

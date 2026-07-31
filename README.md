@@ -4,11 +4,11 @@ WhyNavo is a local-first new tab dashboard for shortcuts, widgets, notes, todos,
 
 It is built as a Chrome / Edge Manifest V3 extension and as a responsive web app for mobile and tablet use. The core idea is simple: user data should work locally first, remain exportable, and only sync to the cloud after the user signs in.
 
-Current release: **0.9.16**. See the [bilingual release notes](docs/releases/0.9.16.md).
+Current release candidate: **0.9.17**. See the [bilingual release notes](docs/releases/0.9.17.md).
 
-> **上线状态 / Launch status:** 本地 0.9.16 构建目前可用于审查与测试。在线注册和云同步仍处于预发布阶段，必须等到对应的公开 Release、正式邮件发件域名、加密异地备份、数据库迁移和线上冒烟测试全部通过后再作为正式服务推广。当前请勿把在线服务用于唯一的重要数据副本。
+> **上线状态 / Launch status:** 本地 0.9.17 构建目前可用于审查与测试。在线注册和云同步仍处于预发布阶段，必须等到对应的公开 Release、正式邮件发件域名、加密异地备份、数据库迁移和线上冒烟测试全部通过后再作为正式服务推广。当前请勿把在线服务用于唯一的重要数据副本。
 >
-> The local 0.9.16 build is available for review and testing. Hosted account registration and cloud sync remain pre-release until the matching public Release, production email sender, encrypted off-site backup, database migration, and live smoke tests all pass. Do not use the hosted service as the only copy of important data yet.
+> The local 0.9.17 build is available for review and testing. Hosted account registration and cloud sync remain pre-release until the matching public Release, production email sender, encrypted off-site backup, database migration, and live smoke tests all pass. Do not use the hosted service as the only copy of important data yet.
 
 ![WhyNavo Sample A workspace](docs/images/whynavo-0.8.1-sample-a.png)
 
@@ -16,7 +16,7 @@ Current release: **0.9.16**. See the [bilingual release notes](docs/releases/0.9
 
 WhyNavo is both a ready-to-use product and a publicly auditable, configurable codebase.
 
-- For everyday users: use the official web app at `https://whynavo.pages.dev/`, register or sign in with email and password, and sync with the hosted WhyNavo service. No server setup, service URL, API key, or access key is required.
+- For everyday users: use the official web app at `https://whynavo.com/`, register or sign in with email and password, and sync with the hosted WhyNavo service. No server setup, service URL, API key, or access key is required.
 - For developers and teams: the source and repository-authored visual assets
   are available under the [MIT License](LICENSE). Preserve the
   [third-party notices](THIRD_PARTY_NOTICES.md) in redistributed builds and do
@@ -50,7 +50,7 @@ WhyNavo is both a ready-to-use product and a publicly auditable, configurable co
 Open the public web app:
 
 ```text
-https://whynavo.pages.dev/
+https://whynavo.com/
 ```
 
 This is the easiest way to try WhyNavo on iPhone, iPad, Android, tablets, and desktop browsers.
@@ -122,7 +122,7 @@ Sign-in is optional.
 在线版地址：
 
 ```text
-https://whynavo.pages.dev/
+https://whynavo.com/
 ```
 
 - 手机和平板：打开上面的地址，添加到主屏幕即可使用。
@@ -184,7 +184,7 @@ https://whynavo.pages.dev/
 
 ### 0.5.1 Cloudflare Pages 迁移
 
-- 官方网页入口迁移到免费的 `https://whynavo.pages.dev/`，不再依赖旧自定义域名。
+- 官方网页入口使用 `https://whynavo.com/`；Cloudflare Pages 的默认子域仅作为底层托管地址，不作为用户入口。
 - Supabase 项目、账号、云端同步表和数据结构保持不变，已同步的数据无需迁移。
 - Chrome / Edge 扩展数据保存在扩展自身空间，不受网页域名变化影响。
 - 网页未登录数据仍遵循浏览器同源隔离：旧网址下仅存在本地的数据需要先导出 JSON，再在新网址导入。
@@ -260,7 +260,7 @@ https://whynavo.pages.dev/
 
 WhyNavo 同时提供两种使用方式：
 
-- 普通用户：直接使用官方在线版 `https://whynavo.pages.dev/`，注册或登录账号即可同步，不需要自己部署服务。
+- 普通用户：直接使用官方在线版 `https://whynavo.com/`，注册或登录账号即可同步，不需要自己部署服务。
 - 开发者或团队：可以 fork 这个仓库，把它当作一套可配置的新标签页/PWA 框架，替换界面、同步服务或部署环境，搭建自己的独立版本。
 
 ## Supported Platforms
@@ -450,7 +450,7 @@ If a very early version stored local data under the pre-account-isolation global
 
 ## Mobile and Tablet Web App
 
-The same frontend can be deployed to Cloudflare Pages or another static hosting provider. The official public build uses `https://whynavo.pages.dev/`. On iPhone and iPad, open that URL in Safari and use "Add to Home Screen". On Android, use the browser's install/add-to-home-screen option.
+The same frontend can be deployed to Cloudflare Pages or another static hosting provider. The official public build uses `https://whynavo.com/`. On iPhone and iPad, open that URL in Safari and use "Add to Home Screen". On Android, use the browser's install/add-to-home-screen option.
 
 After signing in with the same account, mobile and desktop clients can merge shortcuts, widgets, notes, todos, and settings.
 
@@ -465,7 +465,7 @@ The hosted sync backend uses Supabase:
 - Row Level Security to isolate per-user data
 - An Edge Function for cached Bank of China exchange-rate data
 
-Public users do not need to enter service URLs or API keys. The official hosted app at `https://whynavo.pages.dev/` already contains the public client configuration required to talk to the WhyNavo sync service. A user only registers or signs in with email and password.
+Public users do not need to enter service URLs or API keys. The official hosted app at `https://whynavo.com/` already contains the public client configuration required to talk to the WhyNavo sync service. A user only registers or signs in with email and password.
 
 Only developers who fork the repository and self-host their own independent copy need to configure `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, and `VITE_AUTH_REDIRECT_URL`, apply every SQL migration in `supabase/migrations/` in numeric order, configure the required function secrets, and deploy the Edge Functions in `supabase/functions/`. In that mode, this repository works as a configurable framework: the frontend, Auth provider, database project, email domain, and deployment target can be replaced by the self-hosting developer.
 

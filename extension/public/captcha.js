@@ -9,7 +9,7 @@
   const error = document.getElementById("error");
   const text = (zh, en) => language === "en" ? en : zh;
 
-  const allowedParent = parentOrigin === "https://whynavo.pages.dev"
+  const allowedParent = parentOrigin === "https://whynavo.com"
     || /^chrome-extension:\/\/[a-p]{32}$/.test(parentOrigin);
 
   const send = (type, extra = {}) => {

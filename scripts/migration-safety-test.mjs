@@ -1176,8 +1176,13 @@ try {
   assert.equal(extensionManifest.host_permissions.includes("https://api.pwnedpasswords.com/*"), true, "the extension must allow the privacy-preserving leaked-password range check");
   assert.match(
     extensionManifest.content_security_policy?.extension_pages || "",
-    /frame-src https:\/\/whynavo\.pages\.dev/,
+    /frame-src https:\/\/whynavo\.com/,
     "the extension must allow only the official hosted CAPTCHA frame"
+  );
+  assert.doesNotMatch(
+    extensionManifest.content_security_policy?.extension_pages || "",
+    /whynavo\.pages\.dev/,
+    "the extension must not retain the retired Pages CAPTCHA origin"
   );
   const captchaClient = await readFile(join(repoRoot, "extension/public/captcha.js"), "utf8");
   assert.doesNotMatch(captchaClient, /postMessage\([^)]*,\s*["']\*["']\)/, "CAPTCHA tokens must not be broadcast to arbitrary origins");
@@ -1849,10 +1854,13 @@ try {
   assert.equal(webManifest.icons.some((icon) => icon.sizes === "192x192"), true, "PWA must provide a 192px install icon");
   assert.equal(webManifest.icons.some((icon) => icon.sizes === "512x512"), true, "PWA must provide a 512px install icon");
   const resetPasswordTemplate = await readFile(join(repoRoot, "docs/supabase-reset-password-email.html"), "utf8");
-  assert.match(resetPasswordTemplate, /whynavo\.pages\.dev\/icons\/icon128\.png/, "password reset email must use the public whynavo logo");
+  assert.match(resetPasswordTemplate, /whynavo\.com\/icons\/icon128\.png/, "password reset email must use the public WhyNavo logo");
+  assert.doesNotMatch(resetPasswordTemplate, /whynavo\.pages\.dev/, "password reset email must not retain the retired Pages origin");
   assert.match(resetPasswordTemplate, /confirm\.html#token=\{\{ \.TokenHash \}\}[\s\S]*type=recovery/, "password reset email must use the prefetch-safe confirmation page");
   assert.doesNotMatch(resetPasswordTemplate, /\{\{ \.ConfirmationURL \}\}/, "password reset email must not expose a directly consumable one-time link");
   const signupEmailTemplate = await readFile(join(repoRoot, "docs/supabase-confirm-signup-email.html"), "utf8");
+  assert.match(signupEmailTemplate, /whynavo\.com\/icons\/icon128\.png/, "signup email must use the public WhyNavo logo");
+  assert.doesNotMatch(signupEmailTemplate, /whynavo\.pages\.dev/, "signup email must not retain the retired Pages origin");
   assert.match(signupEmailTemplate, /confirm\.html#token=\{\{ \.TokenHash \}\}[\s\S]*type=signup/, "signup email must use the prefetch-safe confirmation page");
   assert.doesNotMatch(signupEmailTemplate, /\{\{ \.ConfirmationURL \}\}/, "signup email must not expose a directly consumable one-time link");
   const backupWorkflow = await readFile(join(repoRoot, ".github/workflows/database-backup.yml"), "utf8");

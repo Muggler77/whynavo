@@ -40,7 +40,7 @@ type AuthEmailPayload = {
 const resendApiKey = Deno.env.get("RESEND_API_KEY") || "";
 const hookSecret = (Deno.env.get("SEND_EMAIL_HOOK_SECRET") || "").replace(/^v1,whsec_/, "");
 const fromAddress = Deno.env.get("AUTH_EMAIL_FROM") || "";
-const defaultPublicAppUrl = "https://whynavo.pages.dev/";
+const defaultPublicAppUrl = "https://whynavo.com/";
 const configuredPublicAppUrl = Deno.env.get("AUTH_EMAIL_PUBLIC_APP_URL") || defaultPublicAppUrl;
 const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
 const normalizedPublicAppUrl = (() => {

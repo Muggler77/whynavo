@@ -9,7 +9,7 @@ import {
 
 const repoRoot = fileURLToPath(new URL("..", import.meta.url));
 const projectRef = supabaseProjectRef();
-const officialOrigin = "https://whynavo.pages.dev/";
+const officialOrigin = "https://whynavo.com/";
 const migrationPattern = /^(\d{4})_[a-z0-9_]+\.sql$/;
 const phaseIndex = process.argv.indexOf("--phase");
 const phase = phaseIndex >= 0 ? process.argv[phaseIndex + 1] : "final";
@@ -80,14 +80,14 @@ const [
 ]);
 
 requireCondition(auth && typeof auth === "object", "Auth configuration is unavailable");
-requireCondition(auth?.site_url === officialOrigin, "Auth Site URL must use the official Pages origin");
+requireCondition(auth?.site_url === officialOrigin, "Auth Site URL must use the official WhyNavo origin");
 const redirectOrigins = String(auth?.uri_allow_list || "")
   .split(",")
   .map((value) => value.trim())
   .filter(Boolean);
 requireCondition(
   redirectOrigins.length === 1 && redirectOrigins[0] === officialOrigin,
-  "Auth redirect allow-list must contain only the official Pages origin"
+  "Auth redirect allow-list must contain only the official WhyNavo origin"
 );
 requireCondition(auth?.disable_signup === false, "Public email registration is disabled");
 requireCondition(auth?.external_email_enabled === true, "Email authentication is disabled");

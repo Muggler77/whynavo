@@ -11,7 +11,7 @@ Production email delivery can be configured in either of these ways:
 
 The public web app currently uses:
 
-- Web app: `https://whynavo.pages.dev/`
+- Web app: `https://whynavo.com/`
 - Email provider: Supabase built-in Auth sender
 - Custom SMTP: disabled until an owned domain is available
 - Send Email Hook: disabled until an owned sender domain is available
@@ -23,8 +23,8 @@ The public web app currently uses:
 Configure Supabase Auth URL settings as follows:
 
 ```txt
-Site URL: https://whynavo.pages.dev/
-Additional Redirect URL: https://whynavo.pages.dev/
+Site URL: https://whynavo.com/
+Additional Redirect URL: https://whynavo.com/
 ```
 
 For public registration, keep email confirmation enabled and require at least 12 characters with an uppercase letter, a lowercase letter, and a number. Signed-in password changes must also require the current password. WhyNavo provides password-reset and signed-in password-update controls in the account dialog.
@@ -76,7 +76,7 @@ Example values after an owned email domain is available:
 
 ```txt
 AUTH_EMAIL_FROM=WhyNavo <no-reply@YOUR_DOMAIN>
-AUTH_EMAIL_PUBLIC_APP_URL=https://whynavo.pages.dev/
+AUTH_EMAIL_PUBLIC_APP_URL=https://whynavo.com/
 ```
 
 Do not commit these values. Set them only in Supabase Secrets.
@@ -89,4 +89,4 @@ supabase functions deploy send-auth-email
 
 Then enable the Supabase Auth "Send Email" hook and point it to the deployed function URL. With the hook enabled, Supabase delegates Auth email delivery to the hook instead of using the built-in SMTP sender.
 
-The Hook does not place the Supabase one-time verification endpoint directly in the email. It places the endpoint in the URL fragment of `https://whynavo.pages.dev/confirm.html`; URL fragments are not sent to Cloudflare. The static page validates the exact Supabase project, endpoint, action, token shape, and redirect origin, then proceeds only after a trusted user click. This follows Supabase's documented mitigation for email-provider link prefetch. Disable click/open tracking in the email provider because rewritten authentication links are unsupported.
+The Hook does not place the Supabase one-time verification endpoint directly in the email. It places the endpoint in the URL fragment of `https://whynavo.com/confirm.html`; URL fragments are not sent to Cloudflare. The static page validates the exact Supabase project, endpoint, action, token shape, and redirect origin, then proceeds only after a trusted user click. This follows Supabase's documented mitigation for email-provider link prefetch. Disable click/open tracking in the email provider because rewritten authentication links are unsupported.
