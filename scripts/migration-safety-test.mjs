@@ -121,7 +121,7 @@ try {
   const { accountScopedKey } = await import(pathToFileURL(dbOutput).href);
   const { defaultState } = await import(pathToFileURL(defaultStateOutput).href);
   const { normalizeHttpUrl, safeHttpHref } = await import(pathToFileURL(urlsOutput).href);
-  const { MAX_IMPORTED_SHORTCUTS, browserFaviconFor, curatedIconFor, fallbackFaviconFor, faviconFor, faviconHostFor, importedToShortcuts, normalizeIconReference, parseBookmarksHtml, parseImportText, siteIconCandidatesFor } = await import(pathToFileURL(importersOutput).href);
+  const { MAX_IMPORTED_SHORTCUTS, curatedIconFor, fallbackFaviconFor, faviconFor, faviconHostFor, importedToShortcuts, normalizeIconReference, parseBookmarksHtml, parseImportText, siteIconCandidatesFor } = await import(pathToFileURL(importersOutput).href);
   const { isRecurringTodoDueOn, isTodoCompletedForDate, localDateKey, nextTodoCompletion, recurrenceLabel } = await import(pathToFileURL(remindersOutput).href);
   const { checkForUpdate } = await import(pathToFileURL(updatesOutput).href);
   const projectConfigSource = await readFile(join(repoRoot, "extension/src/projectConfig.ts"), "utf8");
@@ -981,21 +981,15 @@ try {
   assert.equal(faviconHostFor("https://intranet"), undefined, "single-label intranet hostnames must not be disclosed to favicon providers");
   assert.equal(faviconFor("https://github.com/openai"), "https://www.google.com/s2/favicons?domain_url=https://github.com&sz=256", "automatic icon lookup must request a high-resolution favicon");
   assert.equal(fallbackFaviconFor("https://github.com/openai"), "https://icons.duckduckgo.com/ip3/github.com.ico", "automatic icon lookup must retain an independent fallback provider");
-  assert.equal(siteIconCandidatesFor("https://github.com/openai")[0], "https://github.com/apple-touch-icon.png", "automatic icon lookup must try site-owned high-resolution artwork");
+  assert.equal(siteIconCandidatesFor("https://github.com/openai")[0], "https://github.com/favicon.svg", "automatic icon lookup must try site-owned vector artwork before raster fallbacks");
   assert.equal(curatedIconFor("https://github.com/openai", "GitHub"), "https://cdn.simpleicons.org/github", "known brands must retain a vector fallback");
-  const originalLocation = globalThis.location;
-  const originalChrome = globalThis.chrome;
-  globalThis.location = { protocol: "chrome-extension:" };
-  globalThis.chrome = { runtime: { getURL: (path) => `chrome-extension://test-extension${path}` } };
-  const browserFavicon = new URL(browserFaviconFor("http://www.huya.com/", 128));
-  assert.equal(browserFavicon.origin, "null", "Chrome extension favicon URLs must use the opaque extension origin");
-  assert.equal(browserFavicon.protocol, "chrome-extension:", "local favicon lookup must stay inside the Chrome extension origin");
-  assert.equal(browserFavicon.searchParams.get("pageUrl"), "http://www.huya.com/", "local favicon lookup must preserve the exact public page URL");
-  assert.equal(browserFavicon.searchParams.get("size"), "128", "local favicon lookup must request a stable high-resolution render size");
-  if (originalLocation === undefined) delete globalThis.location;
-  else globalThis.location = originalLocation;
-  if (originalChrome === undefined) delete globalThis.chrome;
-  else globalThis.chrome = originalChrome;
+  assert.equal(curatedIconFor("https://example.com/minimax", "minimax"), undefined, "the one-letter X brand must not match names that merely contain x");
+  assert.equal(curatedIconFor("https://example.com/onesproxy", "onesproxy"), undefined, "proxy names containing x must not be misidentified as X");
+  assert.equal(curatedIconFor("https://example.com/xpert", "xpert"), undefined, "names beginning with x must not be misidentified as the X brand");
+  assert.equal(curatedIconFor("https://example.com/x", "X / Twitter"), "https://cdn.simpleicons.org/x", "an isolated X brand token must remain recognizable");
+  assert.equal(curatedIconFor("https://x.com/home", "minimax"), "https://cdn.simpleicons.org/x", "a verified X host must take precedence over an unrelated title");
+  assert.match(curatedIconFor("https://www.huya.com/", "虎牙直播") || "", /play-lh\.googleusercontent\.com\/.+w512-h512$/, "Huya must use its official high-resolution app artwork instead of a 32px favicon");
+  assert.match(curatedIconFor("https://www.namistory.com/", "纳米漫剧流水线") || "", /\.svg$/, "sites that publish official vector artwork must not fall back to a pixelated favicon");
   const legacyTabRows = parseImportText(JSON.stringify({
     version: "1",
     data: {
@@ -1093,6 +1087,7 @@ try {
     "deleted-folder",
     "imports must not attach new shortcuts to a tombstoned folder"
   );
+  assert.equal(importedAroundTombstones.shortcuts[0]?.iconUrl, undefined, "imports without artwork must leave icon resolution automatic instead of persisting a remote favicon transformer");
 
   const hardeningMigration = await readFile(join(repoRoot, "supabase/migrations/0006_harden_sync_boundaries.sql"), "utf8");
   assert.match(hardeningMigration, /p_name is distinct from 'primary'/, "sync RPC must reject unbounded snapshot names");
@@ -1177,7 +1172,7 @@ try {
   assert.equal(extensionManifest.permissions.includes("geolocation"), false, "precise location must not be requested from every user at installation");
   assert.equal(extensionManifest.optional_permissions?.includes("geolocation"), true, "precise location must remain available as an explicit optional permission");
   assert.equal(extensionManifest.permissions.includes("search"), true, "new-tab web search must use the browser default provider through the Search API");
-  assert.equal(extensionManifest.permissions.includes("favicon"), true, "site icons must prefer Chrome's local favicon database without requesting arbitrary browsing access");
+  assert.equal(extensionManifest.permissions.includes("favicon"), false, "the extension must not use Chrome's favicon resampler because it can disguise low-resolution artwork as a larger bitmap");
   assert.equal(extensionManifest.host_permissions.includes("https://api.pwnedpasswords.com/*"), true, "the extension must allow the privacy-preserving leaked-password range check");
   assert.match(
     extensionManifest.content_security_policy?.extension_pages || "",
@@ -1214,6 +1209,7 @@ try {
   assert.doesNotMatch(serviceWorker, /caches\.match\(request\)\.then\(\(cached\)/, "static assets must not use cache-global insertion order");
   assert.match(serviceWorker, /if \(response\.ok\)[\s\S]*cache\.put\(cacheKey, copy\)/, "failed navigation responses must never replace the offline app shell");
   const appSource = await readFile(join(repoRoot, "extension/src/App.tsx"), "utf8");
+  const iconPresentationCss = await readFile(join(repoRoot, "extension/src/ui-v0914.css"), "utf8");
   const appHtml = await readFile(join(repoRoot, "extension/index.html"), "utf8");
   const releaseNotes = await readFile(join(repoRoot, "docs/releases/0.6.0.md"), "utf8");
   const syncSource = await readFile(join(repoRoot, "extension/src/sync.ts"), "utf8");
@@ -1223,21 +1219,51 @@ try {
     /object-src 'none'; base-uri 'self'/,
     "extension pages must reject object embedding and injected base URLs"
   );
-  assert.match(appSource, /sharedIconObserver/, "shortcut icons must share one visibility observer instead of allocating one per icon");
+  assert.match(appSource, /sharedIconObserver[\s\S]*rootMargin: "1600px 0px"/, "shortcut icons must share one generous preload observer so scrolling never outruns image preparation");
   assert.match(appSource, /RESOLVED_ICON_CACHE_KEY_PREFIX[\s\S]*user:\$\{userId\}/, "resolved icon choices must be stored in an account-scoped cache");
+  assert.match(appSource, /LEGACY_RESOLVED_ICON_CACHE_PREFIXES = \["whynavo:resolved-icons:v1", "whynavo:resolved-icons:v2", "whynavo:resolved-icons:v3", "whynavo:resolved-icons:v4", "whynavo:resolved-icons:v5"\][\s\S]*RESOLVED_ICON_CACHE_KEY_PREFIX = "whynavo:resolved-icons:v6"/, "the brand-matching fix must invalidate every older resolution entry");
   assert.match(appSource, /cleanupDeletedAccountData[\s\S]*deleteResolvedIconCacheForAccount\(userId\)/, "permanent account deletion must remove that account's resolved icon cache");
-  assert.match(appSource, /SHORTCUT_RENDER_BATCH = 48/, "large shortcut collections must render in mobile-safe batches instead of mounting every image at startup");
+  assert.match(appSource, /SHORTCUT_RENDER_BATCH = 96[\s\S]*SHORTCUT_STABLE_RENDER_LIMIT = 360/, "ordinary shortcut collections must mount as one stable canvas while unusually large collections remain batched");
   assert.match(appSource, /ICON_LOAD_TIMEOUT_MS = 5000/, "slow mobile networks must have enough time to load a sharp icon before trying the fallback chain");
   assert.match(appSource, /ICON_FAILURE_RETRY_MS = 6 \* 60 \* 60 \* 1000/, "failed icon chains must be cached temporarily instead of refetched on every launch");
   assert.match(appSource, /FAILED_ICON_CACHE_PREFIX[\s\S]*isFreshFailedIconCache/, "failed icon chains must expire and retry instead of becoming permanent");
-  assert.match(appSource, /MIN_SHARP_ICON_SIZE = 96/, "raster icons must be large enough to remain sharp at the maximum rendered shortcut size");
-  assert.match(appSource, /MIN_USABLE_ICON_SIZE = 24/, "recognizable low-resolution favicons must remain available when a site exposes no sharp artwork");
-  assert.match(appSource, /browserIcon \? \{ url: browserIcon[\s\S]*curated \?[\s\S]*directCandidates[\s\S]*serviceIcon/, "icon resolution must prefer Chrome's local favicon database before curated and remote providers");
-  assert.match(appSource, /item\.url === browserIcon \? item\.url : normalizeIconReference/, "the trusted local Chrome favicon endpoint must survive the HTTPS-only remote icon filter");
-  assert.match(appSource, /usableFallbackUrl[\s\S]*shortestEdge >= MIN_USABLE_ICON_SIZE/, "the icon renderer must retain a usable fallback while continuing to search for sharp artwork");
-  assert.match(appSource, /function IconChoicePreview[\s\S]*shortestEdge < MIN_USABLE_ICON_SIZE/, "the icon editor must hide only genuinely unusable candidates");
+  assert.match(appSource, /MIN_SHARP_ICON_SIZE = 192/, "raster icons must provide a high-density source edge before entering the canvas");
+  assert.match(appSource, /MIN_COMPACT_ICON_SIZE = 48[\s\S]*MIN_COMPACT_RENDER_SIZE = 20/, "recognizable smaller artwork must remain available without being stretched");
+  assert.match(appSource, /rasterIconPresentation[\s\S]*window\.devicePixelRatio[\s\S]*naturalWidth[\s\S]*sourceEdge \/ pixelRatio/, "raster quality checks must account for display density and cap smaller artwork at its native pixel budget");
+  assert.match(appSource, /encodeResolvedIcon[\s\S]*decodeResolvedIcon[\s\S]*compact:/, "resolved icon caches must retain full versus compact presentation so remounts never flash a stretched image");
+  assert.match(appSource, /if \(customIconUrl\)[\s\S]*fixed: true[\s\S]*return \[\]/, "a user-selected icon must be the only fixed candidate instead of re-entering automatic resolution");
+  assert.match(appSource, /hasFixedCandidate[\s\S]*setShouldLoad\(true\)/, "explicitly selected icons must load before scrolling reaches them");
+  assert.match(appSource, /function ShortcutIconContent[\s\S]*fixedIconUrl[\s\S]*FixedShortcutIconImage[\s\S]*function FixedShortcutIconImage/, "an explicitly selected icon must bypass the automatic candidate and failure-cache renderer");
+  assert.match(appSource, /FixedShortcutIconImage[\s\S]*rasterIconPresentation[\s\S]*ShortcutIconImage[\s\S]*priority/, "a selected raster icon must pass adaptive sharpness classification before being painted");
+  assert.match(appSource, /fixedIconKey = `\$\{iconUpdatedAt \|\| ""\}/, "saving an icon must force a fresh fixed-image node instead of retaining stale candidate state");
+  assert.match(appSource, /cacheSelectedIcon\(onlineIconUrl\)[\s\S]*await onSave/, "saving an online icon must cache its raster bytes locally before applying the shortcut");
+  assert.match(appSource, /readCachedSelectedIcon\(iconUrl\)[\s\S]*URL\.createObjectURL\(blob\)/, "fixed icons must prefer the browser-managed local byte cache over another remote request");
+  assert.match(appSource, /MAX_SELECTED_ICON_CACHE_ENTRIES = 512[\s\S]*MAX_SELECTED_ICON_CACHE_BYTES = 1024 \* 1024/, "selected-icon persistence must have bounded entry and byte limits");
+  assert.match(appSource, /deleteSelectedIconCacheForAccount[\s\S]*cleanupDeletedAccountData[\s\S]*await deleteSelectedIconCacheForAccount\(userId\)/, "permanent account deletion must remove the account-scoped selected-icon byte cache");
+  assert.match(appSource, /setLoaded\(cachedIndex >= 0\)[\s\S]*loadedRef\.current = cachedIndex >= 0/, "previously resolved icons must remain painted when their page remounts");
+  assert.match(appSource, /shortcut-dialog-preview[\s\S]*ShortcutIconContent[\s\S]*priority/, "the shortcut editor preview must load eagerly even when the dialog body is scrollable");
+  assert.doesNotMatch(appSource, /browserFaviconFor|\/_favicon\//, "automatic icon resolution must never use a browser endpoint that upscales low-resolution favicons");
+  assert.match(appSource, /curated \?[\s\S]*directCandidates[\s\S]*serviceIcon[\s\S]*fallbackIcon/, "icon resolution must prefer reviewed brand artwork and direct site assets before bounded public favicon providers");
+  assert.match(appSource, /directCandidates\.map\(\(candidate\) => \(\{ url: candidate[\s\S]*vector: isVectorIconReference\(candidate\)/, "site-owned SVG candidates must remain resolution independent");
+  assert.match(appSource, /isGeneratedFaviconUrl[\s\S]*google\.com[\s\S]*icons\.duckduckgo\.com/, "legacy provider URLs must be recognized instead of being treated as user-selected artwork");
+  assert.match(appSource, /const fixedIconUrl = isGeneratedFaviconUrl\(iconUrl\) \? undefined/, "legacy provider URLs already stored in user data must automatically re-enter safe icon resolution");
+  assert.doesNotMatch(appSource, /label: text\("在线", "Online"\), url: faviconFor/, "favicon providers must stay automatic instead of being persisted as explicit user selections");
+  assert.doesNotMatch(appSource, /usableFallbackUrl|MIN_USABLE_ICON_SIZE/, "legacy stretchable low-resolution fallback behavior must stay removed");
+  assert.match(appSource, /function IconChoicePreview[\s\S]*rasterIconPresentation/, "the icon editor must classify candidates before allowing a selection");
+  assert.match(appSource, /function IconChoicePreview[\s\S]*const safeSrc = normalizeIconReference\(src\)[\s\S]*src=\{safeSrc\}/, "icon-choice image elements must receive only validated references");
+  assert.doesNotMatch(appSource, /图标 URL（可选，默认自动获取）|Icon URL \(optional, detected automatically\)/, "the icon editor must not send a free-form URL field directly toward an image element");
+  assert.match(iconPresentationCss, /\.shortcut-icon-image\.is-compact[\s\S]*width: min\(var\(--compact-icon-edge\), 72%\)[\s\S]*transform: translate\(-50%, -50%\)/, "compact artwork must remain centered and bounded instead of being enlarged to fill the tile");
+  assert.match(appSource, /selectedOnlineIconReady[\s\S]*iconChoiceStatus\[onlineIconUrl\] === "ready"/, "the shortcut editor must not save an explicit online icon before it passes the sharpness check");
   assert.doesNotMatch(appSource, /最近使用|Recently used/, "Search must not label arbitrary first items as a real usage history");
   assert.match(appSource, /second: "2-digit"/, "the Home clock must display seconds");
+  assert.doesNotMatch(appSource, /搜索应用、网站、笔记和任务|Search apps, sites, notes, and tasks/, "the Home web search must not imply that it searches local WhyNavo content");
+  assert.match(appSource, /form className="search hero-search"[\s\S]*placeholder=""[\s\S]*home-engine-toggle[\s\S]*onClick=\{toggleSearchEngine\}/, "the Home search must be a pure web search with an in-field click-to-switch engine control");
+  assert.match(appSource, /const toggleSearchEngine = \(\) =>[\s\S]*searchEngine:[\s\S]*=== "baidu" \? "google" : "baidu"/, "the engine control must switch directly between Baidu and Google through synchronized settings");
+  assert.match(appSource, /placeholder=\{text\("搜索网站和文件夹", "Search sites and folders"\)\}/, "the Spaces search behavior and prompt must remain unchanged");
+  assert.match(appSource, /function SearchWorkspace[\s\S]*查找网站、笔记、任务，或直接搜索网络[\s\S]*className="lucid-search-engine"[\s\S]*onClick=\{onToggleEngine\}/, "the Search page must keep universal local search while allowing one-click engine switching inside the field");
+  assert.match(iconPresentationCss, /\.sample-a-hero \.hero-search[\s\S]*grid-template-columns: minmax\(0, 1fr\) 78px 44px[\s\S]*\.lucid-search-engine[\s\S]*cursor: pointer/, "desktop search fields must reserve stable in-field space for the engine toggle");
+  assert.match(iconPresentationCss, /\.sample-a-hero \.hero-search \.home-engine-toggle \{[\s\S]*display: inline-flex/, "the Home engine toggle must override the legacy hidden state");
+  assert.match(iconPresentationCss, /@media \(max-width: 620px\)[\s\S]*grid-template-columns: minmax\(0, 1fr\) 66px 42px/, "the Home engine toggle must remain contained on mobile");
   assert.match(appSource, /folder-view-heading[\s\S]*folder-add-shortcut/, "folders must render as a dedicated icon canvas with an accessible add action");
   assert.match(appSource, /invalidateResolvedShortcutIcon[\s\S]*resolvedIconCache\.delete/, "saving an icon must invalidate a stale failure cache for that shortcut");
   assert.match(appSource, /iconUpdatedAt: iconUrlProvided \|\| iconTextProvided/, "icon edits must carry a dedicated refresh timestamp without tying image reloads to shortcut reordering");
@@ -1249,6 +1275,7 @@ try {
   assert.match(appSource, /requestDeviceLocationPermission\(\)[\s\S]*未授予定位权限/, "the extension must request optional location access only after an explicit settings action");
   assert.match(appSource, /priorityTimeZoneOptions[\s\S]*matchingTimeZones\.slice\(0, 100\)/, "time-zone selection must not mount every world time zone when it first opens");
   assert.match(appSource, /ShortcutRenderSentinel/, "shortcut batches must continue loading as the user approaches the end of the visible grid");
+  assert.doesNotMatch(appSource, /handlePageWheel|onWheel=\{handlePageWheel\}/, "ordinary scrolling must never be hijacked to switch workspace pages");
   assert.match(appSource, /hasLocalCandidate\s*\? `local:/, "large inline icons must not be copied into persistent cache keys");
   assert.doesNotMatch(appSource, /directCandidates\[1\]/, "icon fallback chains must remain bounded for predictable loading time");
   assert.match(appSource, /onPointerLeave=\{scheduleNavigationClose\}/, "auto-hidden navigation must have an explicit delayed close boundary");
@@ -1313,11 +1340,6 @@ try {
   assert.match(syncSource, /terms_version: LEGAL_DOCUMENT_VERSION/, "registration must attach the accepted legal-document version to the Auth user");
   assert.match(appSource, /passwordRecovery \? undefined : currentPassword/, "recovery sessions must remain distinct from signed-in password changes");
   assert.match(appSource, /newPassword !== confirmNewPassword/, "password updates must reject a mistyped confirmation before changing credentials");
-  assert.match(
-    appSource,
-    /shell && shell\.scrollHeight > shell\.clientHeight \+ 1[\s\S]*document\.scrollingElement/,
-    "wheel page switching must respect the actual mobile shell scroll container"
-  );
   assert.doesNotMatch(
     appHtml,
     /dns-prefetch[^>]+(?:cdn\.simpleicons\.org|icons\.duckduckgo\.com|www\.google\.com)/,
@@ -1765,9 +1787,12 @@ try {
   assert.match(releaseWorkflow, /publish:[\s\S]*draft=false[\s\S]*activate:[\s\S]*activate_public_release: true/, "the update manifest must be activated only after the verified draft Release becomes public");
   const stagedVersionManifest = await readFile(join(repoRoot, "scripts/stage-live-version-manifest.mjs"), "utf8");
   const versionManifestLibrary = await readFile(join(repoRoot, "scripts/version-manifest.mjs"), "utf8");
-  assert.match(stagedVersionManifest, /redirect: "error"[\s\S]*16_384[\s\S]*validatePublishedPredecessorManifest/, "the staged manifest fetch must reject redirects and oversized input before reusable validation");
-  assert.match(versionManifestLibrary, /compareReleaseVersions\(manifest\.latestVersion, nextVersion\) >= 0/, "the staged manifest validator must reject current and newer versions");
-  assert.match(versionManifestLibrary, /releaseNotesUrl[\s\S]*OFFICIAL_RELEASE_URL[\s\S]*updateUrl/, "the staged manifest must retain only the official public release destination");
+  const previousVersionManifest = JSON.parse(await readFile(join(repoRoot, "extension/public/previous-version.json"), "utf8"));
+  assert.match(stagedVersionManifest, /previous-version\.json[\s\S]*validatePublishedPredecessorManifest[\s\S]*writeFile/, "staged deployment must use the reviewed repository predecessor manifest instead of writing network responses");
+  assert.equal(previousVersionManifest.latestVersion, "0.9.8", "the current predecessor manifest must track the last public release until activation");
+  assert.ok(!/fetch\(/.test(stagedVersionManifest), "staged manifest generation must not fetch untrusted network content");
+  assert.match(versionManifestLibrary, /compareReleaseVersions\(latestVersion, nextVersion\) >= 0/, "the staged manifest validator must reject current and newer versions");
+  assert.match(versionManifestLibrary, /latestVersion[\s\S]*minimumSupportedVersion[\s\S]*dataSchemaVersion: 1[\s\S]*releaseNotesUrl: OFFICIAL_RELEASE_URL[\s\S]*updateUrl: OFFICIAL_RELEASE_URL/, "the staged manifest must be rebuilt from the official public release destination");
   const supabaseProductionVerifier = await readFile(join(repoRoot, "scripts/verify-supabase-production.mjs"), "utf8");
   assert.match(supabaseProductionVerifier, /phase === "final"[\s\S]*requiredPredeployVersions/, "the production verifier must distinguish backward-compatible predeployment state from final state");
   const supabaseConfig = await readFile(join(repoRoot, "supabase/config.toml"), "utf8");

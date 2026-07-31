@@ -88,7 +88,7 @@ import { createContext, lazy, Suspense, useCallback, useContext, useEffect, useL
 import { createPortal } from "react-dom";
 import { accountScopedKey, adoptLegacyStateForAccount, clearLocalAccountDeletionPending, clearLocalDeletedAccountMarkerForVerifiedUser, commitAnonymousStateAdoption, deleteKey, deleteLocalAccountData, downloadJson, downloadText, hasLegacyUnscopedState, loadStateForAccount, markLocalAccountDeletionPending, mergeAndSaveStateForAccount, readKey, readPendingLocalAccountDeletionIds, saveStateForAccount, writeKey } from "./db";
 import { defaultNavigationOrder, defaultState, defaultWidgetOrder, defaultWidgetSizes, nowIso, uid } from "./defaultState";
-import { MAX_IMPORTED_SHORTCUTS, MAX_IMPORT_TEXT_CHARS, browserFaviconFor, colorFor, curatedIconCount, curatedIconFor, fallbackFaviconFor, faviconFor, importedToShortcuts, normalizeIconReference, parseImportText, siteIconCandidatesFor } from "./importers";
+import { MAX_IMPORTED_SHORTCUTS, MAX_IMPORT_TEXT_CHARS, colorFor, curatedIconCount, curatedIconFor, fallbackFaviconFor, faviconFor, importedToShortcuts, normalizeIconReference, parseImportText, siteIconCandidatesFor } from "./importers";
 import { MIGRATION_BACKUP_KEY, type StateBackup } from "./migrations";
 import { fetchRates, getCachedRates } from "./rates";
 import { checkWebTaskReminders, isRecurringTodoDueOn, isTodoCompletedForDate, nextTodoCompletion, recurrenceLabel, requestTaskReminderPermission, syncTaskReminders } from "./reminders";
@@ -173,9 +173,11 @@ const WEATHER_CACHE_MAX_AGE_MS = 60 * 60 * 1000;
 const RATES_CACHE_MAX_AGE_MS = 6 * 60 * 60 * 1000;
 const ICON_LOAD_TIMEOUT_MS = 5000;
 const ICON_FAILURE_RETRY_MS = 6 * 60 * 60 * 1000;
-const MIN_SHARP_ICON_SIZE = 96;
-const MIN_USABLE_ICON_SIZE = 24;
-const SHORTCUT_RENDER_BATCH = 48;
+const MIN_SHARP_ICON_SIZE = 192;
+const MIN_COMPACT_ICON_SIZE = 48;
+const MIN_COMPACT_RENDER_SIZE = 20;
+const SHORTCUT_RENDER_BATCH = 96;
+const SHORTCUT_STABLE_RENDER_LIMIT = 360;
 const ICON_MANAGER_RENDER_BATCH = 80;
 const MAX_CUSTOM_WALLPAPERS = 12;
 const MAX_IMAGE_UPLOAD_BYTES = 12 * 1024 * 1024;
@@ -200,8 +202,8 @@ const isStrongPassword = (value: string) => (
   && /[A-Z]/.test(value)
   && /[0-9]/.test(value)
 );
-const LEGACY_RESOLVED_ICON_CACHE_KEY = "whynavo:resolved-icons:v1";
-const RESOLVED_ICON_CACHE_KEY_PREFIX = "whynavo:resolved-icons:v2";
+const LEGACY_RESOLVED_ICON_CACHE_PREFIXES = ["whynavo:resolved-icons:v1", "whynavo:resolved-icons:v2", "whynavo:resolved-icons:v3", "whynavo:resolved-icons:v4", "whynavo:resolved-icons:v5"];
+const RESOLVED_ICON_CACHE_KEY_PREFIX = "whynavo:resolved-icons:v6";
 const LOCAL_STATE_CHANNEL = "whynavo-local-state:v1";
 const MAX_RESOLVED_ICON_CACHE_ENTRIES = 300;
 const FAILED_ICON_CACHE_PREFIX = "failed:";
@@ -275,7 +277,7 @@ const observeLazyIcon = (image: HTMLImageElement, onVisible: () => void) => {
       sharedIconObserver?.unobserve(entry.target);
       callback?.();
     });
-  }, { rootMargin: "240px" });
+  }, { rootMargin: "1600px 0px" });
   lazyIconCallbacks.set(image, onVisible);
   sharedIconObserver.observe(image);
   return () => {
@@ -512,7 +514,7 @@ const iconUrlMatches = (value: string | undefined, hosts: string[], pathPrefix: 
     return false;
   }
 };
-const isGeneratedFavicon = (url?: string) => (
+const isGeneratedFaviconUrl = (url?: string) => (
   iconUrlMatches(url, ["google.com", "www.google.com"], "/s2/favicons")
   || iconUrlMatches(url, ["icons.duckduckgo.com"], "/ip3/")
 );
@@ -605,12 +607,80 @@ type IconCandidate = {
   url: string;
   kind: "site-art" | "brand-mark";
   vector: boolean;
+  fixed: boolean;
 };
 
 const resolvedIconCache = new Map<string, string>();
 let resolvedIconCacheStorageKey = `${RESOLVED_ICON_CACHE_KEY_PREFIX}:anonymous`;
 let resolvedIconCacheDirty = false;
 let resolvedIconCachePersistTimer: number | undefined;
+const SELECTED_ICON_CACHE_PREFIX = "whynavo-selected-shortcut-icons-v1";
+const MAX_SELECTED_ICON_CACHE_ENTRIES = 512;
+const MAX_SELECTED_ICON_CACHE_BYTES = 1024 * 1024;
+const cacheableSelectedIconTypes = new Set(["image/avif", "image/gif", "image/jpeg", "image/png", "image/webp"]);
+
+const selectedIconCacheNameFor = (storageKey: string) => `${SELECTED_ICON_CACHE_PREFIX}:${storageKey}`;
+
+const selectedIconCacheRequest = async (iconUrl: string) => {
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(iconUrl));
+  const key = Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
+  return new Request(`${window.location.origin}/__whynavo_cached_icon__/${key}`);
+};
+
+const readCachedSelectedIcon = async (iconUrl: string) => {
+  if (!window.caches || iconUrl.startsWith("data:")) return undefined;
+  try {
+    const cache = await window.caches.open(selectedIconCacheNameFor(resolvedIconCacheStorageKey));
+    const response = await cache.match(await selectedIconCacheRequest(iconUrl));
+    if (!response) return undefined;
+    const blob = await response.blob();
+    return cacheableSelectedIconTypes.has(blob.type.toLowerCase()) && blob.size <= MAX_SELECTED_ICON_CACHE_BYTES
+      ? blob
+      : undefined;
+  } catch {
+    return undefined;
+  }
+};
+
+const cacheSelectedIcon = async (iconUrl: string) => {
+  if (!window.caches || iconUrl.startsWith("data:") || !normalizeIconReference(iconUrl)) return false;
+  const controller = new AbortController();
+  const timeout = window.setTimeout(() => controller.abort(), 8000);
+  try {
+    const response = await fetch(iconUrl, {
+      cache: "force-cache",
+      credentials: "omit",
+      mode: "cors",
+      referrerPolicy: "no-referrer",
+      signal: controller.signal
+    });
+    if (!response.ok) return false;
+    const blob = await response.blob();
+    const type = blob.type.toLowerCase();
+    if (!cacheableSelectedIconTypes.has(type) || blob.size <= 0 || blob.size > MAX_SELECTED_ICON_CACHE_BYTES) return false;
+    const cache = await window.caches.open(selectedIconCacheNameFor(resolvedIconCacheStorageKey));
+    await cache.put(
+      await selectedIconCacheRequest(iconUrl),
+      new Response(blob, { headers: { "Cache-Control": "public, max-age=31536000, immutable", "Content-Type": type } })
+    );
+    const keys = await cache.keys();
+    await Promise.all(keys.slice(0, Math.max(0, keys.length - MAX_SELECTED_ICON_CACHE_ENTRIES)).map((request) => cache.delete(request)));
+    return true;
+  } catch {
+    return false;
+  } finally {
+    window.clearTimeout(timeout);
+  }
+};
+
+const deleteSelectedIconCacheForAccount = async (userId: string) => {
+  if (!window.caches) return;
+  try {
+    await window.caches.delete(selectedIconCacheNameFor(`${RESOLVED_ICON_CACHE_KEY_PREFIX}:user:${userId}`));
+  } catch {
+    // Account deletion must continue if browser-managed icon cache cleanup fails.
+  }
+};
 
 const persistResolvedIconCache = () => {
   if (resolvedIconCachePersistTimer !== undefined) {
@@ -671,10 +741,14 @@ const deleteResolvedIconCacheForAccount = (userId: string) => {
 const cleanupDeletedAccountData = async (userId: string) => {
   await deleteLocalAccountData(userId);
   deleteResolvedIconCacheForAccount(userId);
+  await deleteSelectedIconCacheForAccount(userId);
 };
 
 try {
-  localStorage.removeItem(LEGACY_RESOLVED_ICON_CACHE_KEY);
+  for (let index = localStorage.length - 1; index >= 0; index -= 1) {
+    const key = localStorage.key(index);
+    if (key && LEGACY_RESOLVED_ICON_CACHE_PREFIXES.some((prefix) => key.startsWith(prefix))) localStorage.removeItem(key);
+  }
 } catch {
   // The app remains usable with an in-memory icon cache.
 }
@@ -703,35 +777,68 @@ const isFreshFailedIconCache = (value?: string) => {
 };
 
 const isVectorIconUrl = (url: string) => /(?:\.svg(?:[?#]|$)|^data:image\/svg\+xml)/i.test(url);
+const isVectorIconReference = (url: string) => isVectorIconUrl(url) || isSimpleIconsUrl(url);
+type IconPresentation = { mode: "full" | "compact"; edge: number };
+const fullIconPresentation = (): IconPresentation => ({ mode: "full", edge: 0 });
+const rasterIconPresentation = (image: HTMLImageElement): IconPresentation | undefined => {
+  const renderedSize = Math.max(image.getBoundingClientRect().width, image.getBoundingClientRect().height);
+  const pixelRatio = Math.min(Math.max(window.devicePixelRatio || 1, 1), 2);
+  const requiredEdge = Math.max(MIN_SHARP_ICON_SIZE, Math.ceil(renderedSize * pixelRatio));
+  const sourceEdge = Math.min(image.naturalWidth, image.naturalHeight);
+  if (sourceEdge >= requiredEdge) return fullIconPresentation();
+  const compactEdge = Math.min(Math.floor(renderedSize * 0.72), Math.floor(sourceEdge / pixelRatio));
+  return sourceEdge >= MIN_COMPACT_ICON_SIZE && compactEdge >= MIN_COMPACT_RENDER_SIZE
+    ? { mode: "compact", edge: compactEdge }
+    : undefined;
+};
+const encodeResolvedIcon = (url: string, presentation: IconPresentation) => (
+  presentation.mode === "compact" ? `compact:${presentation.edge}:${url}` : `full:${url}`
+);
+const decodeResolvedIcon = (value?: string): { url: string; presentation: IconPresentation } | undefined => {
+  if (!value || value.startsWith(FAILED_ICON_CACHE_PREFIX)) return undefined;
+  if (value.startsWith("full:")) return { url: value.slice(5), presentation: fullIconPresentation() };
+  const compactMatch = value.match(/^compact:(\d+):(https:\/\/.+)$/);
+  if (!compactMatch) return undefined;
+  const edge = Number(compactMatch[1]);
+  return Number.isFinite(edge) && edge >= MIN_COMPACT_RENDER_SIZE
+    ? { url: compactMatch[2], presentation: { mode: "compact", edge } }
+    : undefined;
+};
+const compactIconStyle = (presentation?: IconPresentation) => (
+  presentation?.mode === "compact"
+    ? { "--compact-icon-edge": `${presentation.edge}px` } as React.CSSProperties
+    : undefined
+);
 
 const iconCandidatesFor = (url: string, iconUrl?: string, title = "") => {
   const builtInIcon = builtInShortcutIconFor(iconUrl);
-  const customIconUrl = builtInIcon ? undefined : normalizeIconReference(iconUrl);
+  const customIconUrl = builtInIcon || isGeneratedFaviconUrl(iconUrl) ? undefined : normalizeIconReference(iconUrl);
+  if (customIconUrl) {
+    return [{
+      url: customIconUrl,
+      kind: isSimpleIconsUrl(customIconUrl) ? "brand-mark" as const : "site-art" as const,
+      vector: isVectorIconUrl(customIconUrl),
+      fixed: true
+    }];
+  }
   if (!remoteIconLookupEnabled) {
-    return customIconUrl && !isGeneratedFavicon(customIconUrl)
-      ? [{ url: customIconUrl, kind: "site-art" as const, vector: isVectorIconUrl(customIconUrl) }]
-      : [];
+    return [];
   }
   const directCandidates = siteIconCandidatesFor(url);
   const curated = curatedIconFor(url, title);
-  const browserIcon = browserFaviconFor(url);
+  const curatedIsVector = curated ? isVectorIconReference(curated) : false;
   const serviceIcon = faviconFor(url);
   const fallbackIcon = fallbackFaviconFor(url);
   const candidates: Array<IconCandidate | undefined> = [
-    customIconUrl && !isGeneratedFavicon(customIconUrl)
-      ? { url: customIconUrl, kind: isSimpleIconsUrl(customIconUrl) ? "brand-mark" : "site-art", vector: isVectorIconUrl(customIconUrl) }
-      : undefined,
-    browserIcon ? { url: browserIcon, kind: "site-art", vector: false } : undefined,
-    curated ? { url: curated, kind: "brand-mark", vector: true } : undefined,
-    ...directCandidates.map((candidate) => ({ url: candidate, kind: "site-art" as const, vector: false })),
-    serviceIcon ? { url: serviceIcon, kind: "site-art", vector: false } : undefined,
-    fallbackIcon ? { url: fallbackIcon, kind: "site-art", vector: false } : undefined,
-    customIconUrl && isGeneratedFavicon(customIconUrl) ? { url: customIconUrl, kind: "site-art", vector: false } : undefined
+    curated ? { url: curated, kind: curatedIsVector ? "brand-mark" : "site-art", vector: curatedIsVector, fixed: false } : undefined,
+    ...directCandidates.map((candidate) => ({ url: candidate, kind: "site-art" as const, vector: isVectorIconReference(candidate), fixed: false })),
+    serviceIcon ? { url: serviceIcon, kind: "site-art", vector: false, fixed: false } : undefined,
+    fallbackIcon ? { url: fallbackIcon, kind: "site-art", vector: false, fixed: false } : undefined
   ];
   const seen = new Set<string>();
   return candidates.filter((item): item is IconCandidate => {
     if (!item) return false;
-    const safeUrl = item.url === browserIcon ? item.url : normalizeIconReference(item.url);
+    const safeUrl = normalizeIconReference(item.url);
     if (!safeUrl || safeUrl.startsWith("whynavo-icon:") || seen.has(safeUrl)) return false;
     item.url = safeUrl;
     seen.add(safeUrl);
@@ -765,43 +872,126 @@ function ShortcutIconContent({ url, iconUrl, iconText, iconColor = "#64748B", ic
   if (normalizedText) return <ShortcutTextIcon text={normalizedText} color={iconColor} />;
   const builtInIcon = builtInShortcutIconFor(iconUrl);
   if (builtInIcon) return <BuiltInShortcutIcon iconUrl={iconUrl} fallback={fallback} />;
+  const fixedIconUrl = isGeneratedFaviconUrl(iconUrl) ? undefined : normalizeIconReference(iconUrl);
+  if (fixedIconUrl) {
+    const fixedIconKey = `${iconUpdatedAt || ""}:${fixedIconUrl.length}:${fixedIconUrl.slice(-96)}`;
+    return <FixedShortcutIconImage key={fixedIconKey} url={url} iconUrl={fixedIconUrl} iconColor={iconColor} alt={title} fallback={fallback} />;
+  }
   return <ShortcutIconImage url={url} iconUrl={iconUrl} iconColor={iconColor} refreshKey={iconUpdatedAt} title={title} fallback={fallback} priority={priority} />;
+}
+
+function FixedShortcutIconImage({ url, iconUrl, iconColor = "#64748B", alt = "", fallback = "" }: { url: string; iconUrl: string; iconColor?: string; alt?: string; fallback?: string }) {
+  const isLocalIcon = iconUrl.startsWith("data:");
+  const cacheKey = isLocalIcon
+    ? `fixed-local:${iconUrl.length}:${iconUrl.slice(-64)}`
+    : `fixed-icon:${iconUrl}`;
+  const [renderUrl, setRenderUrl] = useState(isLocalIcon ? iconUrl : "");
+  const [loaded, setLoaded] = useState(false);
+  const [failed, setFailed] = useState(false);
+  const [presentation, setPresentation] = useState<IconPresentation>();
+
+  useEffect(() => {
+    let active = true;
+    let objectUrl = "";
+    setRenderUrl(isLocalIcon ? iconUrl : "");
+    setLoaded(false);
+    setFailed(false);
+    setPresentation(undefined);
+    if (!isLocalIcon) {
+      void readCachedSelectedIcon(iconUrl).then((blob) => {
+        if (!active) return;
+        if (blob) {
+          objectUrl = URL.createObjectURL(blob);
+          setRenderUrl(objectUrl);
+        } else {
+          setRenderUrl(iconUrl);
+        }
+      });
+    }
+    return () => {
+      active = false;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [cacheKey, iconUrl, isLocalIcon]);
+
+  if (failed) {
+    return <ShortcutIconImage url={url} iconColor={iconColor} title={alt} alt={alt} fallback={fallback} priority />;
+  }
+
+  return (
+    <>
+      {!loaded && <ShortcutTextIcon text={fallback || "网"} color={iconColor} />}
+      {renderUrl && (
+        <img
+          className={`shortcut-icon-image is-site-art ${presentation?.mode === "compact" ? "is-compact" : ""} ${loaded ? "is-loaded" : ""}`.trim()}
+          style={compactIconStyle(presentation)}
+          src={renderUrl}
+          alt={alt}
+          loading="eager"
+          decoding="async"
+          referrerPolicy="no-referrer"
+          onLoad={(event) => {
+            const nextPresentation = isVectorIconReference(iconUrl)
+              ? fullIconPresentation()
+              : rasterIconPresentation(event.currentTarget);
+            if (!nextPresentation) {
+              setLoaded(false);
+              setFailed(true);
+              return;
+            }
+            setPresentation(nextPresentation);
+            setLoaded(true);
+          }}
+          onError={() => {
+            setLoaded(false);
+            setFailed(true);
+          }}
+        />
+      )}
+    </>
+  );
 }
 
 function ShortcutIconImage({ url, iconUrl, iconColor = "#64748B", refreshKey, title = "", alt = "", fallback = "", priority = false }: { url: string; iconUrl?: string; iconColor?: string; refreshKey?: string; title?: string; alt?: string; fallback?: string; priority?: boolean }) {
   const candidates = useMemo(() => iconCandidatesFor(url, iconUrl, title), [url, iconUrl, title, remoteIconLookupEnabled]);
-  const [index, setIndex] = useState(0);
-  const [loaded, setLoaded] = useState(false);
-  const [shouldLoad, setShouldLoad] = useState(priority);
-  const [usableFallbackUrl, setUsableFallbackUrl] = useState<string | undefined>();
-  const imageRef = useRef<HTMLImageElement>(null);
-  const loadedRef = useRef(false);
-  const hasLocalCandidate = candidates.some((candidate) => candidate.url.startsWith("data:") || candidate.url.startsWith("blob:"));
   const candidateKey = iconCandidateCacheKey(candidates, url, iconUrl);
-  const usingUsableFallback = index >= candidates.length && Boolean(usableFallbackUrl);
-  const current = usingUsableFallback
-    ? candidates.find((candidate) => candidate.url === usableFallbackUrl)
-    : candidates[index];
+  const initialCachedValue = resolvedIconCache.get(candidateKey);
+  const initialResolvedIcon = decodeResolvedIcon(initialCachedValue);
+  const initialCachedIndex = initialResolvedIcon ? candidates.findIndex((candidate) => candidate.url === initialResolvedIcon.url) : -1;
+  const hasFixedCandidate = candidates.some((candidate) => candidate.fixed);
+  const [index, setIndex] = useState(initialCachedIndex >= 0 ? initialCachedIndex : 0);
+  const [loaded, setLoaded] = useState(initialCachedIndex >= 0);
+  const [presentation, setPresentation] = useState<IconPresentation | undefined>(initialCachedIndex >= 0 ? initialResolvedIcon?.presentation : undefined);
+  const [shouldLoad, setShouldLoad] = useState(priority || hasFixedCandidate || initialCachedIndex >= 0);
+  const imageRef = useRef<HTMLImageElement>(null);
+  const loadedRef = useRef(initialCachedIndex >= 0);
+  const hasLocalCandidate = candidates.some((candidate) => candidate.url.startsWith("data:") || candidate.url.startsWith("blob:"));
+  const current = candidates[index];
 
   useEffect(() => {
     const cachedValue = resolvedIconCache.get(candidateKey);
     if (isFreshFailedIconCache(cachedValue)) {
       setIndex(candidates.length);
+      setLoaded(false);
+      setPresentation(undefined);
+      loadedRef.current = false;
     } else {
       if (failedIconCacheTime(cachedValue) !== undefined) {
         resolvedIconCache.delete(candidateKey);
         scheduleResolvedIconCachePersist();
       }
-      const cachedIndex = cachedValue ? candidates.findIndex((candidate) => candidate.url === cachedValue) : -1;
+      const resolvedIcon = decodeResolvedIcon(cachedValue);
+      const cachedIndex = resolvedIcon ? candidates.findIndex((candidate) => candidate.url === resolvedIcon.url) : -1;
       setIndex(cachedIndex >= 0 ? cachedIndex : 0);
+      setLoaded(cachedIndex >= 0);
+      setPresentation(cachedIndex >= 0 ? resolvedIcon?.presentation : undefined);
+      loadedRef.current = cachedIndex >= 0;
+      if (cachedIndex >= 0 || hasFixedCandidate || priority) setShouldLoad(true);
     }
-    setLoaded(false);
-    setUsableFallbackUrl(undefined);
-    loadedRef.current = false;
-  }, [candidateKey, refreshKey]);
+  }, [candidateKey, refreshKey, hasFixedCandidate, priority]);
 
   useEffect(() => {
-    if (priority) {
+    if (priority || hasFixedCandidate || resolvedIconCache.has(candidateKey)) {
       setShouldLoad(true);
       return undefined;
     }
@@ -811,17 +1001,20 @@ function ShortcutIconImage({ url, iconUrl, iconColor = "#64748B", refreshKey, ti
       return undefined;
     }
     return observeLazyIcon(image, () => setShouldLoad(true));
-  }, [candidateKey, priority]);
+  }, [candidateKey, hasFixedCandidate, priority]);
 
   useEffect(() => {
     if (!current || !shouldLoad) return undefined;
-    setLoaded(false);
-    loadedRef.current = false;
+    const resolvedIcon = decodeResolvedIcon(resolvedIconCache.get(candidateKey));
+    const alreadyResolved = resolvedIcon?.url === current.url;
+    setLoaded(alreadyResolved);
+    setPresentation(alreadyResolved ? resolvedIcon?.presentation : undefined);
+    loadedRef.current = alreadyResolved;
     const timeout = window.setTimeout(() => {
       if (!loadedRef.current) setIndex((value) => value + 1);
     }, ICON_LOAD_TIMEOUT_MS);
     return () => window.clearTimeout(timeout);
-  }, [current, shouldLoad]);
+  }, [candidateKey, current, shouldLoad]);
 
   useEffect(() => {
     if (
@@ -829,11 +1022,10 @@ function ShortcutIconImage({ url, iconUrl, iconColor = "#64748B", refreshKey, ti
       || hasLocalCandidate
       || candidates.length === 0
       || index < candidates.length
-      || usableFallbackUrl
       || isFreshFailedIconCache(resolvedIconCache.get(candidateKey))
     ) return;
     rememberResolvedIcon(candidateKey, `${FAILED_ICON_CACHE_PREFIX}${Date.now()}`);
-  }, [candidateKey, candidates.length, hasLocalCandidate, index, shouldLoad, usableFallbackUrl]);
+  }, [candidateKey, candidates.length, hasLocalCandidate, index, shouldLoad]);
 
   const fallbackText = fallback || "网";
   if (!current) return <ShortcutTextIcon text={fallbackText} color={iconColor} />;
@@ -843,38 +1035,33 @@ function ShortcutIconImage({ url, iconUrl, iconColor = "#64748B", refreshKey, ti
       <img
         ref={imageRef}
         key={current.url}
-        className={`shortcut-icon-image is-${current.kind} ${loaded ? "is-loaded" : ""}`}
+        className={`shortcut-icon-image is-${current.kind} ${presentation?.mode === "compact" ? "is-compact" : ""} ${loaded ? "is-loaded" : ""}`.trim()}
+        style={compactIconStyle(presentation)}
         src={shouldLoad ? current.url : undefined}
         alt={alt}
-        loading={priority ? "eager" : "lazy"}
+        loading={priority || current.fixed || loaded ? "eager" : "lazy"}
         decoding="async"
         referrerPolicy="no-referrer"
         onLoad={(event) => {
           const image = event.currentTarget;
-          const shortestEdge = Math.min(image.naturalWidth, image.naturalHeight);
-          if (!current.vector && shortestEdge < MIN_SHARP_ICON_SIZE && !usingUsableFallback) {
-            const currentIsUsable = shortestEdge >= MIN_USABLE_ICON_SIZE;
-            if (currentIsUsable && !usableFallbackUrl && index === candidates.length - 1) {
-              loadedRef.current = true;
-              if (!hasLocalCandidate) rememberResolvedIcon(candidateKey, current.url);
-              setLoaded(true);
-              return;
-            }
-            if (currentIsUsable && !usableFallbackUrl) setUsableFallbackUrl(current.url);
+          const nextPresentation = current.vector ? fullIconPresentation() : rasterIconPresentation(image);
+          if (!nextPresentation) {
             loadedRef.current = false;
             setLoaded(false);
+            setPresentation(undefined);
             setIndex((value) => value + 1);
             return;
           }
           loadedRef.current = true;
-          if (!hasLocalCandidate) rememberResolvedIcon(candidateKey, current.url);
+          setPresentation(nextPresentation);
+          if (!hasLocalCandidate) rememberResolvedIcon(candidateKey, encodeResolvedIcon(current.url, nextPresentation));
           setLoaded(true);
         }}
         onError={() => {
           loadedRef.current = false;
           setLoaded(false);
-          if (usingUsableFallback) setUsableFallbackUrl(undefined);
-          else setIndex((value) => value + 1);
+          setPresentation(undefined);
+          setIndex((value) => value + 1);
         }}
       />
     </>
@@ -882,26 +1069,34 @@ function ShortcutIconImage({ url, iconUrl, iconColor = "#64748B", refreshKey, ti
 }
 
 function IconChoicePreview({ src, fallback, onStatus }: { src: string; fallback: string; onStatus?: (status: "loading" | "ready" | "failed") => void }) {
+  const safeSrc = normalizeIconReference(src);
   const [failed, setFailed] = useState(false);
+  const [presentation, setPresentation] = useState<IconPresentation>();
   useEffect(() => {
     setFailed(false);
-    onStatus?.("loading");
-  }, [src]);
-  if (failed) return <span className="icon-choice-fallback">{fallback}</span>;
+    setPresentation(undefined);
+    onStatus?.(safeSrc ? "loading" : "failed");
+  }, [safeSrc]);
+  if (!safeSrc || failed) return <span className="icon-choice-fallback">{fallback}</span>;
   return (
     <img
-      src={src}
+      className={presentation?.mode === "compact" ? "is-compact" : ""}
+      style={compactIconStyle(presentation)}
+      src={safeSrc}
       alt=""
       loading="eager"
       decoding="async"
       referrerPolicy="no-referrer"
       onLoad={(event) => {
-        const shortestEdge = Math.min(event.currentTarget.naturalWidth, event.currentTarget.naturalHeight);
-        if (!isVectorIconUrl(src) && shortestEdge < MIN_USABLE_ICON_SIZE) {
+        const nextPresentation = isVectorIconReference(safeSrc)
+          ? fullIconPresentation()
+          : rasterIconPresentation(event.currentTarget);
+        if (!nextPresentation) {
           setFailed(true);
           onStatus?.("failed");
           return;
         }
+        setPresentation(nextPresentation);
         onStatus?.("ready");
       }}
       onError={() => {
@@ -914,18 +1109,27 @@ function IconChoicePreview({ src, fallback, onStatus }: { src: string; fallback:
 
 function FolderIconContent({ iconUrl, size }: { iconUrl?: string; size: number }) {
   const [failed, setFailed] = useState(false);
-  useEffect(() => setFailed(false), [iconUrl]);
+  const [presentation, setPresentation] = useState<IconPresentation>();
+  useEffect(() => {
+    setFailed(false);
+    setPresentation(undefined);
+  }, [iconUrl]);
   const safeIconUrl = normalizeIconReference(iconUrl);
   if (!safeIconUrl || safeIconUrl.startsWith("whynavo-icon:") || failed) return <Folder size={size} />;
   return (
     <img
+      className={presentation?.mode === "compact" ? "is-compact" : ""}
+      style={compactIconStyle(presentation)}
       src={safeIconUrl}
       alt=""
       decoding="async"
       referrerPolicy="no-referrer"
       onLoad={(event) => {
-        const shortestEdge = Math.min(event.currentTarget.naturalWidth, event.currentTarget.naturalHeight);
-        if (!isVectorIconUrl(safeIconUrl) && shortestEdge < MIN_SHARP_ICON_SIZE) setFailed(true);
+        const nextPresentation = isVectorIconReference(safeIconUrl)
+          ? fullIconPresentation()
+          : rasterIconPresentation(event.currentTarget);
+        if (nextPresentation) setPresentation(nextPresentation);
+        else setFailed(true);
       }}
       onError={() => setFailed(true)}
     />
@@ -1157,7 +1361,7 @@ export default function App() {
   const [clock, setClock] = useState(() => new Date());
   const [activeLayer, setActiveLayer] = useState("all");
   const [layoutEditing, setLayoutEditing] = useState(false);
-  const [shortcutRenderLimit, setShortcutRenderLimit] = useState(SHORTCUT_RENDER_BATCH);
+  const [shortcutRenderLimit, setShortcutRenderLimit] = useState(SHORTCUT_STABLE_RENDER_LIMIT);
   const [navigationOpen, setNavigationOpen] = useState(false);
   const [dragId, setDragId] = useState<string | undefined>();
   const [weather, setWeather] = useState<WeatherState | undefined>();
@@ -1183,7 +1387,6 @@ export default function App() {
   const persistenceErrorShownRef = useRef(false);
   const undoSnapshotRef = useRef<AppState | undefined>();
   const lastSyncedUpdatedAtRef = useRef<string | undefined>();
-  const wheelPageLockRef = useRef(0);
   const toastTimerRef = useRef<number | undefined>();
   const navigationCloseTimerRef = useRef<number | undefined>();
   const passwordRecoveryRef = useRef(passwordRecovery);
@@ -1990,7 +2193,7 @@ export default function App() {
 
   useEffect(() => {
     if (!pageMotion) return;
-    const timer = window.setTimeout(() => setPageMotion(undefined), 560);
+    const timer = window.setTimeout(() => setPageMotion(undefined), 320);
     return () => window.clearTimeout(timer);
   }, [pageMotion, activePage]);
 
@@ -2294,11 +2497,13 @@ export default function App() {
     });
   }, [allShortcuts, shortcutTiles, spaceSearchText, uiLanguage]);
   const renderedShortcutTiles = useMemo(
-    () => filteredShortcutTiles.slice(0, shortcutRenderLimit),
+    () => filteredShortcutTiles.length <= SHORTCUT_STABLE_RENDER_LIMIT
+      ? filteredShortcutTiles
+      : filteredShortcutTiles.slice(0, shortcutRenderLimit),
     [filteredShortcutTiles, shortcutRenderLimit]
   );
   useEffect(() => {
-    setShortcutRenderLimit(SHORTCUT_RENDER_BATCH);
+    setShortcutRenderLimit(SHORTCUT_STABLE_RENDER_LIMIT);
   }, [activeCustomPageId, activeLayer, spaceSearchText]);
   const homeShortcutTiles = useMemo(() => {
     const folderTiles = allFolders.map((folder) => {
@@ -3171,6 +3376,15 @@ export default function App() {
   };
 
   const currentSearchEngine = state.settings.searchEngine || "baidu";
+  const toggleSearchEngine = () => {
+    updateState((current) => ({
+      ...current,
+      settings: {
+        ...current.settings,
+        searchEngine: (current.settings.searchEngine || "baidu") === "baidu" ? "google" : "baidu"
+      }
+    }));
+  };
   const runSearch = () => {
     const text = searchText.trim();
     if (!text) return;
@@ -3607,30 +3821,6 @@ export default function App() {
     });
   };
 
-  const handlePageWheel = (event: React.WheelEvent<HTMLElement>) => {
-    const target = event.target as HTMLElement;
-    if (target.closest("input, textarea, select, .dialog, .overlay")) return;
-    if (Math.abs(event.deltaY) < 34 || Math.abs(event.deltaY) < Math.abs(event.deltaX)) return;
-
-    const shell = shellRef.current;
-    const scrollRoot = shell && shell.scrollHeight > shell.clientHeight + 1
-      ? shell
-      : document.scrollingElement || document.documentElement;
-    const atTop = scrollRoot.scrollTop <= 24;
-    const atBottom = scrollRoot.scrollTop + window.innerHeight >= scrollRoot.scrollHeight - 24;
-    const direction = event.deltaY > 0 ? 1 : -1;
-    if ((direction > 0 && !atBottom) || (direction < 0 && !atTop)) return;
-
-    if (activeCustomPageId) return;
-    const nextPage = visibleSystemPageOrder[visibleSystemPageOrder.indexOf(activePage) + direction];
-    if (!nextPage) return;
-    const now = Date.now();
-    if (now < wheelPageLockRef.current) return;
-    wheelPageLockRef.current = now + 820;
-    event.preventDefault();
-    goToPage(nextPage);
-  };
-
   const widgetGridItems = enabledWidgetOrder.map((key) => {
     const PreviewIcon = widgetLibraryMeta[key].Icon;
     return {
@@ -3712,7 +3902,6 @@ export default function App() {
       <main
         className={`app ${state.settings.theme} nav-${navigationDisplay} nav-${navigationSide} ${navigationOpen ? "nav-open" : ""}`}
         style={backgroundStyle}
-        onWheel={handlePageWheel}
         onContextMenuCapture={handleAppContextMenu}
       >
       <a className="skip-link" href="#whynavo-workspace">{text("跳到主要内容", "Skip to main content")}</a>
@@ -3777,16 +3966,28 @@ export default function App() {
                 <h2>{homeGreeting}</h2>
                 <p>{text("把注意力留给真正重要的事。", "Focus on what matters. You’re in control.")}</p>
               </div>
-              <div className="search hero-search">
+              <form className="search hero-search" onSubmit={(event) => { event.preventDefault(); runSearch(); }}>
                 <input
                   ref={searchInputRef}
                   value={searchText}
                   onChange={(event) => setSearchText(event.target.value)}
-                  onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); runSearch(); } }}
-                  placeholder={text("搜索应用、网站、笔记和任务…", "Search apps, sites, notes, and tasks...")}
+                  placeholder=""
+                  aria-label={text("搜索网络", "Search the web")}
                 />
-                <button type="button" className="search-submit" aria-label={text("搜索", "Search")} title={text("搜索", "Search")} onClick={runSearch}><Search size={18} /></button>
-              </div>
+                <button
+                  type="button"
+                  className="engine-toggle home-engine-toggle"
+                  aria-label={text(
+                    `当前使用${searchEngineLabelFor(uiLanguage, currentSearchEngine)}，点击切换搜索引擎`,
+                    `Using ${searchEngineLabelFor(uiLanguage, currentSearchEngine)}. Click to switch search engine`
+                  )}
+                  title={text("单击切换百度 / Google", "Click to switch Baidu / Google")}
+                  onClick={toggleSearchEngine}
+                >
+                  {searchEngineLabelFor(uiLanguage, currentSearchEngine)}
+                </button>
+                <button type="submit" className="search-submit" aria-label={text("搜索", "Search")} title={text("搜索", "Search")}><Search size={18} /></button>
+              </form>
             </>
           ) : activePage === "shortcuts" ? (
             <label className="space-search">
@@ -3950,6 +4151,7 @@ export default function App() {
               query={searchText}
               onQueryChange={setSearchText}
               onWebSearch={runSearch}
+              onToggleEngine={toggleSearchEngine}
               engineLabel={searchEngineLabelFor(uiLanguage, currentSearchEngine)}
               shortcuts={allShortcuts}
               notes={state.notes}
@@ -4719,10 +4921,11 @@ function HomeShortcuts({ tiles, iconSize, editing, floating, onOpenFolder, onEdi
   );
 }
 
-function SearchWorkspace({ query, onQueryChange, onWebSearch, engineLabel, shortcuts, notes, todos, onAddShortcut, onOpenNotes, onOpenTasks }: {
+function SearchWorkspace({ query, onQueryChange, onWebSearch, onToggleEngine, engineLabel, shortcuts, notes, todos, onAddShortcut, onOpenNotes, onOpenTasks }: {
   query: string;
   onQueryChange: (value: string) => void;
   onWebSearch: () => void;
+  onToggleEngine: () => void;
   engineLabel: string;
   shortcuts: Shortcut[];
   notes: Note[];
@@ -4764,7 +4967,15 @@ function SearchWorkspace({ query, onQueryChange, onWebSearch, engineLabel, short
           placeholder={text("查找网站、笔记、任务，或直接搜索网络", "Find sites, notes, tasks, or search the web")}
           aria-label={text("搜索 WhyNavo 内容", "Search WhyNavo content")}
         />
-        <span className="lucid-search-engine" title={text("可在设置中更改搜索引擎", "Change the search engine in Settings")}>{engineLabel}</span>
+        <button
+          type="button"
+          className="lucid-search-engine"
+          aria-label={text(`当前使用${engineLabel}，点击切换搜索引擎`, `Using ${engineLabel}. Click to switch search engine`)}
+          title={text("单击切换百度 / Google", "Click to switch Baidu / Google")}
+          onClick={onToggleEngine}
+        >
+          {engineLabel}
+        </button>
         <button type="submit" className="lucid-search-web" title={text("搜索网络", "Search the web")} aria-label={text("搜索网络", "Search the web")}><Navigation size={17} /></button>
       </form>
 
@@ -6450,12 +6661,12 @@ function ShortcutDialog({ shortcut, groups, folders, onClose, onSave }: {
   groups: AppState["shortcutGroups"];
   folders: ShortcutFolder[];
   onClose: () => void;
-  onSave: (shortcut: Partial<Shortcut>) => void;
+  onSave: (shortcut: Partial<Shortcut>) => void | Promise<void>;
 }) {
   const language = useUiLanguage();
   const text = (zh: string, en: string) => localized(language, zh, en);
   const [draft, setDraft] = useState<Partial<Shortcut>>(shortcut || { iconColor: "#14B8A6", groupId: groups[0]?.id });
-  const initialIconUrl = shortcut?.iconUrl && !isGeneratedFavicon(shortcut.iconUrl) ? shortcut.iconUrl : "";
+  const initialIconUrl = normalizeIconReference(shortcut?.iconUrl) || "";
   const [iconMode, setIconMode] = useState<ShortcutIconMode>(shortcut?.iconText
     ? "text"
     : initialIconUrl.startsWith("data:image/")
@@ -6465,6 +6676,7 @@ function ShortcutDialog({ shortcut, groups, folders, onClose, onSave }: {
   const [uploadedIconUrl, setUploadedIconUrl] = useState(initialIconUrl.startsWith("data:image/") ? initialIconUrl : "");
   const [customIconText, setCustomIconText] = useState(normalizeShortcutIconText(shortcut?.iconText || shortcut?.title || "网"));
   const [uploadError, setUploadError] = useState("");
+  const [savingIcon, setSavingIcon] = useState(false);
   const [iconProbe, setIconProbe] = useState(0);
   const [iconChoiceStatus, setIconChoiceStatus] = useState<Record<string, "loading" | "ready" | "failed">>({});
   const iconTitle = draft.title || shortcut?.title || "";
@@ -6473,11 +6685,9 @@ function ShortcutDialog({ shortcut, groups, folders, onClose, onSave }: {
   const collectedIconChoices = useMemo(() => {
     const siteCandidates = siteIconCandidatesFor(iconUrl).slice(0, 2);
     const rows: Array<{ label: string; url?: string }> = [
-      { label: text("当前", "Current"), url: onlineIconUrl && !onlineIconUrl.startsWith(builtInIconPrefix) && !isGeneratedFavicon(onlineIconUrl) ? onlineIconUrl : undefined },
-      { label: text("浏览器", "Browser"), url: browserFaviconFor(iconUrl) },
+      { label: text("当前", "Current"), url: onlineIconUrl && !onlineIconUrl.startsWith(builtInIconPrefix) ? normalizeIconReference(onlineIconUrl) : undefined },
       { label: text("品牌", "Brand"), url: curatedIconFor(iconUrl, iconTitle) },
       ...siteCandidates.map((url, index) => ({ label: text(`站点 ${index + 1}`, `Site ${index + 1}`), url })),
-      { label: text("在线", "Online"), url: faviconFor(iconUrl) },
       { label: text("备用", "Backup"), url: fallbackFaviconFor(iconUrl) }
     ];
     const availableRows = rows.filter((item): item is { label: string; url: string } => Boolean(item.url));
@@ -6491,7 +6701,14 @@ function ShortcutDialog({ shortcut, groups, folders, onClose, onSave }: {
   const visibleCollectedIconCount = collectedIconChoices.filter((choice) => iconChoiceStatus[choice.url] !== "failed").length;
   const previewIconUrl = iconMode === "online" ? onlineIconUrl : iconMode === "upload" ? uploadedIconUrl : undefined;
   const previewIconText = iconMode === "text" ? normalizeShortcutIconText(customIconText) : undefined;
-  const canSaveIcon = iconMode !== "text" || Boolean(previewIconText);
+  const selectedOnlineIconReady = !onlineIconUrl
+    || onlineIconUrl.startsWith(builtInIconPrefix)
+    || iconChoiceStatus[onlineIconUrl] === "ready";
+  const canSaveIcon = iconMode === "text"
+    ? Boolean(previewIconText)
+    : iconMode === "upload"
+      ? Boolean(uploadedIconUrl)
+      : selectedOnlineIconReady;
   return (
     <DialogShell title={shortcut?.id ? text("编辑快捷导航", "Edit shortcut") : text("新增快捷导航", "Add shortcut")} onClose={onClose}>
       <label>{text("名称", "Name")}<input maxLength={MAX_ENTITY_NAME_CHARS} value={draft.title || ""} onChange={(event) => setDraft({ ...draft, title: event.target.value })} /></label>
@@ -6506,7 +6723,6 @@ function ShortcutDialog({ shortcut, groups, folders, onClose, onSave }: {
       </div>
 
       {iconMode === "online" && <div className="shortcut-icon-mode-panel online-icon-panel">
-        <label>{text("图标 URL（可选，默认自动获取）", "Icon URL (optional, detected automatically)")}<input maxLength={4 * 1024 * 1024} value={onlineIconUrl} onChange={(event) => setOnlineIconUrl(event.target.value)} placeholder={text("留空会自动使用网站图标", "Leave blank to detect the site icon")} /></label>
         <div className="shortcut-icon-toolbar">
           <button type="button" onClick={() => {
             const targetUrl = draft.url || "";
@@ -6526,12 +6742,12 @@ function ShortcutDialog({ shortcut, groups, folders, onClose, onSave }: {
             {collectedIconChoices.map((choice) => (
               <button
                 type="button"
-                className={`${onlineIconUrl === choice.url || (!onlineIconUrl && choice.url === browserFaviconFor(iconUrl)) ? "active" : ""} ${iconChoiceStatus[choice.url] === "failed" ? "is-unavailable" : ""}`.trim()}
-                aria-pressed={onlineIconUrl === choice.url || (!onlineIconUrl && choice.url === browserFaviconFor(iconUrl))}
+                className={`${onlineIconUrl === choice.url ? "active" : ""} ${iconChoiceStatus[choice.url] === "failed" ? "is-unavailable" : ""}`.trim()}
+                aria-pressed={onlineIconUrl === choice.url}
                 disabled={iconChoiceStatus[choice.url] !== "ready"}
                 key={`${choice.url}:${iconProbe}`}
-                onClick={() => setOnlineIconUrl(choice.url === browserFaviconFor(iconUrl) ? "" : choice.url)}
-                title={iconChoiceStatus[choice.url] === "failed" ? text("该图标无法加载", "This icon could not be loaded") : choice.url}
+                onClick={() => setOnlineIconUrl(choice.url)}
+                title={iconChoiceStatus[choice.url] === "failed" ? text("该图标清晰度不足或无法加载", "This icon is too small or could not be loaded") : choice.url}
               >
                 <span><IconChoicePreview src={choice.url} fallback={(draft.title || "网").slice(0, 1)} onStatus={(status) => setIconChoiceStatus((current) => current[choice.url] === status ? current : { ...current, [choice.url]: status })} /></span>
                 <em>{choice.label}</em>
@@ -6622,19 +6838,28 @@ function ShortcutDialog({ shortcut, groups, folders, onClose, onSave }: {
 
       <div className="shortcut-dialog-preview">
         <span className="shortcut-icon" style={{ "--icon": "58px", "--fallback-color": draft.iconColor || "#737373" } as React.CSSProperties}>
-          <ShortcutIconContent url={draft.url || ""} iconUrl={previewIconUrl} iconText={previewIconText} iconColor={iconColor} title={draft.title || ""} fallback={(draft.title || "网").slice(0, 1)} />
+          <ShortcutIconContent url={draft.url || ""} iconUrl={previewIconUrl} iconText={previewIconText} iconColor={iconColor} title={draft.title || ""} fallback={(draft.title || "网").slice(0, 1)} priority />
         </span>
         <span><strong>{draft.title || text("预览", "Preview")}</strong><small>{iconMode === "online" ? text("在线图标", "Online icon") : iconMode === "text" ? text("纯色文字", "Solid text") : text("本地上传", "Local upload")}</small></span>
       </div>
       <label>{text("分组", "Category")}<select value={draft.groupId || groups[0]?.id} onChange={(event) => setDraft({ ...draft, groupId: event.target.value })}>{groups.map((group) => <option value={group.id} key={group.id}>{shortcutGroupNameFor(language, group)}</option>)}</select></label>
       <label>{text("文件夹", "Folder")}<select value={draft.folderId || ""} onChange={(event) => setDraft({ ...draft, folderId: event.target.value || undefined })}><option value="">{text("不放入文件夹", "No folder")}</option>{folders.map((folder) => <option value={folder.id} key={folder.id}>{folder.name}</option>)}</select></label>
       <label className="check-row"><input type="checkbox" checked={Boolean(draft.pinned)} onChange={(event) => setDraft({ ...draft, pinned: event.target.checked })} /> {text("固定到 Dock", "Pin to Dock")}</label>
-      <button className="primary" disabled={!canSaveIcon || (iconMode === "upload" && !uploadedIconUrl)} onClick={() => onSave({
-        ...draft,
-        iconUrl: iconMode === "online" ? onlineIconUrl : iconMode === "upload" ? uploadedIconUrl : "",
-        iconText: iconMode === "text" ? previewIconText : "",
-        iconColor
-      })}><Save size={16} /> {text("保存并应用", "Save and apply")}</button>
+      <button className="primary" disabled={savingIcon || !canSaveIcon || (iconMode === "upload" && !uploadedIconUrl)} onClick={() => {
+        if (savingIcon) return;
+        setSavingIcon(true);
+        void (async () => {
+          if (iconMode === "online" && onlineIconUrl && !onlineIconUrl.startsWith(builtInIconPrefix)) {
+            await cacheSelectedIcon(onlineIconUrl);
+          }
+          await onSave({
+            ...draft,
+            iconUrl: iconMode === "online" ? onlineIconUrl : iconMode === "upload" ? uploadedIconUrl : "",
+            iconText: iconMode === "text" ? previewIconText : "",
+            iconColor
+          });
+        })().finally(() => setSavingIcon(false));
+      }}><Save size={16} /> {savingIcon ? text("正在固定图标…", "Pinning icon…") : text("保存并应用", "Save and apply")}</button>
     </DialogShell>
   );
 }

@@ -186,36 +186,30 @@ export const fallbackFaviconFor = (url: string) => {
   return host ? `https://icons.duckduckgo.com/ip3/${host}.ico` : undefined;
 };
 
-export const browserFaviconFor = (url: string, size = 128) => {
-  const pageUrl = cleanUrl(url);
-  if (
-    !pageUrl
-    || typeof globalThis.location === "undefined"
-    || globalThis.location.protocol !== "chrome-extension:"
-    || !globalThis.chrome?.runtime?.getURL
-  ) return undefined;
-  const faviconUrl = new URL(globalThis.chrome.runtime.getURL("/_favicon/"));
-  faviconUrl.searchParams.set("pageUrl", pageUrl);
-  faviconUrl.searchParams.set("size", String(Math.max(16, Math.min(256, Math.round(size)))));
-  return faviconUrl.toString();
-};
-
 export const siteIconCandidatesFor = (url: string) => {
   const host = faviconHostFor(url);
   if (!host) return [];
   const origin = `https://${host}`;
   return [
+    `${origin}/favicon.svg`,
+    `${origin}/android-chrome-512x512.png`,
+    `${origin}/web-app-manifest-512x512.png`,
+    `${origin}/icon-512.png`,
     `${origin}/apple-touch-icon.png`,
     `${origin}/apple-touch-icon-precomposed.png`,
     `${origin}/android-chrome-192x192.png`,
     `${origin}/favicon-192x192.png`,
+    `${origin}/favicon.png`,
     `${origin}/favicon.ico`
   ];
 };
 
 const simpleIcon = (slug: string) => `https://cdn.simpleicons.org/${slug}`;
+const huyaOfficialAppIcon = "https://play-lh.googleusercontent.com/cA1bdGakbGvHxGGJeXVe16Jb659n9u8OiCnucuSKBjNkMK9GZS90KZzQH3gtHewr-p3iwiq5IIxk4TSEsbIG=w512-h512";
 
 const curatedIconRules: Array<{ hosts?: string[]; title?: string[]; iconUrl: string }> = [
+  { hosts: ["huya.com"], title: ["虎牙", "huya"], iconUrl: huyaOfficialAppIcon },
+  { hosts: ["namistory.com"], title: ["纳米漫剧", "namistory"], iconUrl: "https://s5.ssl.qhres2.com/static/1d036ee171d75707.svg" },
   { hosts: ["maps.google.com"], title: ["google maps", "谷歌地图"], iconUrl: simpleIcon("googlemaps") },
   { hosts: ["google.com", "google.com.hk"], title: ["google"], iconUrl: simpleIcon("google") },
   { hosts: ["youtube.com", "youtu.be"], iconUrl: simpleIcon("youtube") },
@@ -268,16 +262,26 @@ const hostMatches = (host: string, patterns?: string[]) => {
   return patterns.some((pattern) => host === pattern || host.endsWith(`.${pattern}`));
 };
 
+const titleMatchesCuratedKeyword = (title: string, keyword: string) => {
+  const normalizedKeyword = keyword.trim().toLowerCase();
+  if (!normalizedKeyword) return false;
+  if (/^[a-z0-9]{1,2}$/.test(normalizedKeyword)) {
+    const escapedKeyword = normalizedKeyword.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    return new RegExp(`(^|[^a-z0-9])${escapedKeyword}($|[^a-z0-9])`, "i").test(title);
+  }
+  return title.includes(normalizedKeyword);
+};
+
 export const curatedIconFor = (url: string, title = "") => {
   const host = faviconHostFor(url)?.replace(/^www\./, "").toLowerCase();
   const normalizedTitle = title.trim().toLowerCase();
   if (!host && !normalizedTitle) return undefined;
-  const rule = curatedIconRules.find((item) => {
-    const matchedHost = host ? hostMatches(host, item.hosts) : false;
-    const matchedTitle = normalizedTitle && item.title?.some((keyword) => normalizedTitle.includes(keyword.toLowerCase()));
-    return matchedHost || matchedTitle;
-  });
-  return rule?.iconUrl;
+  const hostRule = host ? curatedIconRules.find((item) => hostMatches(host, item.hosts)) : undefined;
+  if (hostRule) return hostRule.iconUrl;
+  const titleRule = normalizedTitle
+    ? curatedIconRules.find((item) => item.title?.some((keyword) => titleMatchesCuratedKeyword(normalizedTitle, keyword)))
+    : undefined;
+  return titleRule?.iconUrl;
 };
 
 export function parseImportText(input: string): ImportShortcut[] {
@@ -498,7 +502,7 @@ export function importedToShortcuts(
       id: uid(),
       title: row.title,
       url: row.url,
-      iconUrl: row.iconUrl || faviconFor(row.url),
+      iconUrl: row.iconUrl,
       iconColor: colorFor(row.title),
       groupId: group.id,
       folderId: folder?.id,

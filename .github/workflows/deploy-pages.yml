@@ -93,7 +93,7 @@ jobs:
           VITE_AUTH_REDIRECT_URL: https://whynavo.pages.dev/
           VITE_CAPTCHA_FRAME_URL: https://whynavo.pages.dev/captcha.html
         run: npm run build:web
-      - name: Preserve the currently public update manifest during staged rollout
+      - name: Preserve the reviewed predecessor update manifest during staged rollout
         if: github.event_name != 'workflow_dispatch' && inputs.activate_public_release != true
         run: node scripts/stage-live-version-manifest.mjs extension/web-dist/latest-version.json
       - name: Apply backward-compatible database migrations

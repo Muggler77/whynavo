@@ -23,13 +23,16 @@ const validManifest = {
   latestVersion: "0.5.7",
   minimumSupportedVersion: "0.5.0",
   dataSchemaVersion: 1,
+  severity: "critical",
   releaseNotesUrl: "https://github.com/Muggler77/whynavo/releases/latest",
   updateUrl: "https://github.com/Muggler77/whynavo/releases/latest"
 };
 
-assert.equal(
+assert.deepEqual(validatePublishedPredecessorManifest(validManifest, "0.6.0"), validManifest);
+assert.notEqual(
   validatePublishedPredecessorManifest(validManifest, "0.6.0"),
-  validManifest
+  validManifest,
+  "validated manifests must be rebuilt from an allowlisted shape"
 );
 
 for (const invalidManifest of [
