@@ -1878,6 +1878,10 @@ try {
   assert.match(backupWorkflow, /network-restrictions update[\s\S]*runner_ip\/32/, "database backups must restrict temporary database ingress to the current runner");
   assert.match(backupWorkflow, /trap close_ingress EXIT INT TERM[\s\S]*ingress_open=true[\s\S]*close_ingress[\s\S]*trap - EXIT INT TERM/, "database exports must close temporary ingress inside the export process as well as in the always-run cleanup step");
   assert.match(backupWorkflow, /Close direct database ingress[\s\S]*0\.0\.0\.0\/32/, "database backups must close direct database ingress even after an export failure");
+  const cloudflareInfrastructureWorkflow = await readFile(join(repoRoot, ".github/workflows/configure-cloudflare-infrastructure.yml"), "utf8");
+  assert.match(cloudflareInfrastructureWorkflow, /pages\/projects\/\$\{PAGES_PROJECT\}\/domains/, "Cloudflare bootstrap must bind the reviewed Pages project domain");
+  assert.match(cloudflareInfrastructureWorkflow, /r2\/buckets[\s\S]*locationHint: "apac"[\s\S]*storageClass: "Standard"/, "Cloudflare bootstrap must create the reviewed private R2 bucket");
+  assert.doesNotMatch(cloudflareInfrastructureWorkflow, /--request DELETE|domains\/custom|r2\.dev/, "Cloudflare bootstrap must not delete infrastructure or make the backup bucket public");
   assert.match(backupWorkflow, /supabase db dump[\s\S]*--role-only/, "off-site backups must include database roles");
   assert.match(backupWorkflow, /--schema public/, "application backups must explicitly export the public schema");
   assert.match(backupWorkflow, /auth-data\.sql[\s\S]*--schema auth/, "account recovery backups must explicitly export the Auth schema");
