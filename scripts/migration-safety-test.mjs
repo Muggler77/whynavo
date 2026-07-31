@@ -1876,6 +1876,7 @@ try {
   assert.match(backupWorkflow, /"postgres\.\$\{SUPABASE_PROJECT_REF\}"[\s\S]*"aws-1-ap-southeast-1\.pooler\.supabase\.com" 5432 postgres sslmode=require/, "database dumps must use the reviewed IPv4 session pooler");
   assert.doesNotMatch(backupWorkflow, /database\/jit-access|database\/jit\//, "database backups must not call unavailable temporary-access endpoints");
   assert.match(backupWorkflow, /network-restrictions update[\s\S]*runner_ip\/32/, "database backups must restrict temporary database ingress to the current runner");
+  assert.match(backupWorkflow, /projects\/\$\{SUPABASE_PROJECT_REF\}\/ssl-enforcement[\s\S]*currentConfig\.database == true[\s\S]*appliedSuccessfully == true/, "database backups must require the authoritative Supabase SSL-enforcement state");
   assert.match(backupWorkflow, /trap close_ingress EXIT INT TERM[\s\S]*ingress_open=true[\s\S]*close_ingress[\s\S]*trap - EXIT INT TERM/, "database exports must close temporary ingress inside the export process as well as in the always-run cleanup step");
   assert.match(backupWorkflow, /Close direct database ingress[\s\S]*0\.0\.0\.0\/32/, "database backups must close direct database ingress even after an export failure");
   const cloudflareInfrastructureWorkflow = await readFile(join(repoRoot, ".github/workflows/configure-cloudflare-infrastructure.yml"), "utf8");

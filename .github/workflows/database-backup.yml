@@ -85,7 +85,9 @@ jobs:
             return "$close_status"
           }
           trap close_ingress EXIT INT TERM
-          ssl_config="$(supabase --experimental ssl-enforcement get --project-ref "$SUPABASE_PROJECT_REF")"
+          ssl_config="$(curl --fail --silent --show-error \
+            --header "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
+            "https://api.supabase.com/v1/projects/${SUPABASE_PROJECT_REF}/ssl-enforcement")"
           jq -e '.currentConfig.database == true and .appliedSuccessfully == true' <<<"$ssl_config" >/dev/null \
             || { echo "::error::Supabase database SSL enforcement is disabled"; exit 1; }
           runner_ip="$(curl --fail --silent --show-error --max-time 10 https://api.ipify.org)"
