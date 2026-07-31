@@ -12,7 +12,9 @@ jobs:
     timeout-minutes: 10
     env:
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-      PAGES_PROJECT: whynavo
+      # Cloudflare project identifiers are immutable infrastructure names; the
+      # public product and production domain remain WhyNavo / whynavo.com.
+      PAGES_PROJECT: whytab
       PRODUCTION_DOMAIN: whynavo.com
       R2_BUCKET: whynavo-production-backups
     steps:
