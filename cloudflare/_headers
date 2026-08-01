@@ -26,6 +26,16 @@
   Cross-Origin-Resource-Policy: cross-origin
   Cache-Control: public, max-age=300, must-revalidate
 
+# Cloudflare Pages canonicalizes .html routes to extensionless URLs. Keep the
+# final CAPTCHA response embeddable by the official extension as well.
+/captcha
+  ! Content-Security-Policy
+  ! Cross-Origin-Resource-Policy
+  ! X-Frame-Options
+  Content-Security-Policy: default-src 'self'; script-src 'self' https://challenges.cloudflare.com; style-src 'self'; img-src 'self' data:; connect-src 'self' https://challenges.cloudflare.com; frame-src https://challenges.cloudflare.com; object-src 'none'; base-uri 'self'; form-action 'none'; frame-ancestors 'self' chrome-extension:; upgrade-insecure-requests
+  Cross-Origin-Resource-Policy: cross-origin
+  Cache-Control: public, max-age=300, must-revalidate
+
 /captcha.js
   Cache-Control: public, max-age=300, must-revalidate
 
@@ -33,6 +43,10 @@
   Cache-Control: public, max-age=300, must-revalidate
 
 /confirm.html
+  Cache-Control: no-store
+
+# The canonical confirmation route must retain the same token-leakage control.
+/confirm
   Cache-Control: no-store
 
 /confirm.js

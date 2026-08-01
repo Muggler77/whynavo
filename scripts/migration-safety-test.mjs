@@ -1185,6 +1185,17 @@ try {
     "the extension must not retain the retired Pages CAPTCHA origin"
   );
   const captchaClient = await readFile(join(repoRoot, "extension/public/captcha.js"), "utf8");
+  const cloudflareHeaders = await readFile(join(repoRoot, "cloudflare/_headers"), "utf8");
+  assert.match(
+    cloudflareHeaders,
+    /\/captcha\n[\s\S]*?frame-ancestors 'self' chrome-extension:[\s\S]*?Cross-Origin-Resource-Policy: cross-origin/,
+    "the canonical Pages CAPTCHA route must remain embeddable by the official extension"
+  );
+  assert.match(
+    cloudflareHeaders,
+    /\/confirm\n\s+Cache-Control: no-store/,
+    "the canonical Pages confirmation route must never cache verification parameters"
+  );
   assert.doesNotMatch(captchaClient, /postMessage\([^)]*,\s*["']\*["']\)/, "CAPTCHA tokens must not be broadcast to arbitrary origins");
   assert.doesNotMatch(captchaClient, /addEventListener\(["']message["']/, "the sandboxed CAPTCHA document must remain write-only toward its validated parent");
   assert.doesNotMatch(captchaClient, /localhost|127\.0\.0\.1/, "the production CAPTCHA bridge must not trust local development origins");
