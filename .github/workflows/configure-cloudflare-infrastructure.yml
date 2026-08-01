@@ -16,6 +16,7 @@ jobs:
       # public product and production domain remain WhyNavo / whynavo.com.
       PAGES_PROJECT: whytab
       PRODUCTION_DOMAIN: whynavo.com
+      EMAIL_DOMAIN: auth.whynavo.com
       R2_BUCKET: whynavo-production-backups
     steps:
       - name: Verify Cloudflare credential
@@ -85,5 +86,102 @@ jobs:
               || { jq -r '.errors[]? | "Cloudflare error \(.code): \(.message)"' "$response_file"; echo "::error::Could not create the private R2 backup bucket (HTTP ${bucket_status})"; exit 1; }
           fi
           echo "Private R2 bucket ${R2_BUCKET}: ready"
+
+          rm -f "$response_file"
+
+      - name: Ensure authenticated transactional-email DNS
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          api="https://api.cloudflare.com/client/v4"
+          auth_header="Authorization: Bearer ${CLOUDFLARE_API_TOKEN}"
+          response_file="${RUNNER_TEMP}/cloudflare-dns-response.json"
+          dkim_value='p=MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQDXVqJ/9uS9K0CdcvqfH1Z83FlSf8XyPad2gRFShP6yXoredmuI9USqWAOQt/PjD+n+sbqdcXty/L8gSkmwcbrZNBtSgrUNaxLK/QhXDeWUcdVpF5GTTrp/EdYQqXDaggUSzsFZaXSZhk2y5NzLQ87LaDv4LqY3l0ayMdD+BAcWOwIDAQAB'
+
+          zone_status="$(curl --silent --show-error --get \
+            --header "$auth_header" \
+            --data-urlencode "account.id=${CLOUDFLARE_ACCOUNT_ID}" \
+            --data-urlencode "name=${PRODUCTION_DOMAIN}" \
+            --data-urlencode 'status=active' \
+            --output "$response_file" \
+            --write-out '%{http_code}' \
+            "${api}/zones")"
+          [[ "$zone_status" =~ ^2[0-9][0-9]$ ]] \
+            && jq -e '.success == true and (.result | length) == 1' "$response_file" >/dev/null \
+            || { jq -r '.errors[]? | "Cloudflare error \(.code): \(.message)"' "$response_file"; echo "::error::Could not resolve the production DNS zone (HTTP ${zone_status})"; exit 1; }
+          zone_id="$(jq -r '.result[0].id' "$response_file")"
+
+          ensure_record() {
+            local type="$1"
+            local name="$2"
+            local content="$3"
+            local priority="${4:-}"
+            local record_status record_count exact_count record_id payload
+
+            record_status="$(curl --silent --show-error --get \
+              --header "$auth_header" \
+              --data-urlencode "type=${type}" \
+              --data-urlencode "name=${name}" \
+              --output "$response_file" \
+              --write-out '%{http_code}' \
+              "${api}/zones/${zone_id}/dns_records")"
+            [[ "$record_status" =~ ^2[0-9][0-9]$ ]] \
+              && jq -e '.success == true' "$response_file" >/dev/null \
+              || { jq -r '.errors[]? | "Cloudflare error \(.code): \(.message)"' "$response_file"; echo "::error::Could not inspect ${type} ${name} (HTTP ${record_status})"; exit 1; }
+
+            record_count="$(jq -r '.result | length' "$response_file")"
+            exact_count="$(jq -r --arg content "$content" --arg priority "$priority" \
+              '[.result[] | select(.content == $content and ($priority == "" or (.priority | tostring) == $priority))] | length' \
+              "$response_file")"
+            if [ "$exact_count" != "0" ]; then
+              echo "Email DNS ${type} ${name}: ready"
+              return
+            fi
+            if [ "$record_count" -gt 1 ]; then
+              echo "::error::Multiple ${type} records exist for ${name}; refusing to overwrite ambiguous DNS"
+              exit 1
+            fi
+
+            payload="$(jq -cn \
+              --arg type "$type" \
+              --arg name "$name" \
+              --arg content "$content" \
+              --arg priority "$priority" \
+              '{type: $type, name: $name, content: $content, ttl: 1}
+               + (if $priority == "" then {} else {priority: ($priority | tonumber)} end)')"
+            if [ "$record_count" = "0" ]; then
+              record_status="$(curl --silent --show-error \
+                --request POST \
+                --header "$auth_header" \
+                --header 'Content-Type: application/json' \
+                --data "$payload" \
+                --output "$response_file" \
+                --write-out '%{http_code}' \
+                "${api}/zones/${zone_id}/dns_records")"
+            else
+              record_id="$(jq -r '.result[0].id' "$response_file")"
+              record_status="$(curl --silent --show-error \
+                --request PUT \
+                --header "$auth_header" \
+                --header 'Content-Type: application/json' \
+                --data "$payload" \
+                --output "$response_file" \
+                --write-out '%{http_code}' \
+                "${api}/zones/${zone_id}/dns_records/${record_id}")"
+            fi
+            [[ "$record_status" =~ ^2[0-9][0-9]$ ]] \
+              && jq -e --arg type "$type" --arg name "$name" --arg content "$content" \
+                '.success == true and .result.type == $type and .result.name == $name and .result.content == $content' \
+                "$response_file" >/dev/null \
+              || { jq -r '.errors[]? | "Cloudflare error \(.code): \(.message)"' "$response_file"; echo "::error::Could not configure ${type} ${name} (HTTP ${record_status})"; exit 1; }
+            echo "Email DNS ${type} ${name}: configured"
+          }
+
+          ensure_record TXT "resend._domainkey.${EMAIL_DOMAIN}" "$dkim_value"
+          ensure_record MX "send.${EMAIL_DOMAIN}" 'feedback-smtp.ap-northeast-1.amazonses.com' 10
+          ensure_record TXT "send.${EMAIL_DOMAIN}" 'v=spf1 include:amazonses.com ~all'
+          ensure_record TXT "_dmarc.${PRODUCTION_DOMAIN}" 'v=DMARC1; p=none;'
 
           rm -f "$response_file"
