@@ -77,6 +77,21 @@ jobs:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
         run: supabase functions deploy --project-ref "$SUPABASE_PROJECT_REF" --use-api
 
+      - name: Refresh encrypted Auth email delivery secrets
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          SEND_EMAIL_HOOK_SECRET: ${{ secrets.SEND_EMAIL_HOOK_SECRET }}
+          AUTH_EMAIL_FROM: WhyNavo <account@auth.whynavo.com>
+          AUTH_EMAIL_PUBLIC_APP_URL: https://whynavo.com/
+        run: node scripts/configure-supabase-function-secrets.mjs
+
+      - name: Configure signed Auth email delivery
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SEND_EMAIL_HOOK_SECRET: ${{ secrets.SEND_EMAIL_HOOK_SECRET }}
+        run: npm run configure:supabase-email
+
       - name: Configure reviewed Supabase Auth settings
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}

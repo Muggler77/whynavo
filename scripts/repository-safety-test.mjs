@@ -42,7 +42,7 @@ const forbiddenContent = [
   { label: "retired community domain", pattern: /whynavo[.-]is-a[.-]dev/i },
   { label: "retired product branding", pattern: /\bwetab\b/i }
 ];
-const allowedExampleEmails = new Set(["name@example.com"]);
+const allowedExampleEmails = new Set(["name@example.com", "account@auth.whynavo.com"]);
 const emailPattern = /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi;
 const jwtPattern = /\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\b/g;
 

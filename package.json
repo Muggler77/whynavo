@@ -18,6 +18,7 @@
     "verify:production-config": "node scripts/verify-production-config.mjs",
     "verify:supabase-production": "node scripts/verify-supabase-production.mjs",
     "configure:supabase-auth": "node scripts/configure-supabase-auth.mjs",
+    "configure:supabase-email": "node scripts/configure-supabase-email.mjs",
     "deploy:supabase-migrations": "node scripts/apply-supabase-migrations.mjs",
     "verify:release": "node scripts/version-manifest-test.mjs && node scripts/verify-release-version.mjs",
     "verify:extension-package": "node scripts/verify-extension-package.mjs"

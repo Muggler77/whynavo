@@ -14,10 +14,15 @@ const WRITABLE_AUTH_CONFIG_FIELDS = new Set([
   "uri_allow_list",
   "rate_limit_verify",
   "rate_limit_token_refresh",
+  "rate_limit_email_sent",
+  "smtp_max_frequency",
   "mailer_subjects_confirmation",
   "mailer_subjects_recovery",
   "mailer_templates_confirmation_content",
-  "mailer_templates_recovery_content"
+  "mailer_templates_recovery_content",
+  "hook_send_email_enabled",
+  "hook_send_email_uri",
+  "hook_send_email_secrets"
 ]);
 
 const requiredEnvironmentValue = (name) => {

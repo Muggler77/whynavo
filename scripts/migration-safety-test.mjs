@@ -1701,6 +1701,13 @@ try {
   assert.match(supabaseProductionGate, /hook_send_email_enabled === true/, "production must require the signed transactional-email hook");
   assert.match(supabaseProductionGate, /mailer_templates_confirmation_content === confirmationTemplate/, "production must reject signup email-template drift");
   assert.match(supabaseProductionGate, /mailer_templates_recovery_content === recoveryTemplate/, "production must reject password-recovery email-template drift");
+  const emailConfigurator = await readFile(join(repoRoot, "scripts/configure-supabase-email.mjs"), "utf8");
+  assert.match(emailConfigurator, /hook_send_email_enabled: true/, "production email configuration must enable the reviewed Auth hook");
+  assert.match(emailConfigurator, /rate_limit_email_sent: 100/, "production email configuration must respect the free provider throughput limit");
+  assert.match(emailConfigurator, /mailer_templates_confirmation_content: confirmationTemplate/, "production email configuration must deploy the reviewed signup template");
+  const emailWorkflow = await readFile(join(repoRoot, ".github/workflows/configure-production-email.yml"), "utf8");
+  assert.match(emailWorkflow, /configure-supabase-function-secrets\.mjs/, "email credentials must be transferred only through the reviewed temporary-file helper");
+  assert.match(emailWorkflow, /configure:supabase-email[\s\S]*verify:supabase-production/, "email setup must finish with the production security gate");
   assert.match(supabaseProductionGate, /Direct production database ingress is not fully closed/, "production verification must reject direct database ingress");
   assert.match(supabaseProductionGate, /Unreviewed Supabase Security Advisor finding/, "production verification must fail for unreviewed security findings");
   assert.match(
