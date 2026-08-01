@@ -1,3 +1,5 @@
-name = "whynavo"
+# Cloudflare Pages project IDs are immutable; this historical infrastructure
+# identifier is not exposed as the product name or public URL.
+name = "whytab"
 pages_build_output_dir = "extension/web-dist"
 compatibility_date = "2026-07-22"

@@ -1881,6 +1881,7 @@ try {
   assert.match(backupWorkflow, /Close direct database ingress[\s\S]*0\.0\.0\.0\/32/, "database backups must close direct database ingress even after an export failure");
   const cloudflareInfrastructureWorkflow = await readFile(join(repoRoot, ".github/workflows/configure-cloudflare-infrastructure.yml"), "utf8");
   assert.match(cloudflareInfrastructureWorkflow, /pages\/projects\/\$\{PAGES_PROJECT\}\/domains/, "Cloudflare bootstrap must bind the reviewed Pages project domain");
+  assert.match(deployWorkflow, /pages deploy extension\/web-dist --project-name=whytab --branch=main/, "production deployment must target the existing Pages project bound to whynavo.com");
   assert.match(cloudflareInfrastructureWorkflow, /r2\/buckets[\s\S]*locationHint: "apac"[\s\S]*storageClass: "Standard"/, "Cloudflare bootstrap must create the reviewed private R2 bucket");
   assert.doesNotMatch(cloudflareInfrastructureWorkflow, /--request DELETE|domains\/custom|r2\.dev/, "Cloudflare bootstrap must not delete infrastructure or make the backup bucket public");
   assert.match(backupWorkflow, /supabase db dump[\s\S]*--role-only/, "off-site backups must include database roles");

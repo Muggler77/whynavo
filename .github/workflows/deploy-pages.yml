@@ -121,7 +121,9 @@ jobs:
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: pages deploy extension/web-dist --project-name=whynavo --branch=main
+          # `whytab` is the immutable Cloudflare Pages infrastructure ID. The
+          # public product and custom domain remain WhyNavo / whynavo.com.
+          command: pages deploy extension/web-dist --project-name=whytab --branch=main
       - name: Verify hosted app before irreversible cutover
         env:
           REQUIRE_PRODUCTION_CONFIG: "1"
