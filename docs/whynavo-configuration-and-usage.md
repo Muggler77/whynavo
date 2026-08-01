@@ -45,7 +45,7 @@ For the official Cloudflare Pages workflow, configure repository secrets for the
 - `VITE_SUPABASE_ANON_KEY`
 - `VITE_TURNSTILE_SITE_KEY`
 
-The workflow fixes `VITE_AUTH_REDIRECT_URL` and `VITE_CAPTCHA_FRAME_URL` to the official Pages origin. Cloudflare deployment also requires the repository secrets `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`; the API token must be restricted to Pages write access for the WhyNavo account. `SUPABASE_ACCESS_TOKEN` lets the workflow apply reviewed SQL through the official Management API and deploy versioned Edge Functions without storing a database password or connection string. Direct database ingress remains closed throughout deployment. Backward-compatible sync changes are prepared first; the legacy entry point is revoked only after the replacement Release is public and its update manifest is active.
+The workflow fixes `VITE_AUTH_REDIRECT_URL` and `VITE_CAPTCHA_FRAME_URL` to the official Pages origin. Cloudflare deployment requires `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`; the Pages token is restricted to the WhyNavo account. Transactional-email DNS automation uses the separate `CLOUDFLARE_DNS_API_TOKEN`, restricted to DNS write access for `whynavo.com`. `SUPABASE_ACCESS_TOKEN` lets the workflow apply reviewed SQL through the official Management API and deploy versioned Edge Functions without storing a database password or connection string. Direct database ingress remains closed throughout deployment. Backward-compatible sync changes are prepared first; the legacy entry point is revoked only after the replacement Release is public and its update manifest is active.
 
 Do not commit real values to source control.
 
@@ -61,14 +61,15 @@ Recommended Auth URL settings:
 
 The app passes `emailRedirectTo` during registration. Hosted web builds redirect back to the current web app URL. Extension builds redirect to the public web app so the verification link can complete in a normal browser page.
 
-Recommended sender settings:
+Production sender settings:
 
 - Sender name: `WhyNavo`
-- Sender email: use a verified sender/domain that belongs to the project.
+- Sender email: `account@auth.whynavo.com`
+- Provider: Resend through the signed Supabase Send Email Hook
 
 The built-in Supabase Auth sender may be used only for restricted administrator testing. Its branded bilingual registration and recovery templates are tracked in `docs/supabase-confirm-signup-email.html` and `docs/supabase-reset-password-email.html`. Both templates use WhyNavo's explicit-click confirmation page so mailbox link scanners cannot consume the one-time token.
 
-Cloudflare's shared `pages.dev` zone cannot be verified as a custom email sender domain. Keep public registration disabled until an owned domain has been verified and Custom SMTP or the audited Send Email Hook in `docs/auth-email-delivery.md` is configured and delivery-tested.
+The owned sender domain `auth.whynavo.com` is authenticated with DKIM, SPF, return-path MX, and DMARC. The audited Send Email Hook in `docs/auth-email-delivery.md` is the production delivery path. Public launch still requires an end-to-end inbox and junk-folder test with unrelated mailbox providers.
 
 Recommended confirmation email subject:
 

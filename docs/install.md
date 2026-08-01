@@ -17,7 +17,7 @@
 3. 使用仓库中的 `supabase/config.toml` 部署 `boc-rates`、`delete-account` 和 `send-auth-email`。其中邮件函数只有在发件域名和所需 Secrets 配置完成后才启用 Auth Hook。
 4. 本地开发时复制 `.env.example` 为 `.env.local`，填写 `VITE_SUPABASE_URL`、`VITE_SUPABASE_ANON_KEY` 和 `VITE_TURNSTILE_SITE_KEY`。
 5. 创建 Cloudflare Turnstile widget，允许官方 `whynavo.com` 主机名，把站点密钥配置为 `VITE_TURNSTILE_SITE_KEY`，并在 Supabase Auth 的 Bot and Abuse Protection 中启用 Turnstile。
-6. GitHub 部署时，在仓库 Secrets 中配置 `VITE_SUPABASE_URL`、`VITE_SUPABASE_ANON_KEY`、`VITE_TURNSTILE_SITE_KEY`、`CLOUDFLARE_API_TOKEN`、`CLOUDFLARE_ACCOUNT_ID` 和专用、可撤销的 `SUPABASE_ACCESS_TOKEN`。不要存储数据库密码或连接字符串。
+6. GitHub 部署时，在仓库 Secrets 中配置 `VITE_SUPABASE_URL`、`VITE_SUPABASE_ANON_KEY`、`VITE_TURNSTILE_SITE_KEY`、`CLOUDFLARE_API_TOKEN`、`CLOUDFLARE_DNS_API_TOKEN`、`CLOUDFLARE_ACCOUNT_ID` 和专用、可撤销的 `SUPABASE_ACCESS_TOKEN`。Pages Token 与 DNS Token 必须分离，后者只允许修改 `whynavo.com`。不要存储数据库密码或连接字符串。
 7. 注册或登录账号。登录成功后 WhyNavo 会自动同步：打开页面会拉取云端数据，本机修改会自动上传，并按设置间隔定时检查云端更新。
 8. “合并同步”“本机覆盖云端”“云端覆盖本机”按钮仍然保留。两个覆盖操作会二次确认并保存账号范围内的回退点。
 

@@ -1888,6 +1888,8 @@ try {
   assert.match(backupWorkflow, /Close direct database ingress[\s\S]*0\.0\.0\.0\/32/, "database backups must close direct database ingress even after an export failure");
   const cloudflareInfrastructureWorkflow = await readFile(join(repoRoot, ".github/workflows/configure-cloudflare-infrastructure.yml"), "utf8");
   assert.match(cloudflareInfrastructureWorkflow, /pages\/projects\/\$\{PAGES_PROJECT\}\/domains/, "Cloudflare bootstrap must bind the reviewed Pages project domain");
+  assert.match(cloudflareInfrastructureWorkflow, /CLOUDFLARE_DNS_API_TOKEN: \$\{\{ secrets\.CLOUDFLARE_DNS_API_TOKEN \}\}/, "transactional-email DNS must use a dedicated repository secret");
+  assert.match(cloudflareInfrastructureWorkflow, /Ensure authenticated transactional-email DNS[\s\S]*CLOUDFLARE_API_TOKEN: \$\{\{ secrets\.CLOUDFLARE_DNS_API_TOKEN \}\}/, "transactional-email DNS must use the whynavo.com-scoped token instead of the Pages token");
   assert.match(deployWorkflow, /pages deploy extension\/web-dist --project-name=whytab --branch=main/, "production deployment must target the existing Pages project bound to whynavo.com");
   assert.match(cloudflareInfrastructureWorkflow, /r2\/buckets[\s\S]*locationHint: "apac"[\s\S]*storageClass: "Standard"/, "Cloudflare bootstrap must create the reviewed private R2 bucket");
   assert.match(cloudflareInfrastructureWorkflow, /resend\._domainkey\.\$\{EMAIL_DOMAIN\}[\s\S]*feedback-smtp\.ap-northeast-1\.amazonses\.com[\s\S]*v=spf1 include:amazonses\.com ~all[\s\S]*v=DMARC1; p=none;/, "Cloudflare bootstrap must configure DKIM, return-path SPF, and DMARC for the reviewed sender domain");
