@@ -102,7 +102,6 @@ jobs:
 
           zone_status="$(curl --silent --show-error --get \
             --header "$auth_header" \
-            --data-urlencode "account.id=${CLOUDFLARE_ACCOUNT_ID}" \
             --data-urlencode "name=${PRODUCTION_DOMAIN}" \
             --data-urlencode 'status=active' \
             --output "$response_file" \
