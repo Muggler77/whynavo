@@ -40,10 +40,43 @@ const fetchWithRetry = async (path, attempts = 6) => {
   throw lastError;
 };
 
-const home = await fetchWithRetry("/");
-const homeHtml = await home.text();
+const fetchTextUntil = async (path, predicate, errorMessage, attempts = 8) => {
+  let lastError = new Error(errorMessage);
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    try {
+      const separator = path.includes("?") ? "&" : "?";
+      const response = await fetch(
+        `${origin}${path}${separator}whynavo_smoke=${Date.now()}-${attempt}`,
+        {
+          cache: "no-store",
+          redirect: "follow",
+          signal: AbortSignal.timeout(12_000)
+        }
+      );
+      if (!response.ok) {
+        lastError = new Error(`${path} returned ${response.status}`);
+      } else {
+        const text = await response.text();
+        if (predicate(text, response)) return { response, text };
+        lastError = new Error(errorMessage);
+      }
+    } catch (error) {
+      lastError = error;
+    }
+    await wait(Math.min(2_000 * (attempt + 1), 10_000));
+  }
+  throw lastError;
+};
+
+// A Pages custom domain can briefly keep serving the previous deployment after
+// Wrangler reports success. Retry the expected content instead of accepting the
+// first HTTP 200, while retaining every header and asset check below.
+const { response: home, text: homeHtml } = await fetchTextUntil(
+  "/",
+  (html) => /<title>WhyNavo<\/title>/.test(html),
+  "Hosted home page is not the WhyNavo app"
+);
 const homeCsp = home.headers.get("content-security-policy") || "";
-if (!/<title>WhyNavo<\/title>/.test(homeHtml)) throw new Error("Hosted home page is not the WhyNavo app");
 if (!homeCsp.includes("default-src 'self'")) {
   throw new Error("Hosted home page is missing the expected Content-Security-Policy");
 }
