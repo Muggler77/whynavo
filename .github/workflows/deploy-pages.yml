@@ -11,7 +11,10 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  # GitHub hides draft Releases from tokens that only have read access. This
+  # workflow must verify the private draft before deploying, while all release
+  # mutations remain isolated in release.yml.
+  contents: write
 
 concurrency:
   group: whynavo-production-database-access
