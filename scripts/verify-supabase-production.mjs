@@ -248,6 +248,8 @@ if (isFinal) {
 }
 
 const databaseSecurity = Array.isArray(databaseSecurityRows) ? databaseSecurityRows[0] : undefined;
+const legacyRetirementApplied = remoteMigrationVersions.includes("0014");
+const compatibilitySyncShouldRemainCallable = !isFinal && !legacyRetirementApplied;
 requireCondition(databaseSecurity?.current_rpc_exists === true, "The account-bound sync RPC is missing");
 requireCondition(databaseSecurity?.current_pull_rpc_exists === true, "The account-bound snapshot read RPC is missing");
 requireCondition(databaseSecurity?.retired_rpc_exists === true, "The retired sync RPC definition is unexpectedly missing");
@@ -257,7 +259,7 @@ requireCondition(databaseSecurity?.authenticated_can_pull === true, "Signed-in u
 requireCondition(databaseSecurity?.anonymous_can_sync === false, "Anonymous users can call the sync RPC");
 requireCondition(databaseSecurity?.anonymous_can_pull === false, "Anonymous users can call the snapshot read RPC");
 requireCondition(databaseSecurity?.anonymous_can_read_snapshots === false, "Anonymous users can read sync snapshots");
-if (isFinal) {
+if (!compatibilitySyncShouldRemainCallable) {
   requireCondition(
     databaseSecurity?.authenticated_can_use_retired_rpc === false,
     "Signed-in users can still call the retired unbound sync RPC"
@@ -307,7 +309,7 @@ const allowedAdvisorFindings = new Set([
   "authenticated_security_definer_function_executable:public.pull_sync_snapshot_for_user",
   "authenticated_security_definer_function_executable:public.push_sync_snapshot_for_user"
 ]);
-if (!isFinal) {
+if (compatibilitySyncShouldRemainCallable) {
   allowedAdvisorFindings.add("authenticated_security_definer_function_executable:public.push_sync_snapshot");
 }
 const advisorFindings = Array.isArray(advisors?.lints) ? advisors.lints : [];

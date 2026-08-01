@@ -1727,8 +1727,13 @@ try {
   assert.match(supabaseProductionGate, /Unreviewed Supabase Security Advisor finding/, "production verification must fail for unreviewed security findings");
   assert.match(
     supabaseProductionGate,
-    /if \(!isFinal\)[\s\S]*push_sync_snapshot/,
-    "the transitional security-definer warning must be allowed only before the final legacy-sync cutover"
+    /legacyRetirementApplied = remoteMigrationVersions\.includes\("0014"\)[\s\S]*compatibilitySyncShouldRemainCallable = !isFinal && !legacyRetirementApplied/,
+    "incremental releases must preserve a completed legacy-sync cutover instead of reopening the retired API"
+  );
+  assert.match(
+    supabaseProductionGate,
+    /if \(compatibilitySyncShouldRemainCallable\)[\s\S]*push_sync_snapshot/,
+    "the transitional security-definer warning must be allowed only while the compatibility RPC is intentionally callable"
   );
   const releaseWorkflow = await readFile(join(repoRoot, ".github/workflows/release.yml"), "utf8");
   assert.match(releaseWorkflow, /sha256sum/, "release archives must include a user-verifiable SHA-256 checksum");

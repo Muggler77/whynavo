@@ -1,9 +1,9 @@
-const CACHE_NAME = "whynavo-shell-v0.9.18";
+const CACHE_NAME = "whynavo-shell-v0.9.19";
 const ICON_CACHE_NAME = "whynavo-icons-v1";
 const SHELL_CACHE_PREFIX = "whynavo-shell-v";
 const MAX_SHELL_CACHE_VERSIONS = 2;
 const MAX_ICON_CACHE_ENTRIES = 200;
-const APP_SHELL = ["./", "./privacy.html", "./terms.html", "./support.html", "./LICENSE.txt", "./THIRD_PARTY_NOTICES.txt", "./asset-manifest.json", "./app.webmanifest?v=0.9.18", "./icons/icon192.png?v=0.9.18", "./wallpapers/photo/mobile/lucid-room.jpg"];
+const APP_SHELL = ["./", "./privacy.html", "./terms.html", "./support.html", "./LICENSE.txt", "./THIRD_PARTY_NOTICES.txt", "./asset-manifest.json", "./app.webmanifest?v=0.9.19", "./icons/icon192.png?v=0.9.19", "./wallpapers/photo/mobile/lucid-room.jpg"];
 const ICON_HOSTS = new Set(["cdn.simpleicons.org", "icons.duckduckgo.com", "www.google.com"]);
 
 const compareCacheVersions = (left, right) => {
