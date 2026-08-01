@@ -89,8 +89,12 @@ const fetchJsonUntil = async (path, predicate, errorMessage, attempts = 12) => {
 // first HTTP 200, while retaining every header and asset check below.
 const { response: home, text: homeHtml } = await fetchTextUntil(
   "/",
-  (html) => /<title>WhyNavo<\/title>/.test(html),
-  "Hosted home page is not the WhyNavo app"
+  (html) => (
+    /<title>WhyNavo<\/title>/.test(html)
+    && html.includes(`app.webmanifest?v=${packageJson.version}`)
+  ),
+  `Hosted home page is not the WhyNavo ${packageJson.version} app`,
+  12
 );
 const homeCsp = home.headers.get("content-security-policy") || "";
 if (!homeCsp.includes("default-src 'self'")) {
@@ -228,10 +232,17 @@ const assetPaths = [...homeHtml.matchAll(/(?:src|href)=["']([^"']+\.(?:css|js))[
   .map((match) => new URL(match[1], `${origin}/`).pathname);
 if (!assetPaths.length) throw new Error("Hosted app does not reference any built assets");
 for (const path of new Set(assetPaths)) {
-  const asset = await fetchWithRetry(path);
-  const contentType = asset.headers.get("content-type") || "";
-  if (path.endsWith(".js") && !contentType.includes("javascript")) throw new Error(`${path} has an invalid JavaScript content type`);
-  if (path.endsWith(".css") && !contentType.includes("text/css")) throw new Error(`${path} has an invalid stylesheet content type`);
+  await fetchTextUntil(
+    path,
+    (_body, response) => {
+      const contentType = response.headers.get("content-type") || "";
+      if (path.endsWith(".js")) return contentType.includes("javascript");
+      if (path.endsWith(".css")) return contentType.includes("text/css");
+      return false;
+    },
+    `${path} did not propagate with its expected content type`,
+    12
+  );
 }
 
 const supabaseUrl = process.env.VITE_SUPABASE_URL;

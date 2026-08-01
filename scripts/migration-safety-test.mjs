@@ -1806,7 +1806,10 @@ try {
   const hostedSmokeTest = await readFile(join(repoRoot, "scripts/hosted-smoke-test.mjs"), "utf8");
   assert.match(hostedSmokeTest, /REQUIRE_PRODUCTION_CONFIG/, "production monitoring must fail instead of skipping account checks when secrets are missing");
   assert.match(hostedSmokeTest, /ALLOW_PREVIOUS_VERSION_MANIFEST[\s\S]*safe predecessor/, "staged production checks must accept only a validated older update manifest");
+  assert.match(hostedSmokeTest, /app\.webmanifest\?v=\$\{packageJson\.version\}[\s\S]*Hosted home page is not the WhyNavo/, "hosted checks must wait for the release-specific index instead of accepting a stale deployment");
+  assert.match(hostedSmokeTest, /for \(const path of new Set\(assetPaths\)\)[\s\S]*fetchTextUntil[\s\S]*did not propagate with its expected content type/, "hosted checks must wait for Cloudflare asset propagation instead of treating fallback HTML as a valid bundle");
   assert.match(hostedSmokeTest, /auth\/v1\/settings[\s\S]*disable_signup[\s\S]*mailer_autoconfirm/, "production monitoring must verify email registration and confirmation settings");
+  assert.match(hostedSmokeTest, /requireDenied\(\s*"account-bound sync RPC",\s*"\/rest\/v1\/rpc\/push_sync_snapshot_for_user"/, "anonymous account-bound sync verification must call the real RPC path");
   assert.match(hostedSmokeTest, /functions\/v1\/boc-rates/, "production monitoring must verify the public edge-function path");
   assert.match(hostedSmokeTest, /cspSources[\s\S]*\.has\("https:\/\/challenges\.cloudflare\.com"\)/, "hosted checks must parse CSP source lists instead of accepting a hostile URL substring");
   assert.match(hostedSmokeTest, /confirm\.html[\s\S]*cache-control[\s\S]*event\.isTrusted/, "hosted checks must validate the non-cacheable email-confirmation click boundary");
