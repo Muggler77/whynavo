@@ -68,6 +68,22 @@ const fetchTextUntil = async (path, predicate, errorMessage, attempts = 8) => {
   throw lastError;
 };
 
+const fetchJsonUntil = async (path, predicate, errorMessage, attempts = 12) => {
+  const result = await fetchTextUntil(
+    path,
+    (text, response) => {
+      try {
+        return predicate(JSON.parse(text), response);
+      } catch {
+        return false;
+      }
+    },
+    errorMessage,
+    attempts
+  );
+  return { response: result.response, json: JSON.parse(result.text) };
+};
+
 // A Pages custom domain can briefly keep serving the previous deployment after
 // Wrangler reports success. Retry the expected content instead of accepting the
 // first HTTP 200, while retaining every header and asset check below.
@@ -100,15 +116,16 @@ for (const path of ["/privacy.html", "/terms.html"]) {
   if (!response.headers.get("content-security-policy")) throw new Error(`${path} is missing security headers`);
 }
 
-const confirmation = await fetchWithRetry("/confirm.html");
-const confirmationHtml = await confirmation.text();
-if (
-  !confirmationHtml.includes("./confirm.js")
-  || !confirmationHtml.includes("./confirm.css")
-  || confirmationHtml.includes("/auth/v1/verify")
-) {
-  throw new Error("Hosted email-confirmation interstitial is incomplete or embeds a verification token target");
-}
+const { response: confirmation, text: confirmationHtml } = await fetchTextUntil(
+  "/confirm.html",
+  (html, response) => (
+    html.includes("./confirm.js")
+    && html.includes("./confirm.css")
+    && !html.includes("/auth/v1/verify")
+    && response.headers.get("cache-control") === "no-store"
+  ),
+  "Hosted email-confirmation interstitial or its no-store policy is incomplete"
+);
 if (confirmation.headers.get("cache-control") !== "no-store") {
   throw new Error("Email-confirmation interstitial must not be cached");
 }
@@ -121,8 +138,19 @@ if (
   throw new Error("Hosted email-confirmation interstitial does not enforce an explicit verified click");
 }
 
-const captcha = await fetchWithRetry("/captcha.html");
-const captchaHtml = await captcha.text();
+const { response: captcha, text: captchaHtml } = await fetchTextUntil(
+  "/captcha.html",
+  (html, response) => {
+    const policy = response.headers.get("content-security-policy") || "";
+    return (
+      html.includes("challenges.cloudflare.com/turnstile")
+      && policy.includes("frame-ancestors 'self' chrome-extension:")
+      && response.headers.get("cross-origin-resource-policy") === "cross-origin"
+      && !response.headers.get("x-frame-options")
+    );
+  },
+  "Hosted CAPTCHA page is not ready for secure extension embedding"
+);
 const captchaCsp = captcha.headers.get("content-security-policy") || "";
 if (!captchaHtml.includes("challenges.cloudflare.com/turnstile")) throw new Error("Hosted CAPTCHA page is incomplete");
 for (const directive of ["script-src", "connect-src", "frame-src"]) {
@@ -139,23 +167,28 @@ if (captcha.headers.get("cross-origin-resource-policy") !== "cross-origin") {
   throw new Error("CAPTCHA route must remain embeddable by the extension");
 }
 
-const version = await (await fetchWithRetry("/latest-version.json")).json();
-if (allowPreviousVersionManifest) {
-  if (
-    !releasePattern.test(String(version.latestVersion || ""))
-    || !releasePattern.test(String(version.minimumSupportedVersion || ""))
-    || compareVersions(version.minimumSupportedVersion, version.latestVersion) > 0
-    || compareVersions(version.latestVersion, packageJson.version) >= 0
-    || Number(version.dataSchemaVersion) !== 1
-  ) {
-    throw new Error(`Hosted staging manifest is not a safe predecessor of ${packageJson.version}`);
+const isExpectedVersionManifest = (version) => {
+  if (allowPreviousVersionManifest) {
+    return (
+      releasePattern.test(String(version.latestVersion || ""))
+      && releasePattern.test(String(version.minimumSupportedVersion || ""))
+      && compareVersions(version.minimumSupportedVersion, version.latestVersion) <= 0
+      && compareVersions(version.latestVersion, packageJson.version) < 0
+      && Number(version.dataSchemaVersion) === 1
+    );
   }
-} else if (
-  version.latestVersion !== packageJson.version
-  || version.minimumSupportedVersion !== packageJson.version
-) {
-  throw new Error(`Hosted version manifest does not match ${packageJson.version}`);
-}
+  return (
+    version.latestVersion === packageJson.version
+    && version.minimumSupportedVersion === packageJson.version
+  );
+};
+const { json: version } = await fetchJsonUntil(
+  "/latest-version.json",
+  isExpectedVersionManifest,
+  allowPreviousVersionManifest
+    ? `Hosted staging manifest is not a safe predecessor of ${packageJson.version}`
+    : `Hosted version manifest does not match ${packageJson.version}`
+);
 
 const manifest = await (await fetchWithRetry("/manifest.json")).json();
 if (manifest.version !== packageJson.version) throw new Error("Hosted extension metadata does not match the release version");
