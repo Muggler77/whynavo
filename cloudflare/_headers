@@ -18,6 +18,11 @@
 /latest-version.json
   Cache-Control: public, max-age=60, must-revalidate
 
+# Browsers perform byte-level Service Worker update checks. Never let an edge
+# cache pair a new app shell with the previous release's worker script.
+/sw.js
+  Cache-Control: no-store
+
 /captcha.html
   ! Content-Security-Policy
   ! Cross-Origin-Resource-Policy

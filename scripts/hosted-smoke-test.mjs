@@ -221,9 +221,17 @@ if (
   || !webManifest.icons.some((icon) => icon?.sizes === "512x512")
 ) throw new Error("Hosted PWA manifest is incomplete");
 
-const serviceWorker = await (await fetchWithRetry("/sw.js")).text();
-if (!serviceWorker.includes(`whynavo-shell-v${packageJson.version}`)) {
-  throw new Error("Hosted Service Worker cache is not versioned with the release");
+const { response: serviceWorkerResponse, text: serviceWorker } = await fetchTextUntil(
+  "/sw.js",
+  (script, response) => (
+    script.includes(`whynavo-shell-v${packageJson.version}`)
+    && response.headers.get("cache-control") === "no-store"
+  ),
+  `Hosted Service Worker did not propagate with the ${packageJson.version} cache or no-store policy`,
+  12
+);
+if (serviceWorkerResponse.headers.get("cache-control") !== "no-store") {
+  throw new Error("Hosted Service Worker must not be cached by the edge or browser");
 }
 if (!serviceWorker.includes("captcha.html")) throw new Error("Hosted Service Worker does not isolate CAPTCHA navigation");
 if (!serviceWorker.includes("confirm.html")) throw new Error("Hosted Service Worker does not isolate email-confirmation navigation");

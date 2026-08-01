@@ -1200,6 +1200,11 @@ try {
     /\/confirm\n\s+Cache-Control: no-store/,
     "the canonical Pages confirmation route must never cache verification parameters"
   );
+  assert.match(
+    cloudflareHeaders,
+    /\/sw\.js\n\s+Cache-Control: no-store/,
+    "the Service Worker update script must never be retained by an edge cache"
+  );
   assert.doesNotMatch(captchaClient, /postMessage\([^)]*,\s*["']\*["']\)/, "CAPTCHA tokens must not be broadcast to arbitrary origins");
   assert.doesNotMatch(captchaClient, /addEventListener\(["']message["']/, "the sandboxed CAPTCHA document must remain write-only toward its validated parent");
   assert.doesNotMatch(captchaClient, /localhost|127\.0\.0\.1/, "the production CAPTCHA bridge must not trust local development origins");
@@ -1808,6 +1813,7 @@ try {
   assert.match(hostedSmokeTest, /ALLOW_PREVIOUS_VERSION_MANIFEST[\s\S]*safe predecessor/, "staged production checks must accept only a validated older update manifest");
   assert.match(hostedSmokeTest, /app\.webmanifest\?v=\$\{packageJson\.version\}[\s\S]*Hosted home page is not the WhyNavo/, "hosted checks must wait for the release-specific index instead of accepting a stale deployment");
   assert.match(hostedSmokeTest, /for \(const path of new Set\(assetPaths\)\)[\s\S]*fetchTextUntil[\s\S]*did not propagate with its expected content type/, "hosted checks must wait for Cloudflare asset propagation instead of treating fallback HTML as a valid bundle");
+  assert.match(hostedSmokeTest, /fetchTextUntil\([\s\S]*"\/sw\.js"[\s\S]*whynavo-shell-v\$\{packageJson\.version\}[\s\S]*cache-control[\s\S]*no-store/, "hosted checks must wait for a release-matched non-cacheable Service Worker");
   assert.match(hostedSmokeTest, /auth\/v1\/settings[\s\S]*disable_signup[\s\S]*mailer_autoconfirm/, "production monitoring must verify email registration and confirmation settings");
   assert.match(hostedSmokeTest, /requireDenied\(\s*"account-bound sync RPC",\s*"\/rest\/v1\/rpc\/push_sync_snapshot_for_user"/, "anonymous account-bound sync verification must call the real RPC path");
   assert.match(hostedSmokeTest, /functions\/v1\/boc-rates/, "production monitoring must verify the public edge-function path");
