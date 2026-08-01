@@ -89,6 +89,61 @@ jobs:
           fi
           echo "Private R2 bucket ${R2_BUCKET}: ready"
 
+          lifecycle_status="$(curl --silent --show-error \
+            --header "$auth_header" \
+            --output "$response_file" \
+            --write-out '%{http_code}' \
+            "${api}/r2/buckets/${R2_BUCKET}/lifecycle")"
+          [[ "$lifecycle_status" =~ ^2[0-9][0-9]$ ]] \
+            && jq -e '.success == true' "$response_file" >/dev/null \
+            || { jq -r '.errors[]? | "Cloudflare error \(.code): \(.message)"' "$response_file"; echo "::error::Could not inspect R2 lifecycle rules (HTTP ${lifecycle_status})"; exit 1; }
+
+          lifecycle_payload="$(jq -c '
+            {
+              rules: (
+                [(.result.rules // [])[] | select(.id != "whynavo-delete-after-35-days")]
+                + [{
+                    id: "whynavo-delete-after-35-days",
+                    conditions: {prefix: ""},
+                    enabled: true,
+                    deleteObjectsTransition: {
+                      condition: {type: "Age", maxAge: 3024000}
+                    }
+                  }]
+              )
+            }
+          ' "$response_file")"
+          lifecycle_status="$(curl --silent --show-error \
+            --request PUT \
+            --header "$auth_header" \
+            --header 'Content-Type: application/json' \
+            --data "$lifecycle_payload" \
+            --output "$response_file" \
+            --write-out '%{http_code}' \
+            "${api}/r2/buckets/${R2_BUCKET}/lifecycle")"
+          [[ "$lifecycle_status" =~ ^2[0-9][0-9]$ ]] \
+            && jq -e '.success == true' "$response_file" >/dev/null \
+            || { jq -r '.errors[]? | "Cloudflare error \(.code): \(.message)"' "$response_file"; echo "::error::Could not configure the 35-day R2 lifecycle rule (HTTP ${lifecycle_status})"; exit 1; }
+
+          lifecycle_status="$(curl --silent --show-error \
+            --header "$auth_header" \
+            --output "$response_file" \
+            --write-out '%{http_code}' \
+            "${api}/r2/buckets/${R2_BUCKET}/lifecycle")"
+          [[ "$lifecycle_status" =~ ^2[0-9][0-9]$ ]] \
+            && jq -e '
+              .success == true
+              and ([.result.rules[]? | select(
+                .id == "whynavo-delete-after-35-days"
+                and .enabled == true
+                and .conditions.prefix == ""
+                and .deleteObjectsTransition.condition.type == "Age"
+                and .deleteObjectsTransition.condition.maxAge == 3024000
+              )] | length) == 1
+            ' "$response_file" >/dev/null \
+            || { jq -r '.errors[]? | "Cloudflare error \(.code): \(.message)"' "$response_file"; echo "::error::The 35-day R2 lifecycle rule did not verify (HTTP ${lifecycle_status})"; exit 1; }
+          echo "Private R2 bucket lifecycle: encrypted backups expire after 35 days"
+
           rm -f "$response_file"
 
       - name: Ensure authenticated transactional-email DNS

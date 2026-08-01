@@ -111,10 +111,21 @@ if (home.headers.get("cross-origin-resource-policy") !== "same-origin") {
   throw new Error("Hosted app is missing the expected resource isolation policy");
 }
 
-for (const path of ["/privacy.html", "/terms.html"]) {
+for (const path of ["/privacy.html", "/terms.html", "/support.html"]) {
   const response = await fetchWithRetry(path);
   if (!response.headers.get("content-security-policy")) throw new Error(`${path} is missing security headers`);
 }
+
+await fetchTextUntil(
+  "/privacy.html",
+  (html) => html.includes("Cloudflare R2") && html.includes("35 days") && !html.includes("does not currently retain independent off-site exports"),
+  "Hosted privacy notice does not disclose the active encrypted off-site backup and retention policy"
+);
+await fetchTextUntil(
+  "/support.html",
+  (html) => html.includes("WhyNavo Support") && html.includes("private vulnerability reporting"),
+  "Hosted support page is incomplete"
+);
 
 const { response: confirmation, text: confirmationHtml } = await fetchTextUntil(
   "/confirm.html",

@@ -127,9 +127,13 @@ try {
   const projectConfigSource = await readFile(join(repoRoot, "extension/src/projectConfig.ts"), "utf8");
   const privacyNoticeSource = await readFile(join(repoRoot, "extension/public/privacy.html"), "utf8");
   const termsSource = await readFile(join(repoRoot, "extension/public/terms.html"), "utf8");
-  assert.match(projectConfigSource, /LEGAL_DOCUMENT_VERSION = "2026-07-28"/, "registration consent must use the current public legal-document version");
-  assert.match(privacyNoticeSource, /更新日期：2026 年 7 月 28 日[\s\S]*Effective date: July 28, 2026/, "the bilingual privacy notice must expose the consent version date");
-  assert.match(termsSource, /更新日期：2026 年 7 月 28 日[\s\S]*Effective date: July 28, 2026/, "the bilingual terms must match the recorded consent version");
+  const supportSource = await readFile(join(repoRoot, "extension/public/support.html"), "utf8");
+  assert.match(projectConfigSource, /LEGAL_DOCUMENT_VERSION = "2026-08-01"/, "registration consent must use the current public legal-document version");
+  assert.match(privacyNoticeSource, /更新日期：2026 年 8 月 1 日[\s\S]*Effective date: August 1, 2026/, "the bilingual privacy notice must expose the consent version date");
+  assert.match(termsSource, /更新日期：2026 年 8 月 1 日[\s\S]*Effective date: August 1, 2026/, "the bilingual terms must match the recorded consent version");
+  assert.match(privacyNoticeSource, /Cloudflare R2[\s\S]*35 天[\s\S]*Cloudflare R2[\s\S]*35 days/, "the bilingual privacy notice must disclose active encrypted off-site backup storage and retention");
+  assert.doesNotMatch(privacyNoticeSource, /当前不会把 WhyNavo 数据库导出|does not currently retain independent off-site exports/, "the public notice must not deny the active encrypted backup service");
+  assert.match(supportSource, /请勿在公开 Issue[\s\S]*Do not place email addresses/, "the support page must keep personal data out of public reports in both languages");
   const now = new Date("2026-07-15T00:00:00.000Z").toISOString();
   const originalFetch = globalThis.fetch;
   let leakedPasswordRequest;
@@ -1171,7 +1175,7 @@ try {
   assert.equal(extensionManifest.optional_permissions?.includes("notifications"), true, "notification access must be requested only after a user enables a reminder");
   assert.equal(extensionManifest.permissions.includes("geolocation"), false, "precise location must not be requested from every user at installation");
   assert.equal(extensionManifest.optional_permissions?.includes("geolocation"), true, "precise location must remain available as an explicit optional permission");
-  assert.equal(extensionManifest.permissions.includes("search"), true, "new-tab web search must use the browser default provider through the Search API");
+  assert.equal(extensionManifest.permissions.includes("search"), false, "direct Baidu and Google HTTPS searches must not retain the unused Chrome Search API permission");
   assert.equal(extensionManifest.permissions.includes("favicon"), false, "the extension must not use Chrome's favicon resampler because it can disguise low-resolution artwork as a larger bitmap");
   assert.equal(extensionManifest.host_permissions.includes("https://api.pwnedpasswords.com/*"), true, "the extension must allow the privacy-preserving leaked-password range check");
   assert.match(
@@ -1812,7 +1816,7 @@ try {
   const versionManifestLibrary = await readFile(join(repoRoot, "scripts/version-manifest.mjs"), "utf8");
   const previousVersionManifest = JSON.parse(await readFile(join(repoRoot, "extension/public/previous-version.json"), "utf8"));
   assert.match(stagedVersionManifest, /previous-version\.json[\s\S]*validatePublishedPredecessorManifest[\s\S]*writeFile/, "staged deployment must use the reviewed repository predecessor manifest instead of writing network responses");
-  assert.equal(previousVersionManifest.latestVersion, "0.9.8", "the current predecessor manifest must track the last public release until activation");
+  assert.equal(previousVersionManifest.latestVersion, "0.9.17", "the current predecessor manifest must track the last public release until activation");
   assert.ok(!/fetch\(/.test(stagedVersionManifest), "staged manifest generation must not fetch untrusted network content");
   assert.match(versionManifestLibrary, /compareReleaseVersions\(latestVersion, nextVersion\) >= 0/, "the staged manifest validator must reject current and newer versions");
   assert.match(versionManifestLibrary, /latestVersion[\s\S]*minimumSupportedVersion[\s\S]*dataSchemaVersion: 1[\s\S]*releaseNotesUrl: OFFICIAL_RELEASE_URL[\s\S]*updateUrl: OFFICIAL_RELEASE_URL/, "the staged manifest must be rebuilt from the official public release destination");
@@ -1903,6 +1907,8 @@ try {
   assert.match(cloudflareInfrastructureWorkflow, /Ensure authenticated transactional-email DNS[\s\S]*CLOUDFLARE_API_TOKEN: \$\{\{ secrets\.CLOUDFLARE_DNS_API_TOKEN \}\}/, "transactional-email DNS must use the whynavo.com-scoped token instead of the Pages token");
   assert.match(deployWorkflow, /pages deploy extension\/web-dist --project-name=whytab --branch=main/, "production deployment must target the existing Pages project bound to whynavo.com");
   assert.match(cloudflareInfrastructureWorkflow, /r2\/buckets[\s\S]*locationHint: "apac"[\s\S]*storageClass: "Standard"/, "Cloudflare bootstrap must create the reviewed private R2 bucket");
+  assert.match(cloudflareInfrastructureWorkflow, /r2\/buckets\/\$\{R2_BUCKET\}\/lifecycle[\s\S]*whynavo-delete-after-35-days[\s\S]*maxAge: 3024000/, "Cloudflare bootstrap must configure encrypted backup deletion after 35 days");
+  assert.match(cloudflareInfrastructureWorkflow, /Private R2 bucket lifecycle: encrypted backups expire after 35 days/, "Cloudflare bootstrap must verify the public backup-retention promise");
   assert.match(cloudflareInfrastructureWorkflow, /resend\._domainkey\.\$\{EMAIL_DOMAIN\}[\s\S]*feedback-smtp\.ap-northeast-1\.amazonses\.com[\s\S]*v=spf1 include:amazonses\.com ~all[\s\S]*v=DMARC1; p=none;/, "Cloudflare bootstrap must configure DKIM, return-path SPF, and DMARC for the reviewed sender domain");
   assert.match(cloudflareInfrastructureWorkflow, /Multiple \$\{type\} records exist[\s\S]*refusing to overwrite ambiguous DNS/, "Cloudflare bootstrap must fail closed instead of overwriting ambiguous DNS records");
   assert.doesNotMatch(cloudflareInfrastructureWorkflow, /--request DELETE|domains\/custom|r2\.dev/, "Cloudflare bootstrap must not delete infrastructure or make the backup bucket public");

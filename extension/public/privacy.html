@@ -59,7 +59,7 @@
   <body>
     <main>
       <h1>WhyNavo 隐私与数据说明</h1>
-      <p class="meta">更新日期：2026 年 7 月 28 日</p>
+      <p class="meta">更新日期：2026 年 8 月 1 日</p>
       <p class="notice">WhyNavo 采用本地优先设计。你无需登录即可使用，登录仅用于可选的跨设备同步。</p>
 
       <h2>本机数据</h2>
@@ -85,13 +85,14 @@
         <li>Open-Meteo：根据你填写的城市，或在你主动开启当前位置后根据设备坐标，提供天气和地理编码。</li>
         <li>Simple Icons、DuckDuckGo 和 Google：开启自动图标查找时通过 HTTPS 获取网站图标；这会向相应提供方暴露被请求的网站主机名。</li>
         <li>Cloudflare Pages：托管 WhyNavo 网页版本并提供 HTTPS 与安全响应头。</li>
+        <li>Cloudflare R2：在私有存储桶中保留生产数据库的加密灾难恢复副本。</li>
         <li>Cloudflare Turnstile：在注册、登录、密码重置、修改密码和删除账号前进行反滥用验证。</li>
       </ul>
       <p>天气城市、“使用当前位置”偏好、天气结果以及启用定位后取得的坐标只按当前账号分区缓存在本机，用于减少重复请求；它们不进入云端同步快照或完整备份。天气卡片只链接到 Open-Meteo 官方来源页，不会把坐标转交给额外的搜索服务。</p>
       <p>Turnstile 会处理完成反滥用验证所需的浏览器、网络和交互信号，并返回一个短期一次性令牌。WhyNavo 只在当前页面内存中使用该令牌完成认证请求，不会把它写入本机数据、导出备份或云端同步快照。</p>
 
       <h2>保留与删除</h2>
-      <p>本机数据会保留到你在应用中覆盖、清理浏览器网站数据、卸载扩展或删除浏览器配置文件。账号和云端快照会保留到你永久删除账号；删除后会从在线账号和业务表中移除。当前不会把 WhyNavo 数据库导出保存在独立的异地灾备存储中；启用此类灾备前会先更新本说明，明确存储服务、加密方式和保留周期。安全日志和邮件投递日志可能按相应服务商的有限保留周期延迟清除。</p>
+      <p>本机数据会保留到你在应用中覆盖、清理浏览器网站数据、卸载扩展或删除浏览器配置文件。账号和云端快照会保留到你永久删除账号；删除后会立即从在线账号和业务表中移除。WhyNavo 每日导出生产数据库用于灾难恢复，导出会先以 AES-256-GCM 加密，再上传到私有 Cloudflare R2 存储桶；解密所需私钥与云服务和上传凭据分离保存。加密副本最多保留 35 天后由生命周期规则删除，因此账号删除前形成的副本可能在该期限内继续存在。灾难恢复不得选择性恢复已删除账号，恢复生产服务时必须重新应用备份形成后的删除记录。安全日志和邮件投递日志可能按相应服务商的有限保留周期延迟清除。</p>
 
       <h2>跨设备与跨境处理</h2>
       <p>登录同步时，数据会由所使用的云服务区域和网络节点处理，位置可能不同于你所在的国家或地区。不同网页域名的浏览器本机存储彼此隔离；未同步的本机数据不会仅因更换访问域名而自动迁移。</p>
@@ -107,11 +108,11 @@
       <h2>源代码与支持</h2>
       <p>源代码、数据模型和安全说明位于 <a href="https://github.com/Muggler77/whynavo" rel="noreferrer">GitHub 仓库</a>。不包含个人数据的一般问题可通过仓库的 <a href="https://github.com/Muggler77/whynavo/issues" rel="noreferrer">Issues</a> 提交；敏感问题使用 <a href="https://github.com/Muggler77/whynavo/security/advisories/new" rel="noreferrer">私密漏洞报告</a>。</p>
 
-      <p><a href="./terms.html">查看服务条款</a> · <a href="./">返回 WhyNavo</a></p>
+      <p><a href="./terms.html">查看服务条款</a> · <a href="./support.html">支持</a> · <a href="./">返回 WhyNavo</a></p>
 
       <hr class="divider" />
       <h1 id="english">WhyNavo Privacy and Data Notice</h1>
-      <p class="meta">Effective date: July 28, 2026</p>
+      <p class="meta">Effective date: August 1, 2026</p>
       <p class="notice">WhyNavo is local-first. You can use it without an account; signing in is only required for optional cross-device synchronization.</p>
 
       <h2>Data on your device</h2>
@@ -135,6 +136,7 @@
         <li>Have I Been Pwned Pwned Passwords for a k-anonymous leaked-password range query that receives only the first five characters of a locally computed password digest.</li>
         <li>The configured email provider for verification, password reset, and security messages.</li>
         <li>Cloudflare Pages for HTTPS hosting and Cloudflare Turnstile for abuse prevention during account operations.</li>
+        <li>Cloudflare R2 for encrypted production-database disaster-recovery copies in a private bucket.</li>
         <li>Open-Meteo for weather and geocoding based on the city you enter or, only after you enable current-location weather, the device coordinates.</li>
         <li>Simple Icons, DuckDuckGo, and Google for HTTPS site-icon requests when remote lookup is enabled; those requests disclose the requested hostname to the applicable provider.</li>
       </ul>
@@ -142,7 +144,7 @@
       <p>Turnstile processes browser, network, and interaction signals needed to issue a short-lived, single-use challenge token. WhyNavo uses that token only in page memory for the current authentication request.</p>
 
       <h2>Retention, deletion, and your choices</h2>
-      <p>Device data remains until you overwrite it or remove the relevant browser storage. Online account data remains until the account is permanently deleted. WhyNavo does not currently retain independent off-site exports of the production database; this notice will be updated with the storage provider, encryption method, and retention period before such disaster-recovery storage is enabled. Security and email-delivery logs may follow their providers' limited retention periods. You can use WhyNavo without signing in, disable automatic sync and remote icon lookup, and export a complete backup.</p>
+      <p>Device data remains until you overwrite it or remove the relevant browser storage. Online account data remains until the account is permanently deleted and is removed immediately from the live Auth and application tables. WhyNavo creates a daily production-database export for disaster recovery, encrypts it with AES-256-GCM before upload, and stores only the encrypted envelope and checksum in a private Cloudflare R2 bucket. The recovery private key is kept separately from the cloud services and upload credential. A lifecycle rule deletes encrypted copies after no more than 35 days, so a copy created before account deletion may remain until that period expires. Disaster recovery must not selectively restore a deleted account and must reapply deletions made after the restored backup. Security and email-delivery logs may follow their providers' limited retention periods. You can use WhyNavo without signing in, disable automatic sync and remote icon lookup, and export a complete backup.</p>
       <p>You can permanently delete an account after confirming the current email and password and completing the security challenge. The current password is sent over HTTPS to WhyNavo's account-deletion function and used only to reauthenticate the account with Supabase Auth; the function does not store or log it. Successful deletion removes the Supabase Auth account, its cloud snapshot, and that account's data and caches on the current device.</p>
       <p>Ordinary sign-out affects only the current device and switches it to an empty signed-out data area. “Sign out all devices” revokes the account's other refresh sessions; other devices sign out when their sessions refresh. Different web origins have separate browser storage, so device-only data does not automatically move when a domain changes.</p>
 
@@ -151,7 +153,7 @@
 
       <h2>Support and source</h2>
       <p>Source code and security documentation are available in the <a href="https://github.com/Muggler77/whynavo" rel="noreferrer">GitHub repository</a>. Use public <a href="https://github.com/Muggler77/whynavo/issues" rel="noreferrer">Issues</a> only for requests that contain no personal data. Report sensitive security matters through <a href="https://github.com/Muggler77/whynavo/security/advisories/new" rel="noreferrer">private vulnerability reporting</a>.</p>
-      <p><a href="./terms.html">Terms of Service</a> · <a href="./">Return to WhyNavo</a></p>
+      <p><a href="./terms.html">Terms of Service</a> · <a href="./support.html">Support</a> · <a href="./">Return to WhyNavo</a></p>
     </main>
   </body>
 </html>

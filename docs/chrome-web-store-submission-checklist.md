@@ -15,12 +15,11 @@
 
 - [ ] Use the exact copy in `docs/chrome-web-store-listing.md`.
 - [ ] Link the privacy policy to `https://whynavo.com/privacy.html`.
-- [ ] Link support to `https://whynavo.com/terms.html` until a dedicated
-  support site exists.
+- [ ] Link support to `https://whynavo.com/support.html`.
 - [ ] Upload only clean screenshots without personal data.
 - [ ] Use the WhyNavo icon assets from `extension/public/icons/`.
-- [ ] Explain `search`, `alarms`, `storage`, optional `notifications`, and
-  optional `geolocation` exactly as listed.
+- [ ] Explain `alarms`, `storage`, optional `notifications`, and optional
+  `geolocation` exactly as listed; confirm the unused `search` permission is absent.
 
 ## Final release controls
 

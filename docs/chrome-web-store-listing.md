@@ -10,7 +10,7 @@ promotional or implementation-only text to the extension.
 - Short name: `WhyNavo`
 - Category: Productivity
 - Language: English; Simplified Chinese
-- Primary support page: `https://whynavo.com/terms.html`
+- Primary support page: `https://whynavo.com/support.html`
 - Privacy policy: `https://whynavo.com/privacy.html`
 - Release package: the zip produced by `npm run build` from `extension/dist`
 
@@ -58,7 +58,6 @@ policy.
 
 | Permission | Why it is needed |
 | --- | --- |
-| `search` | Opens a query through the browser's default search provider from the new-tab search box. |
 | `alarms` | Schedules recurring local task checks while the new-tab page is closed. |
 | `storage` | Stores the small local reminder schedule used by the background service worker. |
 | Optional `notifications` | Shows a reminder only after the user enables a task reminder. |
@@ -68,8 +67,9 @@ policy.
 | Host access to Supabase | Performs opt-in account authentication and account-scoped synchronization. |
 | Host access to the WhyNavo Pages app | Loads the reviewed CAPTCHA frame and hosted web version used by the product. |
 
-The extension has no content scripts, no `tabs` permission, no browsing
-history permission, no `favicon` permission, and no broad `http://*/*` access.
+The extension has no content scripts, no `search` or `tabs` permission, no
+browsing history permission, no `favicon` permission, and no broad
+`http://*/*` access. Baidu and Google searches open ordinary HTTPS result URLs.
 
 ## Store privacy answers
 
@@ -99,7 +99,7 @@ history permission, no `favicon` permission, and no broad `http://*/*` access.
 
 ## Screenshot set
 
-Use the reviewed product screenshots in `docs/images/` for the initial listing.
-Do not include screenshots containing personal shortcuts, account email
-addresses, private notes, or local file paths. Capture final store screenshots
-from a clean test profile after the hosted Pages deployment is available.
+Use `docs/images/whynavo-0.9.18-store-home.png` for the initial listing. It was
+captured from the production build in a temporary clean Chrome profile at the
+required 1280x800 size. Do not include screenshots containing personal
+shortcuts, account email addresses, private notes, or local file paths.
