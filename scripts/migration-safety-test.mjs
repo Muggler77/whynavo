@@ -340,6 +340,14 @@ try {
   assert.throws(
     () => validateAppStatePayload({
       ...migrated.state,
+      settings: { ...migrated.state.settings, shortcutLabelShadow: "blurred" }
+    }, "test state"),
+    /设置字段/,
+    "unsupported shortcut label shadows must be rejected before persistence"
+  );
+  assert.throws(
+    () => validateAppStatePayload({
+      ...migrated.state,
       settings: {
         ...migrated.state.settings,
         customWallpapers: [{
@@ -373,7 +381,9 @@ try {
     settings: { ...legacyState.settings, iconSize: 64, visualRefreshVersion: 7 }
   });
   assert.equal(oldDefaultVisual.settings.iconSize, 58, "old default icon size should migrate to the new unified default");
-  assert.equal(oldDefaultVisual.settings.visualRefreshVersion, 17, "visual refresh version should advance");
+  assert.equal(oldDefaultVisual.settings.visualRefreshVersion, 18, "visual refresh version should advance");
+  assert.equal(oldDefaultVisual.settings.shortcutLabelColor, "#34434a", "shortcut label color should receive a readable default");
+  assert.equal(oldDefaultVisual.settings.shortcutLabelShadow, "none", "shortcut labels should default to no shadow");
   assert.deepEqual(oldDefaultVisual.settings.customNavPages, [], "legacy state should receive an empty custom page list");
   assert.deepEqual(oldDefaultVisual.settings.hiddenNavPages, ["tools"], "legacy state should adopt the restrained Sample A navigation");
   assert.equal(oldDefaultVisual.settings.navigationDisplay, "always", "legacy state should receive a visible desktop navigation");
@@ -851,6 +861,7 @@ try {
     settings: stampSettingsChanges(settingsBase.settings, {
       ...settingsBase.settings,
       theme: "light",
+      shortcutLabelColor: "#1f2937",
       widgets: { ...settingsBase.settings.widgets, weather: false }
     }, "2026-07-24T01:00:00.000Z"),
     updatedAt: "2026-07-24T01:00:00.000Z"
@@ -861,6 +872,7 @@ try {
       ...settingsBase.settings,
       city: "Tokyo",
       iconSize: 70,
+      shortcutLabelShadow: "strong",
       widgets: { ...settingsBase.settings.widgets, notes: false },
       calendarRecords: { ...settingsBase.settings.calendarRecords, "2026-07-25": "设备 B 日程" }
     }, "2026-07-24T02:00:00.000Z"),
@@ -869,6 +881,8 @@ try {
   const concurrentSettingsMerge = mergeRemote(settingsDeviceA, settingsDeviceB);
   assert.equal(concurrentSettingsMerge.settings.theme, "light", "different concurrent setting fields must both survive");
   assert.equal(concurrentSettingsMerge.settings.iconSize, 70, "newer unrelated setting fields must survive");
+  assert.equal(concurrentSettingsMerge.settings.shortcutLabelColor, "#1f2937", "shortcut label colors must survive concurrent settings merges");
+  assert.equal(concurrentSettingsMerge.settings.shortcutLabelShadow, "strong", "shortcut label shadows must survive concurrent settings merges");
   assert.equal(concurrentSettingsMerge.settings.city, settingsDeviceA.settings.city, "weather cities must remain local to each device");
   assert.equal(concurrentSettingsMerge.settings.widgets.weather, false, "nested widget changes from device A must survive");
   assert.equal(concurrentSettingsMerge.settings.widgets.notes, false, "nested widget changes from device B must survive");

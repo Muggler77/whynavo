@@ -133,7 +133,7 @@ import {
   validateAppStatePayload,
   type SyncStatus
 } from "./sync";
-import type { AppState, Countdown, CustomNavPage, CustomNavPageIcon, Note, RatesState, SearchEngine, Shortcut, ShortcutFolder, SystemNavPage, Todo, UiLanguage, WeatherState, WidgetKey, WidgetSize } from "./types";
+import type { AppState, Countdown, CustomNavPage, CustomNavPageIcon, Note, RatesState, SearchEngine, Shortcut, ShortcutFolder, ShortcutLabelShadow, SystemNavPage, Todo, UiLanguage, WeatherState, WidgetKey, WidgetSize } from "./types";
 import { normalizeHttpUrl, safeHttpHref } from "./urls";
 
 type Dialog = "shortcut" | "folder" | "import" | "library" | "wallpapers" | "pages" | "settings" | "sync" | "timezone" | null;
@@ -229,6 +229,12 @@ const cssImageUrl = (value: string) => {
     .replace(/"/g, '\\"')
     .replace(/[\r\n\f]/g, "");
   return `url("${escaped}")`;
+};
+
+const shortcutLabelShadowCss = (value?: ShortcutLabelShadow) => {
+  if (value === "soft") return "0 1px 3px rgba(0, 0, 0, 0.28)";
+  if (value === "strong") return "0 2px 8px rgba(0, 0, 0, 0.58)";
+  return "none";
 };
 
 const hasPasswordRecoveryMarker = () => {
@@ -1385,6 +1391,7 @@ export default function App() {
   const accountEpochRef = useRef(0);
   const syncLockRef = useRef<symbol | undefined>();
   const persistenceErrorShownRef = useRef(false);
+  const persistenceQueueRef = useRef<Promise<void>>(Promise.resolve());
   const undoSnapshotRef = useRef<AppState | undefined>();
   const lastSyncedUpdatedAtRef = useRef<string | undefined>();
   const toastTimerRef = useRef<number | undefined>();
@@ -2158,7 +2165,11 @@ export default function App() {
     if (!ready) return;
     const persistenceEpoch = accountEpochRef.current;
     const persistenceUserId = activeUserIdRef.current;
-    void mergeAndSaveStateForAccount(state, persistenceUserId)
+    const persistenceOperation = persistenceQueueRef.current
+      .catch(() => undefined)
+      .then(() => mergeAndSaveStateForAccount(state, persistenceUserId));
+    persistenceQueueRef.current = persistenceOperation.then(() => undefined, () => undefined);
+    void persistenceOperation
       .then((saved) => {
         if (!isCurrentAccountOperation(persistenceEpoch, persistenceUserId)) return;
         persistenceErrorShownRef.current = false;
@@ -2181,6 +2192,22 @@ export default function App() {
     }, 1200);
     return () => window.clearTimeout(timer);
   }, [state, ready]);
+
+  useEffect(() => {
+    if (!ready) return;
+    const persistLatestState = () => {
+      void saveStateForAccount(stateRef.current, activeUserIdRef.current).catch(() => undefined);
+    };
+    const persistWhenHidden = () => {
+      if (document.visibilityState === "hidden") persistLatestState();
+    };
+    window.addEventListener("pagehide", persistLatestState);
+    document.addEventListener("visibilitychange", persistWhenHidden);
+    return () => {
+      window.removeEventListener("pagehide", persistLatestState);
+      document.removeEventListener("visibilitychange", persistWhenHidden);
+    };
+  }, [ready]);
 
   useEffect(() => {
     if (!ready || !state.sync?.autoSync || !state.settings.supabaseUrl || !state.settings.supabaseAnonKey) return;
@@ -3756,9 +3783,12 @@ export default function App() {
   const activeWallpaper = state.settings.wallpaper
     || (state.settings.wallpaperRotation ? rotatingWallpaper : wallpaperUrlForId(state.settings.wallpaperPreset, useCompactAssets) || builtInWallpapers[0].url);
   const backgroundStyle = {
+    backgroundImage: cssImageUrl(activeWallpaper),
     "--wallpaper-image": cssImageUrl(activeWallpaper),
     "--date-color": state.settings.dateTimeColor || "#ffffff",
-    "--widget-glass": `${state.settings.glass}%`
+    "--widget-glass": `${state.settings.glass}%`,
+    "--shortcut-label-color": state.settings.shortcutLabelColor || "#34434a",
+    "--shortcut-label-shadow": shortcutLabelShadowCss(state.settings.shortcutLabelShadow)
   } as React.CSSProperties;
   const widgetSizes = { ...defaultWidgetSizes, ...(state.settings.widgetSizes || {}) };
   const widgetRenderers: Record<WidgetKey, React.ReactNode> = {
@@ -6950,6 +6980,7 @@ function ResourceCenterDialog({ state, shortcuts, updateState, initialTab = "wid
   const [query, setQuery] = useState("");
   const [iconQuery, setIconQuery] = useState("");
   const [iconRenderLimit, setIconRenderLimit] = useState(ICON_MANAGER_RENDER_BATCH);
+  const [appliedWallpaperId, setAppliedWallpaperId] = useState<string>();
   const settings = state.settings;
   const sizes = { ...defaultWidgetSizes, ...(settings.widgetSizes || {}) };
   const normalizedQuery = query.trim().toLowerCase();
@@ -7018,6 +7049,7 @@ function ResourceCenterDialog({ state, shortcuts, updateState, initialTab = "wid
         updatedAt: nowIso()
       }
     }));
+    setAppliedWallpaperId(id);
   };
   const customWallpapers = settings.customWallpapers || [];
   const wallpaperCollection = settings.wallpaperCollection || [];
@@ -7152,6 +7184,12 @@ function ResourceCenterDialog({ state, shortcuts, updateState, initialTab = "wid
               </label>
             </div>
           </div>
+          <p className="resource-wallpaper-status" role="status" aria-live="polite">
+            <Check size={14} />
+            {appliedWallpaperId
+              ? text("壁纸已立即应用并自动保存", "Wallpaper applied and saved automatically")
+              : text("点击任意壁纸即可立即应用并自动保存", "Select any wallpaper to apply and save it instantly")}
+          </p>
           <div className="resource-filters wallpaper-filters" aria-label={text("壁纸风格", "Wallpaper styles")}>
             {(["全部", "精选", "日系", "动漫", "猫咪", "酷感", "我的"] as const).map((item) => (
               <button type="button" className={wallpaperCategory === item ? "active" : ""} key={item} onClick={() => setWallpaperCategory(item)}>{language === "zh-CN" ? item : ({ "全部": "All", "精选": "Featured", "日系": "Japanese", "动漫": "Anime", "猫咪": "Cats", "酷感": "Bold", "我的": "Mine" } as const)[item]}</button>
@@ -7164,9 +7202,13 @@ function ResourceCenterDialog({ state, shortcuts, updateState, initialTab = "wid
                   type="button"
                   className={`wallpaper-preview ${!settings.wallpaper && !settings.wallpaperRotation && settings.wallpaperPreset === wallpaper.id ? "active" : ""}`}
                   onClick={() => chooseWallpaper(wallpaper.id)}
+                  aria-pressed={!settings.wallpaper && !settings.wallpaperRotation && settings.wallpaperPreset === wallpaper.id}
                 >
                   <img src={wallpaper.url} alt="" loading="lazy" decoding="async" />
-                  <span>{language === "zh-CN" || wallpaper.custom ? wallpaper.name : wallpaper.id.split("-").map((part) => part.charAt(0).toUpperCase() + part.slice(1)).join(" ")}</span>
+                  <span className="wallpaper-name">{language === "zh-CN" || wallpaper.custom ? wallpaper.name : wallpaper.id.split("-").map((part) => part.charAt(0).toUpperCase() + part.slice(1)).join(" ")}</span>
+                  {!settings.wallpaper && !settings.wallpaperRotation && settings.wallpaperPreset === wallpaper.id && (
+                    <span className="wallpaper-selected" aria-hidden="true"><Check size={14} /></span>
+                  )}
                 </button>
                 <button
                   type="button"
@@ -7423,6 +7465,8 @@ function SettingsDialog({ state, clock, updateCheck, migrationBackupAvailable, u
         ? selectedWallpaper?.name
         : selectedWallpaper?.id.split("-").map((part) => part.charAt(0).toUpperCase() + part.slice(1)).join(" "))
       || text("默认壁纸", "Default wallpaper");
+  const shortcutLabelColor = settings.shortcutLabelColor || "#34434a";
+  const shortcutLabelShadow = settings.shortcutLabelShadow || "none";
   const settingsTime = new Intl.DateTimeFormat(language, {
     timeZone: settings.timeZone || "Asia/Shanghai",
     hour: "2-digit",
@@ -7515,6 +7559,51 @@ function SettingsDialog({ state, clock, updateCheck, migrationBackupAvailable, u
                 <div><strong>{text("图标尺寸", "Icon size")}</strong><span>{text(`主页与空间统一为 ${settings.iconSize}px`, `Home and Spaces use ${settings.iconSize}px`)}</span></div>
                 <input type="range" min="48" max="80" value={settings.iconSize} onChange={(event) => setSetting("iconSize", Number(event.target.value))} />
               </label>
+              <div className="lucid-setting-row lucid-setting-stack shortcut-label-setting">
+                <div><strong>{text("图标文字", "Icon labels")}</strong><span>{text("自定义网站名称的颜色和阴影，修改会立即预览", "Customize site-label color and shadow with a live preview")}</span></div>
+                <div className="shortcut-label-editor">
+                  <div
+                    className="shortcut-label-preview"
+                    style={{
+                      "--settings-wallpaper": cssImageUrl(wallpaperPreviewUrl),
+                      "--preview-label-color": shortcutLabelColor,
+                      "--preview-label-shadow": shortcutLabelShadowCss(shortcutLabelShadow)
+                    } as React.CSSProperties}
+                    aria-label={text("图标文字实时预览", "Live icon-label preview")}
+                  >
+                    <span aria-hidden="true">W</span>
+                    <strong>{text("示例网站", "Example site")}</strong>
+                  </div>
+                  <div className="shortcut-label-controls">
+                    <label className="shortcut-label-color-control">
+                      <span>{text("文字颜色", "Text color")}</span>
+                      <span>
+                        <input
+                          type="color"
+                          value={shortcutLabelColor}
+                          aria-label={text("选择图标文字颜色", "Choose icon-label color")}
+                          onChange={(event) => setSetting("shortcutLabelColor", event.target.value)}
+                        />
+                        <code>{shortcutLabelColor.toUpperCase()}</code>
+                      </span>
+                    </label>
+                    <div className="settings-segments settings-segments-three" role="radiogroup" aria-label={text("图标文字阴影", "Icon-label shadow") }>
+                      {(["none", "soft", "strong"] as const).map((shadow) => (
+                        <button
+                          type="button"
+                          role="radio"
+                          aria-checked={shortcutLabelShadow === shadow}
+                          className={shortcutLabelShadow === shadow ? "active" : ""}
+                          onClick={() => setSetting("shortcutLabelShadow", shadow)}
+                          key={shadow}
+                        >
+                          {shadow === "none" ? text("无阴影", "None") : shadow === "soft" ? text("柔和", "Soft") : text("清晰", "Strong")}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
               <label className="lucid-setting-row lucid-range-row">
                 <div><strong>{text("界面通透度", "Transparency")}</strong><span>{text("控制组件表面的透明程度", "Control the transparency of surfaces")}</span></div>
                 <input type="range" min="28" max="88" value={settings.glass} onChange={(event) => setSetting("glass", Number(event.target.value))} />
@@ -7602,7 +7691,7 @@ function SettingsDialog({ state, clock, updateCheck, migrationBackupAvailable, u
           )}
         </div>
       </div>
-      <div className="lucid-settings-footer"><span>{text("所有界面设置会自动保存", "Interface settings save automatically")}</span><button type="button" className="primary" onClick={onClose}>{text("完成", "Done")}</button></div>
+      <div className="lucid-settings-footer"><span><Check size={14} />{text("点击即生效并自动保存", "Changes apply instantly and save automatically")}</span><button type="button" className="primary" onClick={onClose}>{text("完成", "Done")}</button></div>
     </DialogShell>
   );
 }

@@ -421,6 +421,8 @@ const SETTINGS_KEYS = new Set([
   "photoFrameTitle",
   "dateTimeColor",
   "widgetAccentColor",
+  "shortcutLabelColor",
+  "shortcutLabelShadow",
   "glass",
   "iconSize",
   "gridDensity",
@@ -732,6 +734,8 @@ export function validateAppStatePayload(value: unknown, label = "数据"): asser
     "iconPresentation",
     "dateTimeColor",
     "widgetAccentColor",
+    "shortcutLabelColor",
+    "shortcutLabelShadow",
     "gridDensity",
     "dockPosition",
     "city",
@@ -753,6 +757,7 @@ export function validateAppStatePayload(value: unknown, label = "数据"): asser
       : !validOptionalString(settings[key], key === "supabaseAnonKey" ? 4096 : 500))
     || !validOptionalColor(settings.dateTimeColor)
     || !validOptionalColor(settings.widgetAccentColor)
+    || !validOptionalColor(settings.shortcutLabelColor)
     || !validOptionalNumberInRange(settings.glass, 0, 100)
     || settings.glass === undefined
     || !validOptionalNumberInRange(settings.iconSize, 16, 256)
@@ -765,6 +770,7 @@ export function validateAppStatePayload(value: unknown, label = "数据"): asser
     || !validOptionalBoolean(settings.homeSiteFloating)
     || !validOptionalBoolean(settings.homeSelectionInitialized)
     || (settings.iconPresentation !== undefined && !["original", "soft", "minimal"].includes(String(settings.iconPresentation)))
+    || (settings.shortcutLabelShadow !== undefined && !["none", "soft", "strong"].includes(String(settings.shortcutLabelShadow)))
     || (settings.language !== undefined && !["zh-CN", "en-US"].includes(String(settings.language)))
     || !["comfortable", "compact"].includes(String(settings.gridDensity))
     || !["top", "bottom"].includes(String(settings.dockPosition))
@@ -1511,7 +1517,7 @@ export function normalizeState(state: AppState): AppState {
         ? "aurora-lake"
         : state.settings.wallpaperPreset || "lucid-room",
     wallpaperRotation: visualVersion < 5 ? false : state.settings.wallpaperRotation ?? false,
-    visualRefreshVersion: 17,
+    visualRefreshVersion: 18,
     iconSize: Math.min(80, Math.max(48, visualVersion < 8 && state.settings.iconSize === 64 ? 58 : state.settings.iconSize || 58)),
     glass: Math.min(88, Math.max(28, state.settings.glass || 42)),
     customWallpapers: state.settings.customWallpapers || [],
@@ -1555,6 +1561,10 @@ export function normalizeState(state: AppState): AppState {
     timeZone: validTimeZone(state.settings.timeZone) ? state.settings.timeZone : "Asia/Shanghai",
     dateTimeColor: state.settings.dateTimeColor || "#ffffff",
     widgetAccentColor: state.settings.widgetAccentColor || "#2dd4bf",
+    shortcutLabelColor: validColor(state.settings.shortcutLabelColor) ? state.settings.shortcutLabelColor : "#34434a",
+    shortcutLabelShadow: state.settings.shortcutLabelShadow === "soft" || state.settings.shortcutLabelShadow === "strong"
+      ? state.settings.shortcutLabelShadow
+      : "none",
     weatherUseLocation: state.settings.weatherUseLocation ?? false,
     searchEngine: state.settings.searchEngine || "baidu",
     calendarRecords: state.settings.calendarRecords || {},

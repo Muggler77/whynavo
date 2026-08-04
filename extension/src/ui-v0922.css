@@ -1,0 +1,177 @@
+/* WhyNavo 0.9.22: instant settings feedback and user-controlled shortcut labels. */
+
+.app {
+  --shortcut-label-color: #34434a;
+  --shortcut-label-shadow: none;
+}
+
+.page-shortcuts .shortcut a > span:last-child,
+.page-shortcuts .folder-open > span:last-child,
+.page-custom .shortcut a > span:last-child,
+.page-custom .folder-open > span:last-child,
+.folder-view .shortcut > a > span:last-child,
+.folder-view .folder-open > span:last-child,
+.home-shortcut > span:last-child {
+  color: var(--shortcut-label-color) !important;
+  text-shadow: var(--shortcut-label-shadow) !important;
+}
+
+.resource-wallpaper-status {
+  display: flex;
+  min-height: 32px;
+  margin: 0;
+  padding: 7px 10px;
+  align-items: center;
+  gap: 7px;
+  color: var(--lucid-ink);
+  background: color-mix(in srgb, var(--lucid-brand) 8%, var(--lucid-surface-solid));
+  border: 1px solid color-mix(in srgb, var(--lucid-brand) 24%, var(--lucid-line));
+  border-radius: 7px;
+  font-size: 11px;
+}
+
+.wallpaper-preview {
+  cursor: pointer;
+}
+
+.wallpaper-preview.active {
+  border-color: var(--lucid-brand);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--lucid-brand) 18%, transparent);
+}
+
+.wallpaper-preview .wallpaper-name {
+  z-index: 2;
+}
+
+.wallpaper-preview .wallpaper-selected {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 3;
+  display: grid;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  color: #fff;
+  background: var(--lucid-brand);
+  border: 1px solid rgba(255, 255, 255, 0.78);
+  border-radius: 50%;
+  box-shadow: 0 4px 12px rgba(13, 59, 56, 0.2);
+  place-items: center;
+}
+
+.shortcut-label-setting {
+  align-items: stretch;
+}
+
+.shortcut-label-editor {
+  display: grid;
+  grid-template-columns: minmax(150px, 0.8fr) minmax(260px, 1.2fr);
+  gap: 12px;
+}
+
+.shortcut-label-preview {
+  display: grid;
+  min-height: 116px;
+  padding: 16px;
+  align-content: center;
+  justify-items: center;
+  gap: 8px;
+  background-image: linear-gradient(rgba(255, 255, 255, 0.18), rgba(255, 255, 255, 0.24)), var(--settings-wallpaper);
+  background-position: center;
+  background-size: cover;
+  border: 1px solid var(--lucid-line-strong);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.shortcut-label-preview > span {
+  display: grid;
+  width: 48px;
+  height: 48px;
+  color: #fff;
+  background: #176b65;
+  border-radius: 12px;
+  font-size: 19px;
+  font-weight: 720;
+  place-items: center;
+}
+
+.shortcut-label-preview > strong {
+  max-width: 100%;
+  overflow: hidden;
+  color: var(--preview-label-color);
+  font-size: 12px;
+  font-weight: 570;
+  line-height: 1.35;
+  text-align: center;
+  text-overflow: ellipsis;
+  text-shadow: var(--preview-label-shadow);
+  white-space: nowrap;
+}
+
+.shortcut-label-controls {
+  display: grid;
+  align-content: center;
+  gap: 10px;
+}
+
+.shortcut-label-color-control {
+  display: flex;
+  min-height: 48px;
+  padding: 7px 9px 7px 12px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--lucid-ink);
+  background: color-mix(in srgb, var(--lucid-surface-solid) 82%, transparent);
+  border: 1px solid var(--lucid-line-strong);
+  border-radius: 8px;
+  font-size: 11px;
+  font-weight: 620;
+}
+
+.shortcut-label-color-control > span:last-child {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.shortcut-label-color-control input[type="color"] {
+  width: 44px;
+  height: 34px;
+  padding: 3px;
+  background: transparent;
+  border: 1px solid var(--lucid-line-strong);
+  border-radius: 7px;
+  cursor: pointer;
+}
+
+.shortcut-label-color-control code {
+  min-width: 62px;
+  color: var(--lucid-soft);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 10px;
+}
+
+.lucid-settings-footer > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+@media (max-width: 760px) {
+  .shortcut-label-editor {
+    grid-template-columns: 1fr;
+  }
+
+  .shortcut-label-preview {
+    min-height: 104px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wallpaper-preview img {
+    transition: none;
+  }
+}

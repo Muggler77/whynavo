@@ -112,6 +112,7 @@ export type CustomWallpaper = {
 };
 
 export type SearchEngine = "baidu" | "google";
+export type ShortcutLabelShadow = "none" | "soft" | "strong";
 
 export type Settings = {
   theme: "light" | "dark";
@@ -127,6 +128,8 @@ export type Settings = {
   photoFrameTitle?: string;
   dateTimeColor?: string;
   widgetAccentColor?: string;
+  shortcutLabelColor?: string;
+  shortcutLabelShadow?: ShortcutLabelShadow;
   glass: number;
   iconSize: number;
   gridDensity: "comfortable" | "compact";
