@@ -1378,6 +1378,9 @@ try {
   assert.match(syncClientSource, /lastRemoteUpdatedAt: normalizedRemote\.sync\.lastRemoteUpdatedAt \|\| normalizedRemote\.updatedAt/, "sync conflict baselines must prefer the server-observed remote timestamp");
   assert.match(syncSource, /terms_version: LEGAL_DOCUMENT_VERSION/, "registration must attach the accepted legal-document version to the Auth user");
   assert.match(appSource, /passwordRecovery \? undefined : currentPassword/, "recovery sessions must remain distinct from signed-in password changes");
+  assert.match(appSource, /className="wallpaper-item-actions"[\s\S]*className=\{`wallpaper-collection-action/, "wallpaper rotation controls must remain outside the wallpaper selection button");
+  assert.match(appSource, /aria-label=\{text\(`使用壁纸：\$\{wallpaperLabel\}`,[\s\S]*aria-pressed=\{selected\}/, "wallpaper cards must expose an explicit selectable state");
+  assert.doesNotMatch(appSource, /className=\{`wallpaper-collection-check[\s\S]{0,500}onClick=\{\(\) => toggleWallpaperCollection/, "wallpaper collection controls must not overlap the selected-wallpaper badge");
   assert.match(appSource, /newPassword !== confirmNewPassword/, "password updates must reject a mistyped confirmation before changing credentials");
   assert.doesNotMatch(
     appHtml,

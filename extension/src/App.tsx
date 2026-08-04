@@ -7059,6 +7059,7 @@ function ResourceCenterDialog({ state, shortcuts, updateState, initialTab = "wid
   ];
   const visibleWallpapers = wallpaperItems.filter((wallpaper) => wallpaperCategory === "全部" || wallpaper.category === wallpaperCategory);
   const selectedWallpaperCount = wallpaperItems.filter((wallpaper) => wallpaperCollection.includes(wallpaper.id)).length;
+  const appliedWallpaper = wallpaperItems.find((wallpaper) => wallpaper.id === appliedWallpaperId);
 
   const toggleWallpaperCollection = (id: string) => {
     const next = wallpaperCollection.includes(id)
@@ -7160,7 +7161,7 @@ function ResourceCenterDialog({ state, shortcuts, updateState, initialTab = "wid
       {tab === "wallpapers" && (
         <>
           <div className="resource-section-head">
-            <div><strong>{text("我的壁纸集", "My wallpaper collection")}</strong><small>{text(`已选择 ${selectedWallpaperCount} 张 · 自定义壁纸仅保存在本机`, `${selectedWallpaperCount} selected · Custom wallpapers stay on this device`)}</small></div>
+            <div><strong>{text("每日轮换壁纸", "Daily rotation wallpapers")}</strong><small>{text(`已加入 ${selectedWallpaperCount} 张 · 自定义壁纸仅保存在本机`, `${selectedWallpaperCount} included · Custom wallpapers stay on this device`)}</small></div>
             <div className="wallpaper-actions">
               <label className="file-pick compact-upload">
                 <Upload size={15} />{text("上传多张", "Upload images")}
@@ -7187,7 +7188,7 @@ function ResourceCenterDialog({ state, shortcuts, updateState, initialTab = "wid
           <p className="resource-wallpaper-status" role="status" aria-live="polite">
             <Check size={14} />
             {appliedWallpaperId
-              ? text("壁纸已立即应用并自动保存", "Wallpaper applied and saved automatically")
+              ? text(`已应用「${appliedWallpaper?.name || "所选壁纸"}」并自动保存`, `${appliedWallpaper?.name || "Selected wallpaper"} applied and saved automatically`)
               : text("点击任意壁纸即可立即应用并自动保存", "Select any wallpaper to apply and save it instantly")}
           </p>
           <div className="resource-filters wallpaper-filters" aria-label={text("壁纸风格", "Wallpaper styles")}>
@@ -7196,33 +7197,47 @@ function ResourceCenterDialog({ state, shortcuts, updateState, initialTab = "wid
             ))}
           </div>
           <div className="resource-wallpaper-grid">
-            {visibleWallpapers.map((wallpaper) => (
-              <div className="resource-wallpaper-item" key={wallpaper.id}>
-                <button
-                  type="button"
-                  className={`wallpaper-preview ${!settings.wallpaper && !settings.wallpaperRotation && settings.wallpaperPreset === wallpaper.id ? "active" : ""}`}
-                  onClick={() => chooseWallpaper(wallpaper.id)}
-                  aria-pressed={!settings.wallpaper && !settings.wallpaperRotation && settings.wallpaperPreset === wallpaper.id}
-                >
-                  <img src={wallpaper.url} alt="" loading="lazy" decoding="async" />
-                  <span className="wallpaper-name">{language === "zh-CN" || wallpaper.custom ? wallpaper.name : wallpaper.id.split("-").map((part) => part.charAt(0).toUpperCase() + part.slice(1)).join(" ")}</span>
-                  {!settings.wallpaper && !settings.wallpaperRotation && settings.wallpaperPreset === wallpaper.id && (
-                    <span className="wallpaper-selected" aria-hidden="true"><Check size={14} /></span>
-                  )}
-                </button>
-                <button
-                  type="button"
-                  className={`wallpaper-collection-check ${wallpaperCollection.includes(wallpaper.id) ? "active" : ""}`}
-                  onClick={() => toggleWallpaperCollection(wallpaper.id)}
-                  title={wallpaperCollection.includes(wallpaper.id) ? text("从壁纸集移除", "Remove from collection") : text("加入壁纸集", "Add to collection")}
-                >
-                  {wallpaperCollection.includes(wallpaper.id) ? <Check size={14} /> : <Plus size={14} />}
-                </button>
-                {wallpaper.custom && (
-                  <button type="button" className="wallpaper-remove" onClick={() => removeCustomWallpaper(wallpaper.id)} title={text("删除上传壁纸", "Delete uploaded wallpaper")}><X size={13} /></button>
-                )}
-              </div>
-            ))}
+            {visibleWallpapers.map((wallpaper) => {
+              const wallpaperLabel = language === "zh-CN" || wallpaper.custom
+                ? wallpaper.name
+                : wallpaper.id.split("-").map((part) => part.charAt(0).toUpperCase() + part.slice(1)).join(" ");
+              const selected = !settings.wallpaper && !settings.wallpaperRotation && settings.wallpaperPreset === wallpaper.id;
+              const inRotation = wallpaperCollection.includes(wallpaper.id);
+              return (
+                <div className="resource-wallpaper-item" key={wallpaper.id}>
+                  <button
+                    type="button"
+                    className={`wallpaper-preview ${selected ? "active" : ""}`}
+                    onClick={() => chooseWallpaper(wallpaper.id)}
+                    aria-label={text(`使用壁纸：${wallpaperLabel}`, `Use wallpaper: ${wallpaperLabel}`)}
+                    aria-pressed={selected}
+                  >
+                    <img src={wallpaper.url} alt="" loading="lazy" decoding="async" />
+                    <span className="wallpaper-name">{wallpaperLabel}</span>
+                    {selected && (
+                      <span className="wallpaper-selected" aria-hidden="true"><Check size={14} />{text("当前", "Current")}</span>
+                    )}
+                  </button>
+                  <div className="wallpaper-item-actions">
+                    <button
+                      type="button"
+                      className={`wallpaper-collection-action ${inRotation ? "active" : ""}`}
+                      onClick={() => toggleWallpaperCollection(wallpaper.id)}
+                      aria-label={inRotation
+                        ? text(`从每日轮换中移除：${wallpaperLabel}`, `Remove from daily rotation: ${wallpaperLabel}`)
+                        : text(`加入每日轮换：${wallpaperLabel}`, `Add to daily rotation: ${wallpaperLabel}`)}
+                      aria-pressed={inRotation}
+                    >
+                      {inRotation ? <Check size={14} /> : <Plus size={14} />}
+                      <span>{inRotation ? text("已加入轮换", "In rotation") : text("加入轮换", "Add to rotation")}</span>
+                    </button>
+                    {wallpaper.custom && (
+                      <button type="button" className="wallpaper-remove" onClick={() => removeCustomWallpaper(wallpaper.id)} aria-label={text("删除上传壁纸", "Delete uploaded wallpaper")} title={text("删除上传壁纸", "Delete uploaded wallpaper")}><X size={13} /></button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </>
       )}
