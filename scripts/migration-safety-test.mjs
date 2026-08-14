@@ -1189,7 +1189,7 @@ try {
   assert.equal(extensionManifest.optional_permissions?.includes("notifications"), true, "notification access must be requested only after a user enables a reminder");
   assert.equal(extensionManifest.permissions.includes("geolocation"), false, "precise location must not be requested from every user at installation");
   assert.equal(extensionManifest.optional_permissions?.includes("geolocation"), true, "precise location must remain available as an explicit optional permission");
-  assert.equal(extensionManifest.permissions.includes("search"), false, "direct Baidu and Google HTTPS searches must not retain the unused Chrome Search API permission");
+  assert.equal(extensionManifest.permissions.includes("search"), true, "new-tab web search must use Chrome's Search API and the user's configured provider");
   assert.equal(extensionManifest.permissions.includes("favicon"), false, "the extension must not use Chrome's favicon resampler because it can disguise low-resolution artwork as a larger bitmap");
   assert.equal(extensionManifest.host_permissions.includes("https://api.pwnedpasswords.com/*"), true, "the extension must allow the privacy-preserving leaked-password range check");
   assert.match(
@@ -1202,7 +1202,7 @@ try {
     /whynavo\.pages\.dev/,
     "the extension must not retain the retired Pages CAPTCHA origin"
   );
-  const captchaClient = await readFile(join(repoRoot, "extension/public/captcha.js"), "utf8");
+  const captchaClient = await readFile(join(repoRoot, "web-public/captcha.js"), "utf8");
   const cloudflareHeaders = await readFile(join(repoRoot, "cloudflare/_headers"), "utf8");
   assert.match(
     cloudflareHeaders,
@@ -1248,7 +1248,9 @@ try {
   assert.doesNotMatch(serviceWorker, /caches\.match\(request\)\.then\(\(cached\)/, "static assets must not use cache-global insertion order");
   assert.match(serviceWorker, /if \(response\.ok\)[\s\S]*cache\.put\(cacheKey, copy\)/, "failed navigation responses must never replace the offline app shell");
   const appSource = await readFile(join(repoRoot, "extension/src/App.tsx"), "utf8");
+  const browserSearchSource = await readFile(join(repoRoot, "extension/src/browserSearch.ts"), "utf8");
   const iconPresentationCss = await readFile(join(repoRoot, "extension/src/ui-v0914.css"), "utf8");
+  const searchPolicyCss = await readFile(join(repoRoot, "extension/src/ui-v0924.css"), "utf8");
   const appHtml = await readFile(join(repoRoot, "extension/index.html"), "utf8");
   const releaseNotes = await readFile(join(repoRoot, "docs/releases/0.6.0.md"), "utf8");
   const syncSource = await readFile(join(repoRoot, "extension/src/sync.ts"), "utf8");
@@ -1296,13 +1298,16 @@ try {
   assert.doesNotMatch(appSource, /最近使用|Recently used/, "Search must not label arbitrary first items as a real usage history");
   assert.match(appSource, /second: "2-digit"/, "the Home clock must display seconds");
   assert.doesNotMatch(appSource, /搜索应用、网站、笔记和任务|Search apps, sites, notes, and tasks/, "the Home web search must not imply that it searches local WhyNavo content");
-  assert.match(appSource, /form className="search hero-search"[\s\S]*placeholder=""[\s\S]*home-engine-toggle[\s\S]*onClick=\{toggleSearchEngine\}/, "the Home search must be a pure web search with an in-field click-to-switch engine control");
-  assert.match(appSource, /const toggleSearchEngine = \(\) =>[\s\S]*searchEngine:[\s\S]*=== "baidu" \? "google" : "baidu"/, "the engine control must switch directly between Baidu and Google through synchronized settings");
+  assert.match(appSource, /form className="search hero-search"[\s\S]*placeholder=""[\s\S]*className="search-submit"[\s\S]*使用浏览器默认搜索引擎/, "the Home search must identify the browser-default search behavior without a provider switch");
+  assert.doesNotMatch(appSource, /toggleSearchEngine|home-engine-toggle|searchEngineLabelFor|searchEngines/, "the new-tab surface must not choose or switch the user's search provider");
+  assert.match(browserSearchSource, /chrome\.search\.query\([\s\S]*disposition: "CURRENT_TAB"/, "extension searches must use Chrome's Search API in the current tab");
+  assert.doesNotMatch(browserSearchSource, /google\.com\/search|baidu\.com\/s/, "the extension search adapter must not contain direct search-provider URLs");
   assert.match(appSource, /placeholder=\{text\("搜索网站和文件夹", "Search sites and folders"\)\}/, "the Spaces search behavior and prompt must remain unchanged");
-  assert.match(appSource, /function SearchWorkspace[\s\S]*查找网站、笔记、任务，或直接搜索网络[\s\S]*className="lucid-search-engine"[\s\S]*onClick=\{onToggleEngine\}/, "the Search page must keep universal local search while allowing one-click engine switching inside the field");
-  assert.match(iconPresentationCss, /\.sample-a-hero \.hero-search[\s\S]*grid-template-columns: minmax\(0, 1fr\) 78px 44px[\s\S]*\.lucid-search-engine[\s\S]*cursor: pointer/, "desktop search fields must reserve stable in-field space for the engine toggle");
-  assert.match(iconPresentationCss, /\.sample-a-hero \.hero-search \.home-engine-toggle \{[\s\S]*display: inline-flex/, "the Home engine toggle must override the legacy hidden state");
-  assert.match(iconPresentationCss, /@media \(max-width: 620px\)[\s\S]*grid-template-columns: minmax\(0, 1fr\) 66px 42px/, "the Home engine toggle must remain contained on mobile");
+  assert.match(appSource, /function SearchWorkspace[\s\S]*查找网站、笔记、任务，或直接搜索网络[\s\S]*使用浏览器默认搜索引擎搜索网络/, "the Search page must keep universal local search and submit network searches through the browser default provider");
+  assert.doesNotMatch(appSource, /className="lucid-search-engine"|onToggleEngine|engineLabel/, "the Search page must not expose a provider override");
+  assert.match(searchPolicyCss, /\.sample-a-hero \.hero-search[\s\S]*grid-template-columns: minmax\(0, 1fr\) 44px/, "desktop Home search must reserve space only for the browser-search action");
+  assert.match(searchPolicyCss, /\.lucid-search-command[\s\S]*grid-template-columns: 26px minmax\(0, 1fr\) 44px/, "desktop universal search must reserve space only for the browser-search action");
+  assert.match(searchPolicyCss, /@media \(max-width: 620px\)[\s\S]*grid-template-columns: minmax\(0, 1fr\) 42px/, "the browser-default Home search action must remain contained on mobile");
   assert.match(appSource, /folder-view-heading[\s\S]*folder-add-shortcut/, "folders must render as a dedicated icon canvas with an accessible add action");
   assert.match(appSource, /invalidateResolvedShortcutIcon[\s\S]*resolvedIconCache\.delete/, "saving an icon must invalidate a stale failure cache for that shortcut");
   assert.match(appSource, /iconUpdatedAt: iconUrlProvided \|\| iconTextProvided/, "icon edits must carry a dedicated refresh timestamp without tying image reloads to shortcut reordering");
@@ -1634,7 +1639,7 @@ try {
   assert.match(appSource, /编辑主页布局[\s\S]*Edit Home layout/, "Home right-click must expose layout editing without a fixed corner control");
   assert.match(appSource, /lucid-wallpaper-button[\s\S]*onOpenWallpapers/, "Settings must expose a direct wallpaper-library entry");
   assert.match(appSource, /initialTab=\{dialog === "wallpapers" \? "wallpapers" : "widgets"\}/, "the Settings wallpaper action must open the wallpaper tab directly");
-  assert.match(appSource, /搜索引擎[\s\S]*Search engine[\s\S]*<select className="lucid-compact-input"/, "Settings must use a persistent search-engine select");
+  assert.doesNotMatch(appSource, /<strong>\{text\("搜索引擎", "Search engine"\)\}[\s\S]*settings\.searchEngine/, "Settings must not offer a search-provider override");
   assert.match(appSource, /城市[\s\S]*City[\s\S]*weatherCityOptions\.map/, "weather city selection must use the bounded bilingual city list");
   assert.match(appSource, /shrinkImage\(file, 1600, 0\.86, language\)/, "image-upload errors must follow the active interface language");
   assert.match(

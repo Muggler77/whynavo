@@ -182,14 +182,9 @@
   backdrop-filter: blur(22px);
 }
 
-.sample-a-hero .hero-search .engine-toggle,
 .sample-a-hero .hero-search .search-submit {
   color: var(--sample-soft);
   background: transparent;
-}
-
-.sample-a-hero .hero-search .engine-toggle {
-  display: none;
 }
 
 .sample-a-hero .hero-search input {

@@ -97,6 +97,7 @@ import TurnstileChallenge, { type TurnstileChallengeHandle } from "./TurnstileCh
 import { fetchWeather, fetchWeatherByCoordinates, getCachedWeather, getDevicePosition, requestDeviceLocationPermission, weatherLabel } from "./weather";
 import { checkForUpdate, type UpdateCheckResult } from "./updates";
 import { APP_VERSION, DATA_SCHEMA_VERSION, UPDATE_TARGET_URL } from "./version";
+import { searchWithBrowserDefault } from "./browserSearch";
 import {
   AccountDeletionOutcomeUnknownError,
   AccountDeletionRejectedError,
@@ -133,7 +134,7 @@ import {
   validateAppStatePayload,
   type SyncStatus
 } from "./sync";
-import type { AppState, Countdown, CustomNavPage, CustomNavPageIcon, Note, RatesState, SearchEngine, Shortcut, ShortcutFolder, ShortcutLabelShadow, SystemNavPage, Todo, UiLanguage, WeatherState, WidgetKey, WidgetSize } from "./types";
+import type { AppState, Countdown, CustomNavPage, CustomNavPageIcon, Note, RatesState, Shortcut, ShortcutFolder, ShortcutLabelShadow, SystemNavPage, Todo, UiLanguage, WeatherState, WidgetKey, WidgetSize } from "./types";
 import { normalizeHttpUrl, safeHttpHref } from "./urls";
 
 type Dialog = "shortcut" | "folder" | "import" | "library" | "wallpapers" | "pages" | "settings" | "sync" | "timezone" | null;
@@ -1141,21 +1142,6 @@ function FolderIconContent({ iconUrl, size }: { iconUrl?: string; size: number }
     />
   );
 }
-
-const searchEngines: Record<SearchEngine, { label: string; url: (query: string) => string }> = {
-  baidu: {
-    label: "百度",
-    url: (query) => `https://www.baidu.com/s?wd=${encodeURIComponent(query)}`
-  },
-  google: {
-    label: "Google",
-    url: (query) => `https://www.google.com/search?q=${encodeURIComponent(query)}`
-  }
-};
-
-const searchEngineLabelFor = (language: UiLanguage, engine: SearchEngine) => (
-  engine === "baidu" ? localized(language, "百度", "Baidu") : searchEngines[engine].label
-);
 
 const weatherCityOptions = [
   { value: "Shanghai", zh: "上海", en: "Shanghai" },
@@ -3402,20 +3388,12 @@ export default function App() {
     }, action ? 10000 : 2400);
   };
 
-  const currentSearchEngine = state.settings.searchEngine || "baidu";
-  const toggleSearchEngine = () => {
-    updateState((current) => ({
-      ...current,
-      settings: {
-        ...current.settings,
-        searchEngine: (current.settings.searchEngine || "baidu") === "baidu" ? "google" : "baidu"
-      }
-    }));
-  };
   const runSearch = () => {
-    const text = searchText.trim();
-    if (!text) return;
-    window.open(searchEngines[currentSearchEngine].url(text), "_blank", "noopener,noreferrer");
+    const query = searchText.trim();
+    if (!query) return;
+    void searchWithBrowserDefault(query).catch(() => {
+      showToast(text("浏览器搜索暂时不可用", "Browser search is temporarily unavailable"));
+    });
   };
 
   const chooseTimeZone = (timeZone: string) => {
@@ -4005,18 +3983,11 @@ export default function App() {
                   aria-label={text("搜索网络", "Search the web")}
                 />
                 <button
-                  type="button"
-                  className="engine-toggle home-engine-toggle"
-                  aria-label={text(
-                    `当前使用${searchEngineLabelFor(uiLanguage, currentSearchEngine)}，点击切换搜索引擎`,
-                    `Using ${searchEngineLabelFor(uiLanguage, currentSearchEngine)}. Click to switch search engine`
-                  )}
-                  title={text("单击切换百度 / Google", "Click to switch Baidu / Google")}
-                  onClick={toggleSearchEngine}
-                >
-                  {searchEngineLabelFor(uiLanguage, currentSearchEngine)}
-                </button>
-                <button type="submit" className="search-submit" aria-label={text("搜索", "Search")} title={text("搜索", "Search")}><Search size={18} /></button>
+                  type="submit"
+                  className="search-submit"
+                  aria-label={text("使用浏览器默认搜索引擎搜索", "Search with the browser's default search engine")}
+                  title={text("使用浏览器默认搜索引擎", "Use the browser's default search engine")}
+                ><Search size={18} /></button>
               </form>
             </>
           ) : activePage === "shortcuts" ? (
@@ -4181,8 +4152,6 @@ export default function App() {
               query={searchText}
               onQueryChange={setSearchText}
               onWebSearch={runSearch}
-              onToggleEngine={toggleSearchEngine}
-              engineLabel={searchEngineLabelFor(uiLanguage, currentSearchEngine)}
               shortcuts={allShortcuts}
               notes={state.notes}
               todos={state.todos}
@@ -4951,12 +4920,10 @@ function HomeShortcuts({ tiles, iconSize, editing, floating, onOpenFolder, onEdi
   );
 }
 
-function SearchWorkspace({ query, onQueryChange, onWebSearch, onToggleEngine, engineLabel, shortcuts, notes, todos, onAddShortcut, onOpenNotes, onOpenTasks }: {
+function SearchWorkspace({ query, onQueryChange, onWebSearch, shortcuts, notes, todos, onAddShortcut, onOpenNotes, onOpenTasks }: {
   query: string;
   onQueryChange: (value: string) => void;
   onWebSearch: () => void;
-  onToggleEngine: () => void;
-  engineLabel: string;
   shortcuts: Shortcut[];
   notes: Note[];
   todos: Todo[];
@@ -4998,15 +4965,11 @@ function SearchWorkspace({ query, onQueryChange, onWebSearch, onToggleEngine, en
           aria-label={text("搜索 WhyNavo 内容", "Search WhyNavo content")}
         />
         <button
-          type="button"
-          className="lucid-search-engine"
-          aria-label={text(`当前使用${engineLabel}，点击切换搜索引擎`, `Using ${engineLabel}. Click to switch search engine`)}
-          title={text("单击切换百度 / Google", "Click to switch Baidu / Google")}
-          onClick={onToggleEngine}
-        >
-          {engineLabel}
-        </button>
-        <button type="submit" className="lucid-search-web" title={text("搜索网络", "Search the web")} aria-label={text("搜索网络", "Search the web")}><Navigation size={17} /></button>
+          type="submit"
+          className="lucid-search-web"
+          title={text("使用浏览器默认搜索引擎", "Use the browser's default search engine")}
+          aria-label={text("使用浏览器默认搜索引擎搜索网络", "Search the web with the browser's default search engine")}
+        ><Navigation size={17} /></button>
       </form>
 
       {!normalizedQuery ? (
@@ -7563,13 +7526,6 @@ function SettingsDialog({ state, clock, updateCheck, migrationBackupAvailable, u
                   <ChevronRight size={16} />
                 </button>
               </div>
-              <label className="lucid-setting-row">
-                <div><strong>{text("搜索引擎", "Search engine")}</strong><span>{text("主页和搜索页使用同一个网络搜索引擎", "Home and Search use the same web search engine")}</span></div>
-                <select className="lucid-compact-input" value={settings.searchEngine || "baidu"} onChange={(event) => setSetting("searchEngine", event.target.value as SearchEngine)}>
-                  <option value="baidu">{searchEngineLabelFor(language, "baidu")}</option>
-                  <option value="google">Google</option>
-                </select>
-              </label>
               <label className="lucid-setting-row lucid-range-row">
                 <div><strong>{text("图标尺寸", "Icon size")}</strong><span>{text(`主页与空间统一为 ${settings.iconSize}px`, `Home and Spaces use ${settings.iconSize}px`)}</span></div>
                 <input type="range" min="48" max="80" value={settings.iconSize} onChange={(event) => setSetting("iconSize", Number(event.target.value))} />

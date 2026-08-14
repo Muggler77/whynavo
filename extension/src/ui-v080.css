@@ -228,13 +228,11 @@ body {
   box-shadow: inset 0 1px rgba(255, 255, 255, 0.8), 0 18px 48px rgba(17, 39, 46, 0.14);
 }
 
-.hero-search .engine-toggle,
 .hero-search .search-submit {
   color: #425860;
   background: rgba(230, 239, 241, 0.72);
 }
 
-.hero-search .engine-toggle:hover,
 .hero-search .search-submit:hover {
   color: #142127;
   background: #ffffff;
@@ -1095,11 +1093,6 @@ body {
   .search,
   .hero-search {
     grid-template-columns: auto 18px minmax(0, 1fr) 42px;
-  }
-
-  .engine-toggle {
-    min-width: 54px;
-    padding: 0 8px;
   }
 
   .home-shortcuts-row,

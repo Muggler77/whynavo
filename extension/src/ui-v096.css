@@ -605,11 +605,6 @@
   white-space: nowrap;
 }
 
-.lucid-search-engine {
-  display: inline-flex;
-  align-items: center;
-}
-
 /* Dark surfaces are defined on the root because dialogs and menus use portals. */
 :root[data-whynavo-theme="dark"] {
   --lucid-ink: #f7f9fa;

@@ -739,7 +739,6 @@ export function validateAppStatePayload(value: unknown, label = "数据"): asser
     "gridDensity",
     "dockPosition",
     "city",
-    "searchEngine",
     "navigationDisplay",
     "navigationSide",
     "timeZone",
@@ -776,7 +775,7 @@ export function validateAppStatePayload(value: unknown, label = "数据"): asser
     || !["top", "bottom"].includes(String(settings.dockPosition))
     || typeof settings.city !== "string"
     || settings.city.length > 500
-    || (settings.searchEngine !== undefined && !["baidu", "google"].includes(String(settings.searchEngine)))
+    || !validOptionalString(settings.searchEngine, 32)
     || (settings.navigationDisplay !== undefined && !["always", "auto", "hidden"].includes(String(settings.navigationDisplay)))
     || (settings.navigationSide !== undefined && !["left", "right"].includes(String(settings.navigationSide)))
     || (settings.timeZone !== undefined && !validTimeZone(settings.timeZone))
@@ -1507,8 +1506,9 @@ export function normalizeState(state: AppState): AppState {
       normalizedWidgets[key] = false;
     });
   }
+  const { searchEngine: _retiredSearchEngine, ...retainedSettings } = state.settings;
   const settings: Settings = {
-    ...state.settings,
+    ...retainedSettings,
     language: state.settings.language === "en-US" ? "en-US" : "zh-CN",
     wallpaper: visualVersion < 5 ? undefined : normalizeStoredImageReference(state.settings.wallpaper),
     wallpaperPreset: visualVersion < 12 && state.settings.wallpaperPreset === "coastal-glass"
@@ -1566,7 +1566,6 @@ export function normalizeState(state: AppState): AppState {
       ? state.settings.shortcutLabelShadow
       : "none",
     weatherUseLocation: state.settings.weatherUseLocation ?? false,
-    searchEngine: state.settings.searchEngine || "baidu",
     calendarRecords: state.settings.calendarRecords || {},
     supabaseUrl: DEFAULT_SUPABASE_URL,
     supabaseAnonKey: DEFAULT_SUPABASE_ANON_KEY,

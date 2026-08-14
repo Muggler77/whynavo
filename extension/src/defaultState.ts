@@ -100,7 +100,6 @@ export const defaultState = (): AppState => {
       dockPosition: "bottom",
       city: "Shanghai",
       weatherUseLocation: false,
-      searchEngine: "baidu",
       timeZone: "Asia/Shanghai",
       widgetOrder: defaultWidgetOrder,
       widgetSizes: defaultWidgetSizes,

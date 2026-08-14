@@ -1,0 +1,23 @@
+/* WhyNavo 0.9.24: Chrome-default search controls without provider switching. */
+
+.sample-a-hero .hero-search {
+  grid-template-columns: minmax(0, 1fr) 44px;
+}
+
+.sample-a-hero .hero-search .search-submit {
+  grid-column: 2;
+}
+
+.lucid-search-command {
+  grid-template-columns: 26px minmax(0, 1fr) 44px;
+}
+
+@media (max-width: 620px) {
+  .sample-a-hero .hero-search {
+    grid-template-columns: minmax(0, 1fr) 42px;
+  }
+
+  .lucid-search-command {
+    grid-template-columns: 22px minmax(0, 1fr) 40px;
+  }
+}

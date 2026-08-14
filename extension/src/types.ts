@@ -111,7 +111,6 @@ export type CustomWallpaper = {
   createdAt: string;
 };
 
-export type SearchEngine = "baidu" | "google";
 export type ShortcutLabelShadow = "none" | "soft" | "strong";
 
 export type Settings = {
@@ -136,7 +135,8 @@ export type Settings = {
   dockPosition: "top" | "bottom";
   city: string;
   weatherUseLocation?: boolean;
-  searchEngine?: SearchEngine;
+  /** @deprecated Accepted only while reading pre-0.9.24 state and removed during normalization. */
+  searchEngine?: string;
   calendarRecords?: Record<string, string>;
   visualRefreshVersion?: number;
   widgets: Record<WidgetKey, boolean>;

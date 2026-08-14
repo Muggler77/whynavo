@@ -34,7 +34,9 @@ data into a remote account.
 - Import and export for WhyNavo JSON, WeTab `.data`, browser bookmark HTML, and
   CSV shortcut lists.
 - Customizable spaces, navigation pages, icon choices, text icons, local image
-  icons, wallpaper choices, search engine, language, and widget layout.
+  icons, wallpaper choices, language, and widget layout.
+- Web search through Chrome's Search API, which always respects the search
+  provider selected by the user in Chrome settings.
 - Recurring task reminders through Chrome's local alarm and notification
   permissions, enabled only when the user requests them.
 - Responsive web support for desktop, tablet, and mobile browsers through the
@@ -60,16 +62,18 @@ policy.
 | --- | --- |
 | `alarms` | Schedules recurring local task checks while the new-tab page is closed. |
 | `storage` | Stores the small local reminder schedule used by the background service worker. |
+| `search` | Sends a user-submitted query to Chrome's Search API so Chrome, not WhyNavo, chooses the configured default search provider. WhyNavo never changes that provider. |
 | Optional `notifications` | Shows a reminder only after the user enables a task reminder. |
 | Optional `geolocation` | Lets the user choose current location for weather; it is never requested automatically. |
 | Host access to Open-Meteo | Retrieves weather and city data after the user enables the weather widget. |
 | Host access to Have I Been Pwned | Performs a privacy-preserving password range check during account registration and password replacement. Only a five-character SHA-1 prefix leaves the device. |
 | Host access to Supabase | Performs opt-in account authentication and account-scoped synchronization. |
-| Host access to the WhyNavo Pages app | Loads the reviewed CAPTCHA frame and hosted web version used by the product. |
+| Host access to the WhyNavo Pages app | Loads the isolated CAPTCHA document, version metadata, and reviewed public account/legal pages used by the product. |
 
-The extension has no content scripts, no `search` or `tabs` permission, no
-browsing history permission, no `favicon` permission, and no broad
-`http://*/*` access. Baidu and Google searches open ordinary HTTPS result URLs.
+The extension has no content scripts, no `tabs`, browsing-history, or `favicon`
+permission, and no broad `http://*/*` access. It does not replace or modify the
+user's default search provider. Every network search from the new-tab surface
+is submitted through `chrome.search.query`.
 
 ## Store privacy answers
 
@@ -83,8 +87,10 @@ browsing history permission, no `favicon` permission, and no broad
 - Is data transferred securely? Local data remains in the browser profile;
   optional sync uses authenticated HTTPS requests and account-scoped database
   policies.
-- Does the extension use remote code? No. The extension package contains the
-  application code and does not download executable JavaScript at runtime.
+- Does the extension use remote code? No. All WhyNavo extension logic is in the
+  submitted package. The Cloudflare Turnstile vendor widget runs only inside a
+  cross-origin sandboxed CAPTCHA web document at `whynavo.com`; its files and
+  vendor script are not included or executed as extension-page code.
 - Does the extension use an account? Only for optional synchronization.
 
 ## Reviewer notes
@@ -95,7 +101,10 @@ browsing history permission, no `favicon` permission, and no broad
 4. The optional notification and geolocation permissions are requested only
    after the corresponding feature is enabled.
 5. The web app and browser extension use separate build outputs; Cloudflare
-   Pages-only files are not present in the extension zip.
+   Pages-only files, including `captcha.html`, are not present in the extension
+   zip.
+6. Search from Home or Search calls the Chrome Search API with
+   `disposition: CURRENT_TAB`; there is no search-provider setting or override.
 
 ## Screenshot set
 
