@@ -1,7 +1,7 @@
 {
   "name": "whynavo",
   "private": true,
-  "version": "0.9.24",
+  "version": "0.9.25",
   "description": "WhyNavo browser new tab extension workspace",
   "scripts": {
     "dev": "npm --workspace extension run dev",
@@ -27,9 +27,11 @@
     "extension"
   ],
   "overrides": {
-    "postcss": "8.5.25"
+    "postcss": "8.5.25",
+    "nanoid": "6.0.0"
   },
   "devDependencies": {
-    "esbuild": "0.28.1"
+    "esbuild": "0.28.1",
+    "nanoid": "6.0.0"
   }
 }
