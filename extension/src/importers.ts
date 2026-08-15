@@ -186,22 +186,93 @@ export const fallbackFaviconFor = (url: string) => {
   return host ? `https://icons.duckduckgo.com/ip3/${host}.ico` : undefined;
 };
 
-export const siteIconCandidatesFor = (url: string) => {
+const faviconV2For = (url: string) => {
   const host = faviconHostFor(url);
-  if (!host) return [];
-  const origin = `https://${host}`;
-  return [
-    `${origin}/favicon.svg`,
-    `${origin}/android-chrome-512x512.png`,
-    `${origin}/web-app-manifest-512x512.png`,
-    `${origin}/icon-512.png`,
-    `${origin}/apple-touch-icon.png`,
-    `${origin}/apple-touch-icon-precomposed.png`,
-    `${origin}/android-chrome-192x192.png`,
-    `${origin}/favicon-192x192.png`,
-    `${origin}/favicon.png`,
-    `${origin}/favicon.ico`
-  ];
+  return host
+    ? `https://t0.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=${encodeURIComponent(`https://${host}`)}&size=256`
+    : undefined;
+};
+
+export const faviconCandidatesFor = (url: string) => [faviconFor(url), faviconV2For(url), fallbackFaviconFor(url)]
+  .filter((candidate): candidate is string => Boolean(candidate));
+
+const MULTI_LABEL_PUBLIC_SUFFIXES = new Set([
+  "ac.uk", "co.uk", "gov.uk", "org.uk", "net.uk",
+  "com.au", "net.au", "org.au", "com.br", "com.cn", "com.hk", "com.mx",
+  "co.jp", "co.kr", "com.sg", "com.tw", "co.in", "com.tr", "com.ua"
+]);
+
+const iconOriginsFor = (url: string) => {
+  try {
+    const parsed = new URL(cleanUrl(url));
+    const host = parsed.hostname.toLowerCase();
+    const securePort = parsed.port ? `:${parsed.port}` : "";
+    const origins = [`https://${host}${securePort}`];
+    const canonicalHost = host.replace(/^www\./, "");
+    if (canonicalHost !== host) origins.push(`https://${canonicalHost}${securePort}`);
+    const hostParts = canonicalHost.split(".");
+    const suffix = hostParts.slice(-2).join(".");
+    const baseHost = hostParts.length >= 3
+      ? `${hostParts.slice(-(MULTI_LABEL_PUBLIC_SUFFIXES.has(suffix) ? 3 : 2)).join(".")}`
+      : canonicalHost;
+    if (baseHost !== canonicalHost && !baseHost.includes("..")) origins.push(`https://${baseHost}`);
+    return [...new Set(origins)];
+  } catch {
+    return [];
+  }
+};
+
+const SITE_ICON_PATHS = [
+  "/favicon.svg",
+  "/icon.svg",
+  "/android-chrome-512x512.png",
+  "/web-app-manifest-512x512.png",
+  "/icon-512.png",
+  "/favicon-512x512.png",
+  "/icons/icon-512x512.png",
+  "/assets/icon-512.png",
+  "/apple-touch-icon.png",
+  "/apple-touch-icon-180x180.png",
+  "/apple-touch-icon-precomposed.png",
+  "/favicon-192x192.png",
+  "/android-chrome-192x192.png",
+  "/web-app-manifest-192x192.png",
+  "/icon-192.png",
+  "/icons/icon-192x192.png",
+  "/assets/icon-192.png",
+  "/favicon.png",
+  "/icon.png",
+  "/site-icon.png",
+  "/assets/favicon.png",
+  "/assets/favicon.svg",
+  "/favicon.ico",
+  "/static/favicon.ico",
+  "/favicon-96x96.png",
+  "/favicon-48x48.png",
+  "/favicon-32x32.png"
+];
+
+export const siteIconCandidatesFor = (url: string) => {
+  if (!faviconHostFor(url)) return [];
+  const origins = iconOriginsFor(url);
+  if (!origins.length) return [];
+  const candidates = origins.flatMap((origin) => SITE_ICON_PATHS.map((path) => `${origin}${path}`));
+  try {
+    const parsed = new URL(cleanUrl(url));
+    const directory = parsed.pathname.endsWith("/")
+      ? parsed.pathname
+      : parsed.pathname.slice(0, parsed.pathname.lastIndexOf("/") + 1);
+    if (directory && directory !== "/") {
+      candidates.push(`${origins[0]}${directory}favicon.svg`, `${origins[0]}${directory}favicon.ico`);
+    }
+    if (parsed.pathname !== "/" && !/\/[^/]*\.[^/]+$/.test(parsed.pathname)) {
+      const routePath = parsed.pathname.endsWith("/") ? parsed.pathname : `${parsed.pathname}/`;
+      candidates.push(`${origins[0]}${routePath}favicon.svg`, `${origins[0]}${routePath}favicon.ico`);
+    }
+  } catch {
+    // Invalid or local URLs have already been filtered by iconOriginsFor.
+  }
+  return [...new Set(candidates)].slice(0, 48);
 };
 
 const simpleIcon = (slug: string) => `https://cdn.simpleicons.org/${slug}`;
@@ -276,8 +347,10 @@ export const curatedIconFor = (url: string, title = "") => {
   const host = faviconHostFor(url)?.replace(/^www\./, "").toLowerCase();
   const normalizedTitle = title.trim().toLowerCase();
   if (!host && !normalizedTitle) return undefined;
-  const hostRule = host ? curatedIconRules.find((item) => hostMatches(host, item.hosts)) : undefined;
-  if (hostRule) return hostRule.iconUrl;
+  if (host) {
+    const hostRule = curatedIconRules.find((item) => hostMatches(host, item.hosts));
+    return hostRule?.iconUrl;
+  }
   const titleRule = normalizedTitle
     ? curatedIconRules.find((item) => item.title?.some((keyword) => titleMatchesCuratedKeyword(normalizedTitle, keyword)))
     : undefined;

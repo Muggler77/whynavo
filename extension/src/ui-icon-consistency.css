@@ -1,0 +1,70 @@
+/* Adaptive icon fitting shared by Home, Spaces, Search, folders, previews and Dock. */
+
+.shortcut-icon .shortcut-icon-image,
+.lucid-result-icon .shortcut-icon-image,
+.dock a .shortcut-icon-image {
+  position: absolute;
+  display: block;
+  max-width: none;
+  margin: 0;
+  border-radius: inherit;
+  filter: none;
+}
+
+.shortcut-icon .shortcut-icon-image.is-contain:not(.is-compact),
+.lucid-result-icon .shortcut-icon-image.is-contain:not(.is-compact),
+.dock a .shortcut-icon-image.is-contain:not(.is-compact),
+.sample-a-sites-panel .home-shortcut .shortcut-icon .shortcut-icon-image.is-contain:not(.is-compact) {
+  inset: 8% !important;
+  width: 84% !important;
+  height: 84% !important;
+  object-fit: contain !important;
+  transform: none !important;
+  filter: none !important;
+}
+
+.shortcut-icon .shortcut-icon-image.is-cover,
+.lucid-result-icon .shortcut-icon-image.is-cover,
+.dock a .shortcut-icon-image.is-cover,
+.sample-a-sites-panel .home-shortcut .shortcut-icon .shortcut-icon-image.is-cover {
+  inset: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover !important;
+  transform: none !important;
+  filter: none !important;
+}
+
+.collected-icon-grid img.is-contain:not(.is-compact),
+.folder-icon img.is-contain:not(.is-compact) {
+  width: 84% !important;
+  height: 84% !important;
+  object-fit: contain !important;
+}
+
+.folder-icon img.is-contain:not(.is-compact) {
+  position: absolute;
+  inset: 8% !important;
+  transform: none !important;
+}
+
+.collected-icon-grid img.is-cover,
+.folder-icon img.is-cover {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover !important;
+}
+
+.folder-icon img.is-cover {
+  position: absolute;
+  inset: 0 !important;
+  transform: none !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .shortcut-icon-image,
+  .collected-icon-grid img,
+  .folder-icon img {
+    transition: none !important;
+  }
+}

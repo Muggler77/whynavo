@@ -88,7 +88,7 @@ import { createContext, lazy, Suspense, useCallback, useContext, useEffect, useL
 import { createPortal } from "react-dom";
 import { accountScopedKey, adoptLegacyStateForAccount, clearLocalAccountDeletionPending, clearLocalDeletedAccountMarkerForVerifiedUser, commitAnonymousStateAdoption, deleteKey, deleteLocalAccountData, downloadJson, downloadText, hasLegacyUnscopedState, loadStateForAccount, markLocalAccountDeletionPending, mergeAndSaveStateForAccount, readKey, readPendingLocalAccountDeletionIds, saveStateForAccount, writeKey } from "./db";
 import { defaultNavigationOrder, defaultState, defaultWidgetOrder, defaultWidgetSizes, nowIso, uid } from "./defaultState";
-import { MAX_IMPORTED_SHORTCUTS, MAX_IMPORT_TEXT_CHARS, colorFor, curatedIconCount, curatedIconFor, fallbackFaviconFor, faviconFor, importedToShortcuts, normalizeIconReference, parseImportText, siteIconCandidatesFor } from "./importers";
+import { MAX_IMPORTED_SHORTCUTS, MAX_IMPORT_TEXT_CHARS, colorFor, curatedIconCount, curatedIconFor, faviconCandidatesFor, fallbackFaviconFor, faviconFor, importedToShortcuts, normalizeIconReference, parseImportText, siteIconCandidatesFor } from "./importers";
 import { MIGRATION_BACKUP_KEY, type StateBackup } from "./migrations";
 import { fetchRates, getCachedRates } from "./rates";
 import { checkWebTaskReminders, isRecurringTodoDueOn, isTodoCompletedForDate, nextTodoCompletion, recurrenceLabel, requestTaskReminderPermission, syncTaskReminders } from "./reminders";
@@ -174,9 +174,10 @@ const WEATHER_CACHE_MAX_AGE_MS = 60 * 60 * 1000;
 const RATES_CACHE_MAX_AGE_MS = 6 * 60 * 60 * 1000;
 const ICON_LOAD_TIMEOUT_MS = 5000;
 const ICON_FAILURE_RETRY_MS = 6 * 60 * 60 * 1000;
-const MIN_SHARP_ICON_SIZE = 192;
+const MIN_SHARP_ICON_SIZE = 128;
 const MIN_COMPACT_ICON_SIZE = 48;
 const MIN_COMPACT_RENDER_SIZE = 20;
+const DEFAULT_ICON_RENDER_SIZE = 64;
 const SHORTCUT_RENDER_BATCH = 96;
 const SHORTCUT_STABLE_RENDER_LIMIT = 360;
 const ICON_MANAGER_RENDER_BATCH = 80;
@@ -237,6 +238,14 @@ const shortcutLabelShadowCss = (value?: ShortcutLabelShadow) => {
   if (value === "strong") return "0 2px 8px rgba(0, 0, 0, 0.58)";
   return "none";
 };
+
+const DEFAULT_SHORTCUT_LABEL_COLOR = "#34434a";
+const DARK_SHORTCUT_LABEL_COLOR = "#f4f7f6";
+const shortcutLabelColorForTheme = (value: string | undefined, theme: AppState["settings"]["theme"]) => (
+  theme === "dark" && (!value || value.toLowerCase() === DEFAULT_SHORTCUT_LABEL_COLOR)
+    ? DARK_SHORTCUT_LABEL_COLOR
+    : value || DEFAULT_SHORTCUT_LABEL_COLOR
+);
 
 const hasPasswordRecoveryMarker = () => {
   const hash = new URLSearchParams(window.location.hash.slice(1));
@@ -523,6 +532,7 @@ const iconUrlMatches = (value: string | undefined, hosts: string[], pathPrefix: 
 };
 const isGeneratedFaviconUrl = (url?: string) => (
   iconUrlMatches(url, ["google.com", "www.google.com"], "/s2/favicons")
+  || iconUrlMatches(url, ["gstatic.com", "t0.gstatic.com"], "/faviconV2")
   || iconUrlMatches(url, ["icons.duckduckgo.com"], "/ip3/")
 );
 const isSimpleIconsUrl = (url?: string) => iconUrlMatches(url, ["cdn.simpleicons.org"], "/");
@@ -785,30 +795,46 @@ const isFreshFailedIconCache = (value?: string) => {
 
 const isVectorIconUrl = (url: string) => /(?:\.svg(?:[?#]|$)|^data:image\/svg\+xml)/i.test(url);
 const isVectorIconReference = (url: string) => isVectorIconUrl(url) || isSimpleIconsUrl(url);
-type IconPresentation = { mode: "full" | "compact"; edge: number };
-const fullIconPresentation = (): IconPresentation => ({ mode: "full", edge: 0 });
+type IconFit = "cover" | "contain";
+type IconPresentation = { mode: "full" | "compact"; edge: number; fit: IconFit };
+const fullIconPresentation = (fit: IconFit = "contain"): IconPresentation => ({ mode: "full", edge: 0, fit });
+const rasterIconFit = (image: HTMLImageElement): IconFit => {
+  const aspectRatio = image.naturalWidth / Math.max(image.naturalHeight, 1);
+  return aspectRatio >= 0.86 && aspectRatio <= 1.16 ? "cover" : "contain";
+};
 const rasterIconPresentation = (image: HTMLImageElement): IconPresentation | undefined => {
-  const renderedSize = Math.max(image.getBoundingClientRect().width, image.getBoundingClientRect().height);
+  const bounds = image.getBoundingClientRect();
+  const measuredSize = Math.max(bounds.width, bounds.height);
+  const renderedSize = measuredSize > 0 ? measuredSize : DEFAULT_ICON_RENDER_SIZE;
   const pixelRatio = Math.min(Math.max(window.devicePixelRatio || 1, 1), 2);
   const requiredEdge = Math.max(MIN_SHARP_ICON_SIZE, Math.ceil(renderedSize * pixelRatio));
   const sourceEdge = Math.min(image.naturalWidth, image.naturalHeight);
-  if (sourceEdge >= requiredEdge) return fullIconPresentation();
+  const fit = rasterIconFit(image);
+  if (sourceEdge >= requiredEdge) return fullIconPresentation(fit);
   const compactEdge = Math.min(Math.floor(renderedSize * 0.72), Math.floor(sourceEdge / pixelRatio));
   return sourceEdge >= MIN_COMPACT_ICON_SIZE && compactEdge >= MIN_COMPACT_RENDER_SIZE
-    ? { mode: "compact", edge: compactEdge }
+    ? { mode: "compact", edge: compactEdge, fit: "contain" }
     : undefined;
 };
 const encodeResolvedIcon = (url: string, presentation: IconPresentation) => (
-  presentation.mode === "compact" ? `compact:${presentation.edge}:${url}` : `full:${url}`
+  presentation.mode === "compact"
+    ? `compact:${presentation.edge}:${presentation.fit}:${url}`
+    : `full:${presentation.fit}:${url}`
 );
 const decodeResolvedIcon = (value?: string): { url: string; presentation: IconPresentation } | undefined => {
   if (!value || value.startsWith(FAILED_ICON_CACHE_PREFIX)) return undefined;
-  if (value.startsWith("full:")) return { url: value.slice(5), presentation: fullIconPresentation() };
-  const compactMatch = value.match(/^compact:(\d+):(https:\/\/.+)$/);
-  if (!compactMatch) return undefined;
-  const edge = Number(compactMatch[1]);
+  const fullMatch = value.match(/^full:(cover|contain):(https:\/\/.+)$/);
+  if (fullMatch) return { url: fullMatch[2], presentation: fullIconPresentation(fullMatch[1] as IconFit) };
+  if (value.startsWith("full:")) return { url: value.slice(5), presentation: fullIconPresentation("contain") };
+  const compactMatch = value.match(/^compact:(\d+):(cover|contain):(https:\/\/.+)$/);
+  const legacyCompactMatch = compactMatch ? undefined : value.match(/^compact:(\d+):(https:\/\/.+)$/);
+  const match = compactMatch || legacyCompactMatch;
+  if (!match) return undefined;
+  const edge = Number(match[1]);
+  const fit = compactMatch ? compactMatch[2] as IconFit : "contain";
+  const url = compactMatch ? compactMatch[3] : match[2];
   return Number.isFinite(edge) && edge >= MIN_COMPACT_RENDER_SIZE
-    ? { url: compactMatch[2], presentation: { mode: "compact", edge } }
+    ? { url, presentation: { mode: "compact", edge, fit } }
     : undefined;
 };
 const compactIconStyle = (presentation?: IconPresentation) => (
@@ -816,6 +842,26 @@ const compactIconStyle = (presentation?: IconPresentation) => (
     ? { "--compact-icon-edge": `${presentation.edge}px` } as React.CSSProperties
     : undefined
 );
+const iconPresentationClassName = (presentation?: IconPresentation) => {
+  if (!presentation) return "";
+  return `${presentation.mode === "compact" ? "is-compact " : ""}is-${presentation.fit}`;
+};
+
+const stableStringFingerprint = (...values: string[]) => {
+  let first = 0x811c9dc5;
+  let second = 0x9e3779b9;
+  let length = 0;
+  const mix = (code: number) => {
+    first = Math.imul(first ^ code, 0x01000193);
+    second = Math.imul(second ^ code, 0x85ebca6b);
+  };
+  values.forEach((value) => {
+    for (let index = 0; index < value.length; index += 1) mix(value.charCodeAt(index));
+    mix(0xffff);
+    length += value.length + 1;
+  });
+  return `${length.toString(36)}:${(first >>> 0).toString(36)}:${(second >>> 0).toString(36)}`;
+};
 
 const iconCandidatesFor = (url: string, iconUrl?: string, title = "") => {
   const builtInIcon = builtInShortcutIconFor(iconUrl);
@@ -834,12 +880,17 @@ const iconCandidatesFor = (url: string, iconUrl?: string, title = "") => {
   const directCandidates = siteIconCandidatesFor(url);
   const curated = curatedIconFor(url, title);
   const curatedIsVector = curated ? isVectorIconReference(curated) : false;
+  const primaryDirectCandidates = directCandidates.slice(0, 6);
+  const secondaryDirectCandidates = directCandidates.slice(6);
   const serviceIcon = faviconFor(url);
   const fallbackIcon = fallbackFaviconFor(url);
+  const serviceFallbacks = faviconCandidatesFor(url).filter((candidate) => candidate !== serviceIcon && candidate !== fallbackIcon);
   const candidates: Array<IconCandidate | undefined> = [
     curated ? { url: curated, kind: curatedIsVector ? "brand-mark" : "site-art", vector: curatedIsVector, fixed: false } : undefined,
-    ...directCandidates.map((candidate) => ({ url: candidate, kind: "site-art" as const, vector: isVectorIconReference(candidate), fixed: false })),
+    ...primaryDirectCandidates.map((candidate) => ({ url: candidate, kind: "site-art" as const, vector: isVectorIconReference(candidate), fixed: false })),
     serviceIcon ? { url: serviceIcon, kind: "site-art", vector: false, fixed: false } : undefined,
+    ...serviceFallbacks.map((candidate) => ({ url: candidate, kind: "site-art" as const, vector: false, fixed: false })),
+    ...secondaryDirectCandidates.map((candidate) => ({ url: candidate, kind: "site-art" as const, vector: isVectorIconReference(candidate), fixed: false })),
     fallbackIcon ? { url: fallbackIcon, kind: "site-art", vector: false, fixed: false } : undefined
   ];
   const seen = new Set<string>();
@@ -853,16 +904,16 @@ const iconCandidatesFor = (url: string, iconUrl?: string, title = "") => {
   });
 };
 
-const iconCandidateCacheKey = (candidates: IconCandidate[], url: string, iconUrl?: string) => {
+const iconCandidateCacheKey = (candidates: IconCandidate[], url: string, iconUrl?: string, title = "") => {
   const hasLocalCandidate = candidates.some((candidate) => candidate.url.startsWith("data:") || candidate.url.startsWith("blob:"));
   return hasLocalCandidate
-    ? `local:${url}:${iconUrl?.length || 0}:${iconUrl?.slice(-48) || ""}`
-    : candidates.map((candidate) => `${candidate.kind}:${candidate.url}`).join("|");
+    ? `local:${stableStringFingerprint(url, iconUrl || "", ...candidates.map((candidate) => `${candidate.kind}:${candidate.url}`))}`
+    : `remote:${stableStringFingerprint(comparableUrl(url), iconUrl || "", title.trim().toLocaleLowerCase())}`;
 };
 
 const invalidateResolvedShortcutIcon = (url: string, iconUrl?: string, title = "") => {
   const candidates = iconCandidatesFor(url, iconUrl, title);
-  const key = iconCandidateCacheKey(candidates, url, iconUrl);
+  const key = iconCandidateCacheKey(candidates, url, iconUrl, title);
   if (!key || !resolvedIconCache.delete(key)) return;
   scheduleResolvedIconCachePersist();
 };
@@ -876,48 +927,53 @@ function BuiltInShortcutIcon({ iconUrl, fallback = "" }: { iconUrl?: string; fal
 
 function ShortcutIconContent({ url, iconUrl, iconText, iconColor = "#64748B", iconUpdatedAt, title = "", fallback = "", priority = false }: { url: string; iconUrl?: string; iconText?: string; iconColor?: string; iconUpdatedAt?: string; title?: string; fallback?: string; priority?: boolean }) {
   const normalizedText = normalizeShortcutIconText(iconText);
-  if (normalizedText) return <ShortcutTextIcon text={normalizedText} color={iconColor} />;
   const builtInIcon = builtInShortcutIconFor(iconUrl);
+  const fixedIconUrl = isGeneratedFaviconUrl(iconUrl) && !iconUpdatedAt
+    ? undefined
+    : normalizeIconReference(iconUrl);
+  const fixedIconFingerprint = useMemo(
+    () => fixedIconUrl ? stableStringFingerprint(fixedIconUrl) : "",
+    [fixedIconUrl]
+  );
+  if (normalizedText) return <ShortcutTextIcon text={normalizedText} color={iconColor} />;
   if (builtInIcon) return <BuiltInShortcutIcon iconUrl={iconUrl} fallback={fallback} />;
-  const fixedIconUrl = isGeneratedFaviconUrl(iconUrl) ? undefined : normalizeIconReference(iconUrl);
   if (fixedIconUrl) {
-    const fixedIconKey = `${iconUpdatedAt || ""}:${fixedIconUrl.length}:${fixedIconUrl.slice(-96)}`;
-    return <FixedShortcutIconImage key={fixedIconKey} url={url} iconUrl={fixedIconUrl} iconColor={iconColor} alt={title} fallback={fallback} />;
+    const fixedIconKey = `${iconUpdatedAt || ""}:${fixedIconFingerprint}`;
+    return <FixedShortcutIconImage key={fixedIconKey} url={url} iconUrl={fixedIconUrl} fingerprint={fixedIconFingerprint} iconColor={iconColor} alt={title} fallback={fallback} />;
   }
   return <ShortcutIconImage url={url} iconUrl={iconUrl} iconColor={iconColor} refreshKey={iconUpdatedAt} title={title} fallback={fallback} priority={priority} />;
 }
 
-function FixedShortcutIconImage({ url, iconUrl, iconColor = "#64748B", alt = "", fallback = "" }: { url: string; iconUrl: string; iconColor?: string; alt?: string; fallback?: string }) {
+function FixedShortcutIconImage({ url, iconUrl, fingerprint, iconColor = "#64748B", alt = "", fallback = "" }: { url: string; iconUrl: string; fingerprint: string; iconColor?: string; alt?: string; fallback?: string }) {
   const isLocalIcon = iconUrl.startsWith("data:");
   const cacheKey = isLocalIcon
-    ? `fixed-local:${iconUrl.length}:${iconUrl.slice(-64)}`
+    ? `fixed-local:${fingerprint}`
     : `fixed-icon:${iconUrl}`;
-  const [renderUrl, setRenderUrl] = useState(isLocalIcon ? iconUrl : "");
+  const [renderUrl, setRenderUrl] = useState(iconUrl);
   const [loaded, setLoaded] = useState(false);
   const [failed, setFailed] = useState(false);
   const [presentation, setPresentation] = useState<IconPresentation>();
+  const cacheRecoveryAttemptedRef = useRef(false);
+  const objectUrlRef = useRef("");
+  const activeRef = useRef(true);
 
   useEffect(() => {
-    let active = true;
-    let objectUrl = "";
-    setRenderUrl(isLocalIcon ? iconUrl : "");
+    activeRef.current = true;
+    cacheRecoveryAttemptedRef.current = false;
+    if (objectUrlRef.current) {
+      URL.revokeObjectURL(objectUrlRef.current);
+      objectUrlRef.current = "";
+    }
+    setRenderUrl(iconUrl);
     setLoaded(false);
     setFailed(false);
     setPresentation(undefined);
-    if (!isLocalIcon) {
-      void readCachedSelectedIcon(iconUrl).then((blob) => {
-        if (!active) return;
-        if (blob) {
-          objectUrl = URL.createObjectURL(blob);
-          setRenderUrl(objectUrl);
-        } else {
-          setRenderUrl(iconUrl);
-        }
-      });
-    }
     return () => {
-      active = false;
-      if (objectUrl) URL.revokeObjectURL(objectUrl);
+      activeRef.current = false;
+      if (objectUrlRef.current) {
+        URL.revokeObjectURL(objectUrlRef.current);
+        objectUrlRef.current = "";
+      }
     };
   }, [cacheKey, iconUrl, isLocalIcon]);
 
@@ -930,7 +986,7 @@ function FixedShortcutIconImage({ url, iconUrl, iconColor = "#64748B", alt = "",
       {!loaded && <ShortcutTextIcon text={fallback || "网"} color={iconColor} />}
       {renderUrl && (
         <img
-          className={`shortcut-icon-image is-site-art ${presentation?.mode === "compact" ? "is-compact" : ""} ${loaded ? "is-loaded" : ""}`.trim()}
+          className={`shortcut-icon-image is-site-art ${iconPresentationClassName(presentation)} ${loaded ? "is-loaded" : ""}`.trim()}
           style={compactIconStyle(presentation)}
           src={renderUrl}
           alt={alt}
@@ -939,7 +995,7 @@ function FixedShortcutIconImage({ url, iconUrl, iconColor = "#64748B", alt = "",
           referrerPolicy="no-referrer"
           onLoad={(event) => {
             const nextPresentation = isVectorIconReference(iconUrl)
-              ? fullIconPresentation()
+              ? fullIconPresentation("contain")
               : rasterIconPresentation(event.currentTarget);
             if (!nextPresentation) {
               setLoaded(false);
@@ -951,7 +1007,24 @@ function FixedShortcutIconImage({ url, iconUrl, iconColor = "#64748B", alt = "",
           }}
           onError={() => {
             setLoaded(false);
-            setFailed(true);
+            if (isLocalIcon || cacheRecoveryAttemptedRef.current) {
+              setFailed(true);
+              return;
+            }
+            cacheRecoveryAttemptedRef.current = true;
+            void readCachedSelectedIcon(iconUrl).then((blob) => {
+              if (!activeRef.current) return;
+              if (!blob) {
+                setFailed(true);
+                return;
+              }
+              objectUrlRef.current = URL.createObjectURL(blob);
+              setRenderUrl(objectUrlRef.current);
+              setPresentation(undefined);
+              setFailed(false);
+            }).catch(() => {
+              if (activeRef.current) setFailed(true);
+            });
           }}
         />
       )}
@@ -961,19 +1034,25 @@ function FixedShortcutIconImage({ url, iconUrl, iconColor = "#64748B", alt = "",
 
 function ShortcutIconImage({ url, iconUrl, iconColor = "#64748B", refreshKey, title = "", alt = "", fallback = "", priority = false }: { url: string; iconUrl?: string; iconColor?: string; refreshKey?: string; title?: string; alt?: string; fallback?: string; priority?: boolean }) {
   const candidates = useMemo(() => iconCandidatesFor(url, iconUrl, title), [url, iconUrl, title, remoteIconLookupEnabled]);
-  const candidateKey = iconCandidateCacheKey(candidates, url, iconUrl);
+  const candidateKey = iconCandidateCacheKey(candidates, url, iconUrl, title);
   const initialCachedValue = resolvedIconCache.get(candidateKey);
+  const initialFailed = isFreshFailedIconCache(initialCachedValue);
   const initialResolvedIcon = decodeResolvedIcon(initialCachedValue);
   const initialCachedIndex = initialResolvedIcon ? candidates.findIndex((candidate) => candidate.url === initialResolvedIcon.url) : -1;
   const hasFixedCandidate = candidates.some((candidate) => candidate.fixed);
-  const [index, setIndex] = useState(initialCachedIndex >= 0 ? initialCachedIndex : 0);
-  const [loaded, setLoaded] = useState(initialCachedIndex >= 0);
-  const [presentation, setPresentation] = useState<IconPresentation | undefined>(initialCachedIndex >= 0 ? initialResolvedIcon?.presentation : undefined);
-  const [shouldLoad, setShouldLoad] = useState(priority || hasFixedCandidate || initialCachedIndex >= 0);
+  const [index, setIndex] = useState(initialFailed ? candidates.length : initialCachedIndex >= 0 ? initialCachedIndex : 0);
+  const [loaded, setLoaded] = useState(!initialFailed && initialCachedIndex >= 0);
+  const [presentation, setPresentation] = useState<IconPresentation | undefined>(!initialFailed && initialCachedIndex >= 0 ? initialResolvedIcon?.presentation : undefined);
+  const [shouldLoad, setShouldLoad] = useState(!initialFailed && (priority || hasFixedCandidate || initialCachedIndex >= 0));
   const imageRef = useRef<HTMLImageElement>(null);
   const loadedRef = useRef(initialCachedIndex >= 0);
   const hasLocalCandidate = candidates.some((candidate) => candidate.url.startsWith("data:") || candidate.url.startsWith("blob:"));
   const current = candidates[index];
+  const attemptId = current
+    ? stableStringFingerprint(candidateKey, String(index), current.url, refreshKey || "")
+    : "";
+  const activeAttemptRef = useRef(attemptId);
+  activeAttemptRef.current = attemptId;
 
   useEffect(() => {
     const cachedValue = resolvedIconCache.get(candidateKey);
@@ -981,6 +1060,7 @@ function ShortcutIconImage({ url, iconUrl, iconColor = "#64748B", refreshKey, ti
       setIndex(candidates.length);
       setLoaded(false);
       setPresentation(undefined);
+      setShouldLoad(false);
       loadedRef.current = false;
     } else {
       if (failedIconCacheTime(cachedValue) !== undefined) {
@@ -1011,17 +1091,39 @@ function ShortcutIconImage({ url, iconUrl, iconColor = "#64748B", refreshKey, ti
   }, [candidateKey, hasFixedCandidate, priority]);
 
   useEffect(() => {
+    const retryAfterNetworkRecovery = () => {
+      const cachedValue = resolvedIconCache.get(candidateKey);
+      if (!isFreshFailedIconCache(cachedValue)) return;
+      resolvedIconCache.delete(candidateKey);
+      scheduleResolvedIconCachePersist();
+      loadedRef.current = false;
+      setIndex(0);
+      setLoaded(false);
+      setPresentation(undefined);
+      setShouldLoad(true);
+    };
+    window.addEventListener("online", retryAfterNetworkRecovery);
+    return () => window.removeEventListener("online", retryAfterNetworkRecovery);
+  }, [candidateKey]);
+
+  useEffect(() => {
     if (!current || !shouldLoad) return undefined;
+    const activeAttempt = attemptId;
     const resolvedIcon = decodeResolvedIcon(resolvedIconCache.get(candidateKey));
     const alreadyResolved = resolvedIcon?.url === current.url;
     setLoaded(alreadyResolved);
     setPresentation(alreadyResolved ? resolvedIcon?.presentation : undefined);
     loadedRef.current = alreadyResolved;
     const timeout = window.setTimeout(() => {
-      if (!loadedRef.current) setIndex((value) => value + 1);
+      if (activeAttemptRef.current !== activeAttempt || loadedRef.current) return;
+      activeAttemptRef.current = "";
+      setIndex((value) => value === index ? value + 1 : value);
     }, ICON_LOAD_TIMEOUT_MS);
-    return () => window.clearTimeout(timeout);
-  }, [candidateKey, current, shouldLoad]);
+    return () => {
+      window.clearTimeout(timeout);
+      if (activeAttemptRef.current === activeAttempt) activeAttemptRef.current = "";
+    };
+  }, [attemptId, candidateKey, current, index, shouldLoad]);
 
   useEffect(() => {
     if (
@@ -1041,8 +1143,8 @@ function ShortcutIconImage({ url, iconUrl, iconColor = "#64748B", refreshKey, ti
       {!loaded && <ShortcutTextIcon text={fallbackText} color={iconColor} />}
       <img
         ref={imageRef}
-        key={current.url}
-        className={`shortcut-icon-image is-${current.kind} ${presentation?.mode === "compact" ? "is-compact" : ""} ${loaded ? "is-loaded" : ""}`.trim()}
+        key={attemptId}
+        className={`shortcut-icon-image is-${current.kind} ${iconPresentationClassName(presentation)} ${loaded ? "is-loaded" : ""}`.trim()}
         style={compactIconStyle(presentation)}
         src={shouldLoad ? current.url : undefined}
         alt={alt}
@@ -1050,13 +1152,17 @@ function ShortcutIconImage({ url, iconUrl, iconColor = "#64748B", refreshKey, ti
         decoding="async"
         referrerPolicy="no-referrer"
         onLoad={(event) => {
+          if (activeAttemptRef.current !== attemptId) return;
           const image = event.currentTarget;
-          const nextPresentation = current.vector ? fullIconPresentation() : rasterIconPresentation(image);
+          const nextPresentation = current.vector || current.kind === "brand-mark"
+            ? fullIconPresentation("contain")
+            : rasterIconPresentation(image);
           if (!nextPresentation) {
+            activeAttemptRef.current = "";
             loadedRef.current = false;
             setLoaded(false);
             setPresentation(undefined);
-            setIndex((value) => value + 1);
+            setIndex((value) => value === index ? value + 1 : value);
             return;
           }
           loadedRef.current = true;
@@ -1065,10 +1171,12 @@ function ShortcutIconImage({ url, iconUrl, iconColor = "#64748B", refreshKey, ti
           setLoaded(true);
         }}
         onError={() => {
+          if (activeAttemptRef.current !== attemptId) return;
+          activeAttemptRef.current = "";
           loadedRef.current = false;
           setLoaded(false);
           setPresentation(undefined);
-          setIndex((value) => value + 1);
+          setIndex((value) => value === index ? value + 1 : value);
         }}
       />
     </>
@@ -1087,7 +1195,7 @@ function IconChoicePreview({ src, fallback, onStatus }: { src: string; fallback:
   if (!safeSrc || failed) return <span className="icon-choice-fallback">{fallback}</span>;
   return (
     <img
-      className={presentation?.mode === "compact" ? "is-compact" : ""}
+      className={iconPresentationClassName(presentation)}
       style={compactIconStyle(presentation)}
       src={safeSrc}
       alt=""
@@ -1096,7 +1204,7 @@ function IconChoicePreview({ src, fallback, onStatus }: { src: string; fallback:
       referrerPolicy="no-referrer"
       onLoad={(event) => {
         const nextPresentation = isVectorIconReference(safeSrc)
-          ? fullIconPresentation()
+          ? fullIconPresentation("contain")
           : rasterIconPresentation(event.currentTarget);
         if (!nextPresentation) {
           setFailed(true);
@@ -1125,7 +1233,7 @@ function FolderIconContent({ iconUrl, size }: { iconUrl?: string; size: number }
   if (!safeIconUrl || safeIconUrl.startsWith("whynavo-icon:") || failed) return <Folder size={size} />;
   return (
     <img
-      className={presentation?.mode === "compact" ? "is-compact" : ""}
+      className={iconPresentationClassName(presentation)}
       style={compactIconStyle(presentation)}
       src={safeIconUrl}
       alt=""
@@ -1133,7 +1241,7 @@ function FolderIconContent({ iconUrl, size }: { iconUrl?: string; size: number }
       referrerPolicy="no-referrer"
       onLoad={(event) => {
         const nextPresentation = isVectorIconReference(safeIconUrl)
-          ? fullIconPresentation()
+          ? fullIconPresentation("contain")
           : rasterIconPresentation(event.currentTarget);
         if (nextPresentation) setPresentation(nextPresentation);
         else setFailed(true);
@@ -1376,6 +1484,7 @@ export default function App() {
   const activeUserIdRef = useRef<string | undefined>();
   const accountEpochRef = useRef(0);
   const syncLockRef = useRef<symbol | undefined>();
+  const externalDataRequestRef = useRef<symbol | undefined>();
   const persistenceErrorShownRef = useRef(false);
   const persistenceQueueRef = useRef<Promise<void>>(Promise.resolve());
   const undoSnapshotRef = useRef<AppState | undefined>();
@@ -2279,7 +2388,7 @@ export default function App() {
     undoSnapshotRef.current = undefined;
     setUndoLabel("");
     applyState(restored);
-    setToast("已撤销");
+    setToast(text("已撤销", "Undone"));
     setToastAction(undefined);
     window.setTimeout(() => setToast(""), 1800);
   };
@@ -2293,12 +2402,18 @@ export default function App() {
   const refreshExternalData = async (target = state, feedback = false) => {
     const requestEpoch = accountEpochRef.current;
     const requestUserId = activeUserIdRef.current;
-    const stillCurrentAccount = () => isCurrentAccountOperation(requestEpoch, requestUserId);
+    const requestToken = Symbol("external-data-request");
+    externalDataRequestRef.current = requestToken;
+    const isLatestRequest = () => externalDataRequestRef.current === requestToken;
+    const canApplyResult = () => isLatestRequest() && isCurrentAccountOperation(requestEpoch, requestUserId);
     if (feedback) {
       showToast(text("正在刷新天气和汇率...", "Refreshing weather and exchange rates..."));
       setWeatherRefreshing(true);
       setRatesRefreshing(true);
       setRatesMessage(text("正在刷新...", "Refreshing..."));
+    } else {
+      setWeatherRefreshing(false);
+      setRatesRefreshing(false);
     }
 
     const weatherTask = (async () => {
@@ -2307,26 +2422,27 @@ export default function App() {
           .then((position) => fetchWeatherByCoordinates(position.latitude, position.longitude, target.settings.city, requestUserId))
           .catch(() => fetchWeather(target.settings.city, requestUserId))
         : await fetchWeather(target.settings.city, requestUserId);
-      if (!stillCurrentAccount()) return false;
+      if (!canApplyResult()) return false;
       setWeather(nextWeather);
       return true;
     })().catch(async () => {
       const cached = await getCachedWeather(requestUserId).catch(() => undefined);
-      if (cached && stillCurrentAccount()) setWeather(cached);
+      if (cached && canApplyResult()) setWeather(cached);
       return false;
     }).finally(() => {
-      if (feedback) setWeatherRefreshing(false);
+      if (feedback && isLatestRequest()) setWeatherRefreshing(false);
     });
 
     const ratesTask = (async () => {
       const nextRates = await fetchRates(target.settings.supabaseUrl, target.settings.supabaseAnonKey);
-      if (!stillCurrentAccount()) return false;
+      if (!canApplyResult()) return false;
       setRates(nextRates);
       setRatesMessage(nextRates.stale ? text("云端缓存", "Cloud cache") : text("已更新", "Updated"));
       return !nextRates.stale;
     })().catch(async (error) => {
       const cached = await getCachedRates().catch(() => undefined);
-      if (cached && stillCurrentAccount()) {
+      if (!canApplyResult()) return false;
+      if (cached) {
         setRates(cached);
         if (feedback) setRatesMessage(text("已使用缓存", "Using cached data"));
       } else {
@@ -2334,15 +2450,16 @@ export default function App() {
       }
       return false;
     }).finally(() => {
-      if (feedback) setRatesRefreshing(false);
+      if (feedback && isLatestRequest()) setRatesRefreshing(false);
     });
 
     const [weatherUpdated, ratesUpdated] = await Promise.all([weatherTask, ratesTask]);
-    if (feedback && stillCurrentAccount()) {
-      if (weatherUpdated && ratesUpdated) showToast("天气和汇率已刷新");
-      else if (weatherUpdated || ratesUpdated) showToast("部分数据已刷新，另一项暂时不可用或已使用缓存");
-      else showToast("刷新失败，已尽量使用本机缓存");
+    if (feedback && canApplyResult()) {
+      if (weatherUpdated && ratesUpdated) showToast(text("天气和汇率已刷新", "Weather and exchange rates refreshed"));
+      else if (weatherUpdated || ratesUpdated) showToast(text("部分数据已刷新，另一项暂时不可用或已使用缓存", "Some data refreshed; the other source is unavailable or using cache"));
+      else showToast(text("刷新失败，已尽量使用本机缓存", "Refresh failed; local cache was used where possible"));
     }
+    if (isLatestRequest()) externalDataRequestRef.current = undefined;
   };
 
   const runUpdateCheck = useCallback(async (feedback = false) => {
@@ -3765,7 +3882,7 @@ export default function App() {
     "--wallpaper-image": cssImageUrl(activeWallpaper),
     "--date-color": state.settings.dateTimeColor || "#ffffff",
     "--widget-glass": `${state.settings.glass}%`,
-    "--shortcut-label-color": state.settings.shortcutLabelColor || "#34434a",
+    "--shortcut-label-color": shortcutLabelColorForTheme(state.settings.shortcutLabelColor, state.settings.theme),
     "--shortcut-label-shadow": shortcutLabelShadowCss(state.settings.shortcutLabelShadow)
   } as React.CSSProperties;
   const widgetSizes = { ...defaultWidgetSizes, ...(state.settings.widgetSizes || {}) };
@@ -4168,7 +4285,7 @@ export default function App() {
               shortcutCount={allShortcuts.length}
               folderCount={allFolders.length}
               widgetCount={widgetOrder.filter((key) => state.settings.widgets[key]).length}
-              syncLabel={sync.user ? "已登录" : "未登录"}
+              syncLabel={sync.user ? text("已登录", "Signed in") : text("未登录", "Signed out")}
               onOpenWidgets={() => goToPage("widgets")}
               onOpenShortcuts={() => goToPage("shortcuts")}
               onAddShortcut={() => setDialog("shortcut")}
@@ -4216,8 +4333,12 @@ export default function App() {
                         key={shortcut.id}
                         data-shortcut-id={shortcut.id}
                         onDragStart={() => setDragId(shortcut.id)}
+                        onDragEnd={() => setDragId(undefined)}
                         onDragOver={(event) => event.preventDefault()}
-                        onDrop={() => moveShortcut(shortcut.id)}
+                        onDrop={() => {
+                          moveShortcut(shortcut.id);
+                          setDragId(undefined);
+                        }}
                       >
                         <a href={safeHttpHref(shortcut.url)} title={shortcut.url} target="_blank" rel="noreferrer">
                           <span className="shortcut-icon">
@@ -4469,13 +4590,17 @@ export default function App() {
           onOpenTimeZone={() => setDialog("timezone")}
           onOpenWallpapers={() => setDialog("wallpapers")}
           onWeatherUseLocationChange={async (enabled) => {
+            const requestEpoch = accountEpochRef.current;
+            const requestUserId = activeUserIdRef.current;
             if (enabled) {
               const granted = await requestDeviceLocationPermission().catch(() => false);
+              if (!isCurrentAccountOperation(requestEpoch, requestUserId)) return;
               if (!granted) {
-                showToast("未授予定位权限，继续使用所选城市天气");
+                showToast(text("未授予定位权限，继续使用所选城市天气", "Location access was not granted. Weather will keep using the selected city."));
                 return;
               }
             }
+            if (!isCurrentAccountOperation(requestEpoch, requestUserId)) return;
             updateState((current) => ({
               ...current,
               settings: {
@@ -4487,7 +4612,7 @@ export default function App() {
           }}
           onClose={() => {
             setDialog(null);
-            void refreshExternalData(state, true);
+            void refreshExternalData(stateRef.current, true);
           }}
         />
       )}
@@ -4665,10 +4790,10 @@ export default function App() {
         />
       )}
       {toast && (
-        <div className="toast">
+        <div className="toast" role="status" aria-live="polite" aria-atomic="true">
           <span>{toast}</span>
           {toastAction && <button type="button" onClick={toastAction.onClick}>{toastAction.label}</button>}
-          {undoSnapshotRef.current && undoLabel && <button type="button" onClick={undoLastChange}>撤销</button>}
+          {undoSnapshotRef.current && undoLabel && <button type="button" onClick={undoLastChange}>{text("撤销", "Undo")}</button>}
         </div>
       )}
       </main>
@@ -4691,6 +4816,8 @@ function ToolHub({ shortcutCount, folderCount, widgetCount, syncLabel, onOpenWid
   onRefresh: () => void;
   onWallpaper: () => void;
 }) {
+  const language = useUiLanguage();
+  const text = (zh: string, en: string) => localized(language, zh, en);
   const [translateText, setTranslateText] = useState("");
   const [numberText, setNumberText] = useState("2026");
   const [pxText, setPxText] = useState("16");
@@ -4703,43 +4830,43 @@ function ToolHub({ shortcutCount, folderCount, widgetCount, syncLabel, onOpenWid
   const openTranslate = () => {
     const query = translateText.trim();
     const url = query
-      ? `https://translate.google.com/?sl=auto&tl=zh-CN&text=${encodeURIComponent(query)}&op=translate`
+      ? `https://translate.google.com/?sl=auto&tl=${language === "zh-CN" ? "zh-CN" : "en"}&text=${encodeURIComponent(query)}&op=translate`
       : "https://translate.google.com/";
     window.open(url, "_blank", "noopener,noreferrer");
   };
   const tools: Array<{ title: string; desc: string; icon: React.ReactNode; action: () => void; primary?: boolean; accent?: string }> = [
-    { title: "资源中心", desc: `${widgetCount} 个小组件 · 壁纸/图标`, icon: <Palette size={22} />, action: onSettings, primary: true },
-    { title: "网站管理", desc: `${shortcutCount} 个网站 · ${folderCount} 个文件夹`, icon: <Layers size={22} />, action: onOpenShortcuts, primary: true },
-    { title: "新建网站", desc: "添加一个常用入口", icon: <Plus size={22} />, action: onAddShortcut },
-    { title: "新建文件夹", desc: "整理同类网站", icon: <FolderPlus size={22} />, action: onAddFolder },
-    { title: "云同步", desc: syncLabel, icon: <UserCircle size={22} />, action: onSync },
-    { title: "刷新数据", desc: "天气与汇率", icon: <RefreshCcw size={22} />, action: onRefresh },
-    { title: "时区", desc: "调整时间显示", icon: <Clock3 size={22} />, action: onTimezone },
-    { title: "换壁纸", desc: "切换内置背景", icon: <Shuffle size={22} />, action: onWallpaper },
-    { title: "回到主页", desc: "查看小组件", icon: <CalendarDays size={22} />, action: onOpenWidgets }
+    { title: text("资源中心", "Resource center"), desc: text(`${widgetCount} 个小组件 · 壁纸/图标`, `${widgetCount} widgets · wallpapers/icons`), icon: <Palette size={22} />, action: onSettings, primary: true },
+    { title: text("网站管理", "Manage sites"), desc: text(`${shortcutCount} 个网站 · ${folderCount} 个文件夹`, `${shortcutCount} sites · ${folderCount} folders`), icon: <Layers size={22} />, action: onOpenShortcuts, primary: true },
+    { title: text("新建网站", "Add site"), desc: text("添加一个常用入口", "Create a shortcut"), icon: <Plus size={22} />, action: onAddShortcut },
+    { title: text("新建文件夹", "Add folder"), desc: text("整理同类网站", "Organize related sites"), icon: <FolderPlus size={22} />, action: onAddFolder },
+    { title: text("云同步", "Cloud sync"), desc: syncLabel, icon: <UserCircle size={22} />, action: onSync },
+    { title: text("刷新数据", "Refresh data"), desc: text("天气与汇率", "Weather and exchange rates"), icon: <RefreshCcw size={22} />, action: onRefresh },
+    { title: text("时区", "Time zone"), desc: text("调整时间显示", "Adjust displayed time"), icon: <Clock3 size={22} />, action: onTimezone },
+    { title: text("换壁纸", "Change wallpaper"), desc: text("切换内置背景", "Cycle built-in backgrounds"), icon: <Shuffle size={22} />, action: onWallpaper },
+    { title: text("回到主页", "Back to Home"), desc: text("查看小组件", "View widgets"), icon: <CalendarDays size={22} />, action: onOpenWidgets }
   ];
 
   return (
-    <section className="tool-hub" aria-label="工具箱">
+    <section className="tool-hub" aria-label={text("工具箱", "Toolbox")}>
       <div className="tool-hero">
-        <h2>工具箱</h2>
+        <h2>{text("工具箱", "Toolbox")}</h2>
       </div>
       <div className="tool-utility-grid">
         <section className="tool-utility-panel translate-tool">
-          <div className="tool-panel-title"><Search size={18} /><span>翻译</span></div>
-          <textarea value={translateText} onChange={(event) => setTranslateText(event.target.value)} placeholder="输入内容后打开翻译" />
-          <button type="button" className="primary" onClick={openTranslate}>打开翻译</button>
+          <div className="tool-panel-title"><Search size={18} /><span>{text("翻译", "Translate")}</span></div>
+          <textarea value={translateText} onChange={(event) => setTranslateText(event.target.value)} placeholder={text("输入内容后打开翻译", "Enter text to translate")} />
+          <button type="button" className="primary" onClick={openTranslate}>{text("打开翻译", "Open Translate")}</button>
         </section>
         <section className="tool-utility-panel number-tool">
-          <div className="tool-panel-title"><BookOpen size={18} /><span>数字工具</span></div>
-          <input aria-label="十进制数字" inputMode="decimal" value={numberText} onChange={(event) => setNumberText(event.target.value)} />
+          <div className="tool-panel-title"><BookOpen size={18} /><span>{text("数字工具", "Number tools")}</span></div>
+          <input aria-label={text("十进制数字", "Decimal number")} inputMode="decimal" value={numberText} onChange={(event) => setNumberText(event.target.value)} />
           <div className="tool-result-grid">
-            <div><span>二进制</span><strong>{validNumber ? Math.trunc(numericValue).toString(2) : "--"}</strong></div>
-            <div><span>十六进制</span><strong>{validNumber ? Math.trunc(numericValue).toString(16).toUpperCase() : "--"}</strong></div>
+            <div><span>{text("二进制", "Binary")}</span><strong>{validNumber ? Math.trunc(numericValue).toString(2) : "--"}</strong></div>
+            <div><span>{text("十六进制", "Hexadecimal")}</span><strong>{validNumber ? Math.trunc(numericValue).toString(16).toUpperCase() : "--"}</strong></div>
           </div>
         </section>
         <section className="tool-utility-panel size-tool">
-          <div className="tool-panel-title"><TimerReset size={18} /><span>尺寸换算</span></div>
+          <div className="tool-panel-title"><TimerReset size={18} /><span>{text("尺寸换算", "Size conversion")}</span></div>
           <div className="tool-inline-inputs">
             <label><span>px</span><input inputMode="decimal" value={pxText} onChange={(event) => setPxText(event.target.value)} /></label>
             <label><span>base</span><input inputMode="decimal" value={baseText} onChange={(event) => setBaseText(event.target.value)} /></label>
@@ -5309,9 +5436,10 @@ function TasksWorkspace({ state, updateState }: {
 }
 
 function Dock({ shortcuts }: { shortcuts: Shortcut[] }) {
+  const language = useUiLanguage();
   if (!shortcuts.length) return null;
   return (
-    <nav className="dock" aria-label="固定快捷入口">
+    <nav className="dock" aria-label={localized(language, "固定快捷入口", "Pinned shortcuts")}>
       {shortcuts.slice(0, 14).map((shortcut) => (
         <a key={shortcut.id} data-shortcut-id={shortcut.id} href={safeHttpHref(shortcut.url)} title={shortcut.title} target="_blank" rel="noreferrer">
           <ShortcutIconContent url={shortcut.url} iconUrl={shortcut.iconUrl} iconText={shortcut.iconText} iconColor={shortcut.iconColor} iconUpdatedAt={shortcut.iconUpdatedAt} title={shortcut.title} fallback={shortcut.title.slice(0, 1)} />
@@ -6675,13 +6803,25 @@ function ShortcutDialog({ shortcut, groups, folders, onClose, onSave }: {
   const iconTitle = draft.title || shortcut?.title || "";
   const iconUrl = draft.url || shortcut?.url || "";
   const iconColor = draft.iconColor || "#14B8A6";
+  const normalizedIconSourceUrl = normalizeHttpUrl(iconUrl) || iconUrl.trim();
+  const iconSourceUrlRef = useRef(normalizeHttpUrl(shortcut?.url || "") || (shortcut?.url || "").trim());
+  useEffect(() => {
+    if (iconSourceUrlRef.current === normalizedIconSourceUrl) return;
+    iconSourceUrlRef.current = normalizedIconSourceUrl;
+    setIconChoiceStatus({});
+    setIconProbe((current) => current + 1);
+    setOnlineIconUrl(curatedIconFor(normalizedIconSourceUrl) || "");
+  }, [normalizedIconSourceUrl]);
   const collectedIconChoices = useMemo(() => {
-    const siteCandidates = siteIconCandidatesFor(iconUrl).slice(0, 2);
+    const siteCandidates = siteIconCandidatesFor(iconUrl).slice(0, 8);
+    const fallbackIcon = fallbackFaviconFor(iconUrl);
+    const providerCandidates = faviconCandidatesFor(iconUrl).filter((url) => url !== fallbackIcon);
     const rows: Array<{ label: string; url?: string }> = [
       { label: text("当前", "Current"), url: onlineIconUrl && !onlineIconUrl.startsWith(builtInIconPrefix) ? normalizeIconReference(onlineIconUrl) : undefined },
       { label: text("品牌", "Brand"), url: curatedIconFor(iconUrl, iconTitle) },
       ...siteCandidates.map((url, index) => ({ label: text(`站点 ${index + 1}`, `Site ${index + 1}`), url })),
-      { label: text("备用", "Backup"), url: fallbackFaviconFor(iconUrl) }
+      ...providerCandidates.map((url, index) => ({ label: text(`服务 ${index + 1}`, `Provider ${index + 1}`), url })),
+      { label: text("备用", "Backup"), url: fallbackIcon }
     ];
     const availableRows = rows.filter((item): item is { label: string; url: string } => Boolean(item.url));
     const seen = new Set<string>();
@@ -7058,22 +7198,31 @@ function ResourceCenterDialog({ state, shortcuts, updateState, initialTab = "wid
         wallpaperCollection: [...(current.settings.wallpaperCollection || []), ...additions.map((item) => item.id)],
         wallpaperPreset: additions[0]?.id || current.settings.wallpaperPreset,
         wallpaper: undefined,
+        wallpaperRotation: false,
         updatedAt: nowIso()
       }
     }));
+    if (additions[0]) setAppliedWallpaperId(additions[0].id);
   };
 
   const removeCustomWallpaper = (id: string) => {
-    updateState((current) => ({
-      ...current,
-      settings: {
-        ...current.settings,
-        customWallpapers: (current.settings.customWallpapers || []).filter((item) => item.id !== id),
-        wallpaperCollection: (current.settings.wallpaperCollection || []).filter((item) => item !== id),
-        wallpaperPreset: current.settings.wallpaperPreset === id ? builtInWallpapers[0].id : current.settings.wallpaperPreset,
-        updatedAt: nowIso()
-      }
-    }));
+    updateState((current) => {
+      const removed = (current.settings.customWallpapers || []).find((item) => item.id === id);
+      const removedWasApplied = current.settings.wallpaperPreset === id;
+      return {
+        ...current,
+        settings: {
+          ...current.settings,
+          customWallpapers: (current.settings.customWallpapers || []).filter((item) => item.id !== id),
+          wallpaperCollection: (current.settings.wallpaperCollection || []).filter((item) => item !== id),
+          wallpaper: removed?.dataUrl === current.settings.wallpaper ? undefined : current.settings.wallpaper,
+          wallpaperPreset: removedWasApplied ? builtInWallpapers[0].id : current.settings.wallpaperPreset,
+          wallpaperRotation: removedWasApplied ? false : current.settings.wallpaperRotation,
+          updatedAt: nowIso()
+        }
+      };
+    });
+    setAppliedWallpaperId((current) => current === id ? undefined : current);
   };
 
 
@@ -7443,7 +7592,7 @@ function SettingsDialog({ state, clock, updateCheck, migrationBackupAvailable, u
         ? selectedWallpaper?.name
         : selectedWallpaper?.id.split("-").map((part) => part.charAt(0).toUpperCase() + part.slice(1)).join(" "))
       || text("默认壁纸", "Default wallpaper");
-  const shortcutLabelColor = settings.shortcutLabelColor || "#34434a";
+  const shortcutLabelColor = shortcutLabelColorForTheme(settings.shortcutLabelColor, settings.theme);
   const shortcutLabelShadow = settings.shortcutLabelShadow || "none";
   const settingsTime = new Intl.DateTimeFormat(language, {
     timeZone: settings.timeZone || "Asia/Shanghai",
@@ -7494,7 +7643,14 @@ function SettingsDialog({ state, clock, updateCheck, migrationBackupAvailable, u
       <div className="lucid-settings-layout">
         <nav className="lucid-settings-nav" aria-label={text("设置分类", "Settings sections")}>
           {sections.map((item) => (
-            <button type="button" className={section === item.id ? "active" : ""} onClick={() => setSection(item.id)} key={item.id}>
+            <button
+              type="button"
+              className={section === item.id ? "active" : ""}
+              aria-current={section === item.id ? "page" : undefined}
+              aria-controls={`settings-${item.id}`}
+              onClick={() => setSection(item.id)}
+              key={item.id}
+            >
               <item.Icon size={17} /><span>{item.label}</span>
             </button>
           ))}
@@ -7502,8 +7658,8 @@ function SettingsDialog({ state, clock, updateCheck, migrationBackupAvailable, u
 
         <div className="lucid-settings-content">
           {section === "appearance" && (
-            <section className="lucid-settings-section">
-              <header><span>{text("外观", "Appearance")}</span><h3>{text("克制、清晰，并与你的壁纸协调", "Quiet, clear, and balanced with your wallpaper")}</h3></header>
+            <section className="lucid-settings-section" id="settings-appearance">
+              <header><span>{text("外观", "Appearance")}</span><h3>{text("主题、壁纸与显示", "Theme, wallpaper, and display")}</h3></header>
               <div className="lucid-setting-row">
                 <div><strong>{text("界面语言", "Language")}</strong><span>{text("立即切换，并随账号同步到其他设备", "Switch instantly and sync across devices")}</span></div>
                 <div className="settings-segments" role="radiogroup" aria-label={text("界面语言", "Interface language")}>
@@ -7519,19 +7675,25 @@ function SettingsDialog({ state, clock, updateCheck, migrationBackupAvailable, u
                 </div>
               </div>
               <div className="lucid-setting-row lucid-wallpaper-row">
-                <div><strong>{text("壁纸", "Wallpaper")}</strong><span>{wallpaperName}</span></div>
+                <div><strong>{text("壁纸", "Wallpaper")}</strong><span>{text("当前背景与壁纸库", "Current background and wallpaper library")}</span></div>
                 <button type="button" className="lucid-wallpaper-button" onClick={onOpenWallpapers}>
                   <span style={{ "--settings-wallpaper": cssImageUrl(wallpaperPreviewUrl) } as React.CSSProperties} aria-hidden="true" />
-                  <b>{text("选择壁纸", "Choose wallpaper")}</b>
+                  <b>{wallpaperName}</b>
                   <ChevronRight size={16} />
                 </button>
               </div>
               <label className="lucid-setting-row lucid-range-row">
                 <div><strong>{text("图标尺寸", "Icon size")}</strong><span>{text(`主页与空间统一为 ${settings.iconSize}px`, `Home and Spaces use ${settings.iconSize}px`)}</span></div>
-                <input type="range" min="48" max="80" value={settings.iconSize} onChange={(event) => setSetting("iconSize", Number(event.target.value))} />
+                <span className="lucid-range-control">
+                  <input type="range" min="48" max="80" value={settings.iconSize} onChange={(event) => setSetting("iconSize", Number(event.target.value))} />
+                  <output>{settings.iconSize}px</output>
+                </span>
               </label>
-              <div className="lucid-setting-row lucid-setting-stack shortcut-label-setting">
-                <div><strong>{text("图标文字", "Icon labels")}</strong><span>{text("自定义网站名称的颜色和阴影，修改会立即预览", "Customize site-label color and shadow with a live preview")}</span></div>
+              <details className="lucid-setting-disclosure shortcut-label-setting">
+                <summary>
+                  <span className="lucid-setting-copy"><strong>{text("图标文字", "Icon labels")}</strong><span>{text("颜色与阴影", "Color and shadow")}</span></span>
+                  <span className="shortcut-label-summary-value" aria-hidden="true"><i style={{ background: shortcutLabelColor }} /><ChevronRight size={16} /></span>
+                </summary>
                 <div className="shortcut-label-editor">
                   <div
                     className="shortcut-label-preview"
@@ -7574,14 +7736,17 @@ function SettingsDialog({ state, clock, updateCheck, migrationBackupAvailable, u
                     </div>
                   </div>
                 </div>
-              </div>
+              </details>
               <label className="lucid-setting-row lucid-range-row">
                 <div><strong>{text("界面通透度", "Transparency")}</strong><span>{text("控制组件表面的透明程度", "Control the transparency of surfaces")}</span></div>
-                <input type="range" min="28" max="88" value={settings.glass} onChange={(event) => setSetting("glass", Number(event.target.value))} />
+                <span className="lucid-range-control">
+                  <input type="range" min="28" max="88" value={settings.glass} onChange={(event) => setSetting("glass", Number(event.target.value))} />
+                  <output>{settings.glass}%</output>
+                </span>
               </label>
-              <div className="lucid-setting-row">
+              <div className="lucid-setting-row lucid-toggle-row">
                 <div><strong>{text("网站图标", "Site icons")}</strong><span>{text("高清结果会缓存在本机，不会每次重新加载", "Resolved icons are cached locally instead of reloaded each time")}</span></div>
-                <label className="lucid-switch"><input type="checkbox" checked={settings.remoteIconLookup ?? true} onChange={(event) => setSetting("remoteIconLookup", event.target.checked)} /><span /></label>
+                <label className="lucid-switch"><input type="checkbox" aria-label={text("自动获取网站图标", "Detect site icons automatically")} checked={settings.remoteIconLookup ?? true} onChange={(event) => setSetting("remoteIconLookup", event.target.checked)} /><span /></label>
               </div>
               <label className="lucid-setting-row">
                 <div><strong>{text("城市", "City")}</strong><span>{text("天气小组件显示的位置", "Location shown in the weather widget")}</span></div>
@@ -7590,9 +7755,9 @@ function SettingsDialog({ state, clock, updateCheck, migrationBackupAvailable, u
                   {weatherCityOptions.map((city) => <option value={city.value} key={city.value}>{localized(language, city.zh, city.en)}</option>)}
                 </select>
               </label>
-              <div className="lucid-setting-row">
+              <div className="lucid-setting-row lucid-toggle-row">
                 <div><strong>{text("设备定位", "Device location")}</strong><span>{text("只在获取天气时读取当前位置", "Read your location only when fetching weather")}</span></div>
-                <label className="lucid-switch"><input type="checkbox" checked={settings.weatherUseLocation ?? false} onChange={(event) => void onWeatherUseLocationChange(event.target.checked)} /><span /></label>
+                <label className="lucid-switch"><input type="checkbox" aria-label={text("使用设备定位获取天气", "Use device location for weather")} checked={settings.weatherUseLocation ?? false} onChange={(event) => void onWeatherUseLocationChange(event.target.checked)} /><span /></label>
               </div>
               <div className="lucid-setting-row">
                 <div><strong>{text("时间显示", "Time display")}</strong><span>{settingsTime} · {settings.timeZone || "Asia/Shanghai"}</span></div>
@@ -7602,8 +7767,8 @@ function SettingsDialog({ state, clock, updateCheck, migrationBackupAvailable, u
           )}
 
           {section === "navigation" && (
-            <section className="lucid-settings-section">
-              <header><span>{text("导航", "Navigation")}</span><h3>{text("导航固定在边缘，不改变内容中心", "Navigation stays at the edge without shifting the content")}</h3></header>
+            <section className="lucid-settings-section" id="settings-navigation">
+              <header><span>{text("导航", "Navigation")}</span><h3>{text("位置与显示方式", "Position and visibility")}</h3></header>
               <div className="lucid-setting-row">
                 <div><strong>{text("位置", "Position")}</strong><span>{text("桌面端固定到屏幕左侧或右侧", "Pin to the left or right edge on desktop")}</span></div>
                 <div className="settings-segments" role="radiogroup" aria-label={text("桌面导航位置", "Desktop navigation position")}>
@@ -7623,13 +7788,13 @@ function SettingsDialog({ state, clock, updateCheck, migrationBackupAvailable, u
           )}
 
           {section === "data" && (
-            <section className="lucid-settings-section">
-              <header><span>{text("本机优先数据", "Local-first data")}</span><h3>{text("备份、恢复和迁移都由你控制", "You control backup, restore, and migration")}</h3></header>
+            <section className="lucid-settings-section" id="settings-data">
+              <header><span>{text("本机优先数据", "Local-first data")}</span><h3>{text("导入、导出与恢复", "Import, export, and restore")}</h3></header>
               <div className="lucid-data-actions">
                 <button type="button" onClick={onImport}><Import size={17} /><span><strong>{text("导入网站", "Import sites")}</strong><small>{text("支持 WeTab、浏览器书签与文本", "Supports WeTab, browser bookmarks, and text")}</small></span></button>
                 <button type="button" onClick={exportNotesMarkdown}><FileText size={17} /><span><strong>{text("导出笔记", "Export notes")}</strong><small>{text("生成通用 Markdown 文件", "Creates a portable Markdown file")}</small></span></button>
                 <button type="button" onClick={onExport}><Download size={17} /><span><strong>{text("导出完整备份", "Export complete backup")}</strong><small>{text("包含网站、笔记、任务和设置", "Includes sites, notes, tasks, and settings")}</small></span></button>
-                <label className="lucid-data-action"><Upload size={17} /><span><strong>{text("恢复完整备份", "Restore complete backup")}</strong><small>{text("从 WhyNavo JSON 文件恢复", "Restore from a WhyNavo JSON file")}</small></span><input type="file" accept="application/json,.json" onChange={(event) => { const file = event.target.files?.[0]; if (file) void onImportBackup(file).catch((error) => window.alert(error instanceof Error ? error.message : text("备份恢复失败", "Backup restore failed"))); event.currentTarget.value = ""; }} /></label>
+                <label className="lucid-data-action"><Upload size={17} /><span><strong>{text("恢复完整备份", "Restore complete backup")}</strong><small>{text("从 WhyNavo JSON 文件恢复", "Restore from a WhyNavo JSON file")}</small></span><input type="file" aria-label={text("选择完整备份文件", "Choose a complete backup file")} accept="application/json,.json" onChange={(event) => { const file = event.target.files?.[0]; if (file) void onImportBackup(file).catch((error) => window.alert(error instanceof Error ? error.message : text("备份恢复失败", "Backup restore failed"))); event.currentTarget.value = ""; }} /></label>
                 <button type="button" disabled={!migrationBackupAvailable} onClick={onRestoreMigrationBackup}><TimerReset size={17} /><span><strong>{text("回到更新前数据", "Restore pre-update data")}</strong><small>{migrationBackupAvailable ? text("恢复本设备最近迁移点", "Restore the latest migration point on this device") : text("当前没有迁移恢复点", "No migration restore point is available")}</small></span></button>
               </div>
               <p className="lucid-data-notice"><ShieldCheck size={15} /> {text("备份可能包含私人便签、待办、照片和壁纸，请像保护私人文件一样保管。", "Backups may contain private notes, tasks, photos, and wallpapers. Protect them like private files.")}</p>
@@ -7646,9 +7811,9 @@ function SettingsDialog({ state, clock, updateCheck, migrationBackupAvailable, u
           )}
 
           {section === "about" && (
-            <section className="lucid-settings-section">
-              <header><span>WhyNavo</span><h3>{text("版本与兼容状态", "Version and compatibility")}</h3></header>
-              <div className="lucid-version-mark"><Compass size={30} /><div><strong>WhyNavo {APP_VERSION}</strong><span>{text("本机优先的新标签页工作空间", "Local-first new tab workspace")}</span></div></div>
+            <section className="lucid-settings-section" id="settings-about">
+              <header><span>WhyNavo</span><h3>{text("版本与更新", "Version and updates")}</h3></header>
+              <div className="lucid-version-mark"><img src="./icons/icon128.png" alt="" width="48" height="48" /><div><strong>WhyNavo {APP_VERSION}</strong><span>{text("本机优先的新标签页工作空间", "Local-first new tab workspace")}</span></div></div>
               <dl className="lucid-version-list">
                 <div><dt>{text("应用版本", "App version")}</dt><dd>{APP_VERSION}</dd></div>
                 <div><dt>{text("数据版本", "Data version")}</dt><dd>{state.dataSchemaVersion || DATA_SCHEMA_VERSION}</dd></div>
@@ -7662,7 +7827,7 @@ function SettingsDialog({ state, clock, updateCheck, migrationBackupAvailable, u
           )}
         </div>
       </div>
-      <div className="lucid-settings-footer"><span><Check size={14} />{text("点击即生效并自动保存", "Changes apply instantly and save automatically")}</span><button type="button" className="primary" onClick={onClose}>{text("完成", "Done")}</button></div>
+      <div className="lucid-settings-footer"><span><Check size={14} />{text("更改会自动保存", "Changes save automatically")}</span><button type="button" className="primary" onClick={onClose}><Check size={15} />{text("完成", "Done")}</button></div>
     </DialogShell>
   );
 }
