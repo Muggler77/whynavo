@@ -1,8 +1,8 @@
-/* WhyNavo 0.9.26: fluid desktop canvas for browser zoom and wide viewports. */
+/* WhyNavo 0.9.26-0.9.27: fluid desktop canvas for browser zoom and wide viewports. */
 
 @media (min-width: 701px) {
   .shell {
-    --whynavo-fluid-content: min(90vw, calc(100% - clamp(28px, 3vw, 112px)));
+    --whynavo-fluid-content: min(80vw, calc(100% - clamp(28px, 3vw, 112px)));
     padding-right: clamp(20px, 2.7vw, 52px);
     padding-left: clamp(20px, 2.7vw, 52px);
   }
@@ -19,6 +19,32 @@
     width: var(--whynavo-fluid-content);
     max-width: none;
     margin-inline: auto;
+  }
+}
+
+@media (min-width: 701px) and (max-width: 760px) {
+  .shell {
+    padding-right: 12px;
+    padding-left: 12px;
+  }
+
+  .topbar,
+  .hero,
+  .workspace,
+  .dock,
+  .workspace.page-shortcuts,
+  .workspace.page-custom,
+  .workspace.page-search,
+  .workspace.page-notes,
+  .workspace.page-tasks {
+    width: 100%;
+    margin-inline: 0;
+  }
+}
+
+@media (min-width: 761px) and (max-width: 1180px) {
+  .shell {
+    --whynavo-fluid-content: min(80vw, calc(100vw - 208px));
   }
 }
 

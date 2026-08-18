@@ -1348,7 +1348,7 @@ try {
   assert.match(appSource, /second: "2-digit"/, "the Home clock must display seconds");
   assert.doesNotMatch(appSource, /搜索应用、网站、笔记和任务|Search apps, sites, notes, and tasks/, "the Home web search must not imply that it searches local WhyNavo content");
   assert.match(appSource, /useState<WebSearchProvider>\("browser"\)/, "the new-tab search selector must start with Chrome's configured default provider");
-  assert.match(appSource, /className="search-provider-select"[\s\S]*<option value="browser">[\s\S]*<option value="baidu">/, "the browser-default option must remain first while Baidu is an explicit secondary choice");
+  assert.match(appSource, /search-provider-control[\s\S]*<option value="browser">[\s\S]*<option value="baidu">/, "the browser-default option must remain first while Baidu is an explicit secondary choice");
   assert.doesNotMatch(appSource, /settings:\s*\{[\s\S]{0,320}searchProvider|searchEngine:\s*searchProvider/, "the optional provider choice must not become a synchronized default-search override");
   assert.match(browserSearchSource, /chrome\.search\.query\([\s\S]*disposition: "NEW_TAB"/, "default-provider searches must use Chrome's Search API in a new tab");
   assert.match(browserSearchSource, /provider === "baidu"[\s\S]*https:\/\/www\.baidu\.com\/s[\s\S]*openHttpUrlInNewTab/, "Baidu must be available only after an explicit provider selection and must open in a new tab");
@@ -1357,10 +1357,10 @@ try {
   assert.ok((appSource.match(/onClick=\{\(event\) => openShortcutInNewTab\(event,/g) || []).length >= 6, "every shortcut surface must enforce new-tab navigation");
   assert.match(appSource, /placeholder=\{text\("搜索网站和文件夹", "Search sites and folders"\)\}/, "the Spaces search behavior and prompt must remain unchanged");
   assert.match(appSource, /function SearchWorkspace[\s\S]*查找网站、笔记、任务，或直接搜索网络[\s\S]*使用浏览器默认搜索引擎搜索网络/, "the Search page must keep universal local search and submit network searches through the browser default provider");
-  assert.match(searchPolicyCss, /\.sample-a-hero \.hero-search[\s\S]*grid-template-columns: auto minmax\(0, 1fr\) 44px/, "desktop Home search must contain the provider selector without shrinking the query field to a fixed width");
-  assert.match(searchPolicyCss, /\.lucid-search-command[\s\S]*grid-template-columns: 26px auto minmax\(0, 1fr\) 44px/, "desktop universal search must keep local-search affordance, provider choice, query, and action in stable tracks");
-  assert.match(searchPolicyCss, /@media \(max-width: 620px\)[\s\S]*grid-template-columns: auto minmax\(0, 1fr\) 42px/, "the provider selector and search action must remain contained on mobile");
-  assert.match(fluidLayoutCss, /--whynavo-fluid-content: min\(90vw, calc\(100% - clamp\(28px, 3vw, 112px\)\)\)/, "desktop content must keep proportional gutters while expanding with the effective viewport when users zoom out");
+  assert.match(searchPolicyCss, /\.sample-a-hero \.hero-search[\s\S]*grid-template-columns: var\(--whynavo-search-provider-width\) minmax\(0, 1fr\) 44px/, "desktop Home search must reserve a stable provider slot without layout shift");
+  assert.match(searchPolicyCss, /\.lucid-search-command[\s\S]*grid-template-columns: 26px var\(--whynavo-search-provider-width\) minmax\(0, 1fr\) 44px/, "desktop universal search must keep local-search affordance, provider choice, query, and action in stable tracks");
+  assert.match(searchPolicyCss, /@media \(max-width: 620px\)[\s\S]*grid-template-columns: var\(--whynavo-search-provider-width\) minmax\(0, 1fr\) 42px/, "the provider selector and search action must remain contained on mobile");
+  assert.match(fluidLayoutCss, /--whynavo-fluid-content: min\(80vw, calc\(100% - clamp\(28px, 3vw, 112px\)\)\)/, "desktop content must follow the reference canvas ratio while expanding with the effective viewport");
   assert.match(fluidLayoutCss, /\.workspace\.page-shortcuts,[\s\S]*\.workspace\.page-tasks[\s\S]*width: var\(--whynavo-fluid-content\)/, "every major workspace must share the same zoom-responsive side gutters");
   assert.match(appSource, /folder-view-heading[\s\S]*folder-add-shortcut/, "folders must render as a dedicated icon canvas with an accessible add action");
   assert.match(appSource, /invalidateResolvedShortcutIcon[\s\S]*resolvedIconCache\.delete/, "saving an icon must invalidate a stale failure cache for that shortcut");

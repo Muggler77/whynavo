@@ -4,13 +4,13 @@ WhyNavo is a local-first new tab dashboard for shortcuts, widgets, notes, todos,
 
 It is built as a Chrome / Edge Manifest V3 extension and as a responsive web app for mobile and tablet use. The core idea is simple: user data should work locally first, remain exportable, and only sync to the cloud after the user signs in.
 
-Current release candidate: **0.9.26**. See the [bilingual release notes](docs/releases/0.9.26.md).
+Current release candidate: **0.9.27**. See the [bilingual release notes](docs/releases/0.9.27.md).
 
-> **上线状态 / Launch status:** 正式域名、认证邮件、账号隔离同步、数据库迁移、生产监控和每日 R2 加密异地备份已经启用。Chrome 网上应用店的 `0.9.26` 合规修正版已准备好，当前商店审核状态以开发者后台为准；在商店恢复上架前，可使用在线版或 GitHub Release。重要数据仍建议保留完整 JSON 导出。
+> **上线状态 / Launch status:** 正式域名、认证邮件、账号隔离同步、数据库迁移、生产监控和每日 R2 加密异地备份已经启用。Chrome 网上应用店的 `0.9.27` 合规修正版已准备好，当前商店审核状态以开发者后台为准；在商店恢复上架前，可使用在线版或 GitHub Release。重要数据仍建议保留完整 JSON 导出。
 >
-> The production domain, authentication email, account-isolated synchronization, database migrations, monitoring, and daily encrypted R2 backups are active. The Chrome Web Store policy-correction build `0.9.26` is ready; the developer dashboard remains the source of truth for review status. Until the listing is restored, use the hosted app or the GitHub Release. Keep a complete JSON export for important data.
+> The production domain, authentication email, account-isolated synchronization, database migrations, monitoring, and daily encrypted R2 backups are active. The Chrome Web Store policy-correction build `0.9.27` is ready; the developer dashboard remains the source of truth for review status. Until the listing is restored, use the hosted app or the GitHub Release. Keep a complete JSON export for important data.
 
-![WhyNavo 0.9.26 local-first workspace](docs/images/whynavo-0.9.18-store-home.png)
+![WhyNavo 0.9.27 local-first workspace](docs/images/whynavo-0.9.18-store-home.png)
 
 ## Product and Framework
 

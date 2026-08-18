@@ -1,11 +1,15 @@
-/* WhyNavo 0.9.24-0.9.26: policy-safe search provider controls. */
+/* WhyNavo 0.9.24-0.9.27: policy-safe search provider controls without layout shift. */
+
+:root {
+  --whynavo-search-provider-width: 82px;
+}
 
 .sample-a-hero .hero-search {
-  grid-template-columns: auto minmax(0, 1fr) 44px;
+  grid-template-columns: var(--whynavo-search-provider-width) minmax(0, 1fr) 44px;
   padding-left: 10px;
 }
 
-.sample-a-hero .hero-search .search-provider-select {
+.sample-a-hero .hero-search .search-provider-control {
   grid-column: 1;
 }
 
@@ -18,12 +22,23 @@
 }
 
 .lucid-search-command {
-  grid-template-columns: 26px auto minmax(0, 1fr) 44px;
+  grid-template-columns: 26px var(--whynavo-search-provider-width) minmax(0, 1fr) 44px;
+}
+
+.search-provider-control {
+  position: relative;
+  display: block;
+  width: var(--whynavo-search-provider-width);
+  min-width: 0;
+  height: 44px;
 }
 
 .search-provider-select {
-  min-width: 84px;
-  height: 44px;
+  display: block;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  height: 100%;
   padding: 0 8px;
   color: var(--lucid-soft, var(--sample-soft));
   background: transparent;
@@ -35,10 +50,16 @@
   font-weight: 620;
   letter-spacing: 0;
   cursor: pointer;
+  appearance: none;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  transition: color 180ms ease, background-color 180ms ease;
 }
 
 .search-provider-select:hover {
   color: var(--lucid-ink, var(--sample-ink));
+  background: color-mix(in srgb, var(--lucid-surface, #fff) 38%, transparent);
 }
 
 .search-provider-select:focus-visible {
@@ -48,23 +69,44 @@
   border-radius: 6px;
 }
 
+.search-provider-chevron {
+  position: absolute;
+  top: 50%;
+  right: 8px;
+  color: currentColor;
+  pointer-events: none;
+  transform: translateY(-50%);
+  transition: transform 180ms ease;
+}
+
+.search-provider-control:focus-within .search-provider-chevron {
+  transform: translateY(-50%) rotate(180deg);
+}
+
 .search-provider-select option {
   color: var(--lucid-ink, #151b20);
   background: var(--lucid-surface-solid, #fbfcfc);
 }
 
 @media (max-width: 620px) {
+  :root {
+    --whynavo-search-provider-width: 74px;
+  }
+
   .sample-a-hero .hero-search {
-    grid-template-columns: auto minmax(0, 1fr) 42px;
+    grid-template-columns: var(--whynavo-search-provider-width) minmax(0, 1fr) 42px;
     padding-left: 8px;
   }
 
   .lucid-search-command {
-    grid-template-columns: 22px auto minmax(0, 1fr) 40px;
+    grid-template-columns: 22px var(--whynavo-search-provider-width) minmax(0, 1fr) 40px;
+  }
+
+  .search-provider-control {
+    height: 40px;
   }
 
   .search-provider-select {
-    min-width: 68px;
     padding-right: 4px;
     padding-left: 4px;
     font-size: 10px;

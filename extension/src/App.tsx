@@ -20,6 +20,7 @@ import {
   CalendarDays,
   Check,
   Clock3,
+  ChevronDown,
   Compass,
   Droplets,
   Download,
@@ -4099,16 +4100,7 @@ export default function App() {
                 <p>{text("把注意力留给真正重要的事。", "Focus on what matters. You’re in control.")}</p>
               </div>
               <form className="search hero-search" onSubmit={(event) => { event.preventDefault(); runSearch(); }}>
-                <select
-                  className="search-provider-select"
-                  value={searchProvider}
-                  onChange={(event) => setSearchProvider(event.target.value as WebSearchProvider)}
-                  aria-label={text("选择搜索引擎", "Choose search provider")}
-                  title={searchProvider === "browser" ? text("跟随 Chrome 默认搜索引擎", "Use Chrome's default search provider") : text("使用百度搜索", "Search with Baidu")}
-                >
-                  <option value="browser">{text("Chrome 默认", "Chrome default")}</option>
-                  <option value="baidu">{text("百度", "Baidu")}</option>
-                </select>
+                <SearchProviderControl value={searchProvider} onChange={setSearchProvider} />
                 <input
                   ref={searchInputRef}
                   value={searchText}
@@ -4119,8 +4111,8 @@ export default function App() {
                 <button
                   type="submit"
                   className="search-submit"
-                  aria-label={text("使用浏览器默认搜索引擎搜索", "Search with the browser's default search engine")}
-                  title={text("使用浏览器默认搜索引擎", "Use the browser's default search engine")}
+                  aria-label={searchProvider === "baidu" ? text("使用百度搜索", "Search with Baidu") : text("使用浏览器默认搜索引擎搜索", "Search with the browser's default search engine")}
+                  title={searchProvider === "baidu" ? text("使用百度搜索", "Search with Baidu") : text("使用浏览器默认搜索引擎", "Use the browser's default search engine")}
                 ><Search size={18} /></button>
               </form>
             </>
@@ -5067,6 +5059,27 @@ function HomeShortcuts({ tiles, iconSize, editing, floating, onOpenFolder, onEdi
   );
 }
 
+function SearchProviderControl({ value, onChange }: { value: WebSearchProvider; onChange: (provider: WebSearchProvider) => void }) {
+  const language = useUiLanguage();
+  const text = (zh: string, en: string) => localized(language, zh, en);
+  const isBaidu = value === "baidu";
+  return (
+    <span className="search-provider-control">
+      <select
+        className={`search-provider-select ${isBaidu ? "is-baidu" : "is-browser"}`}
+        value={value}
+        onChange={(event) => onChange(event.target.value as WebSearchProvider)}
+        aria-label={isBaidu ? text("当前使用百度搜索，选择可切换", "Baidu is selected; choose to switch") : text("当前使用浏览器默认搜索，选择可切换", "Chrome default search is selected; choose to switch")}
+        title={isBaidu ? text("百度搜索（点击可切换回默认）", "Baidu search (click to switch back to default)") : text("浏览器默认搜索（点击可切换到百度）", "Chrome default search (click to switch to Baidu)")}
+      >
+        <option value="browser">{text("默认", "Default")}</option>
+        <option value="baidu">{text("百度", "Baidu")}</option>
+      </select>
+      <ChevronDown className="search-provider-chevron" size={13} strokeWidth={1.8} aria-hidden="true" />
+    </span>
+  );
+}
+
 function SearchWorkspace({ query, onQueryChange, onWebSearch, searchProvider, onSearchProviderChange, shortcuts, notes, todos, onAddShortcut, onOpenNotes, onOpenTasks }: {
   query: string;
   onQueryChange: (value: string) => void;
@@ -5106,16 +5119,7 @@ function SearchWorkspace({ query, onQueryChange, onWebSearch, searchProvider, on
     <section className="lucid-search-workspace">
       <form className="lucid-search-command" onSubmit={(event) => { event.preventDefault(); onWebSearch(); }}>
         <Search size={23} aria-hidden="true" />
-        <select
-          className="search-provider-select"
-          value={searchProvider}
-          onChange={(event) => onSearchProviderChange(event.target.value as WebSearchProvider)}
-          aria-label={text("选择网络搜索引擎", "Choose web search provider")}
-          title={searchProvider === "browser" ? text("跟随 Chrome 默认搜索引擎", "Use Chrome's default search provider") : text("使用百度搜索", "Search with Baidu")}
-        >
-          <option value="browser">{text("Chrome 默认", "Chrome default")}</option>
-          <option value="baidu">{text("百度", "Baidu")}</option>
-        </select>
+        <SearchProviderControl value={searchProvider} onChange={onSearchProviderChange} />
         <input
           autoFocus
           value={query}
@@ -5126,8 +5130,8 @@ function SearchWorkspace({ query, onQueryChange, onWebSearch, searchProvider, on
         <button
           type="submit"
           className="lucid-search-web"
-          title={text("使用浏览器默认搜索引擎", "Use the browser's default search engine")}
-          aria-label={text("使用浏览器默认搜索引擎搜索网络", "Search the web with the browser's default search engine")}
+          title={searchProvider === "baidu" ? text("使用百度搜索", "Search with Baidu") : text("使用浏览器默认搜索引擎", "Use the browser's default search engine")}
+          aria-label={searchProvider === "baidu" ? text("使用百度搜索网络", "Search the web with Baidu") : text("使用浏览器默认搜索引擎搜索网络", "Search the web with the browser's default search engine")}
         ><Navigation size={17} /></button>
       </form>
 
