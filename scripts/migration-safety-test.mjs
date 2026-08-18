@@ -1262,6 +1262,7 @@ try {
   const iconConsistencyCss = await readFile(join(repoRoot, "extension/src/ui-icon-consistency.css"), "utf8");
   const searchPolicyCss = await readFile(join(repoRoot, "extension/src/ui-v0924.css"), "utf8");
   const fluidLayoutCss = await readFile(join(repoRoot, "extension/src/ui-v0926.css"), "utf8");
+  const searchInteractionCss = await readFile(join(repoRoot, "extension/src/ui-v0928.css"), "utf8");
   const refinedSettingsCss = await readFile(join(repoRoot, "extension/src/ui-settings-refined.css"), "utf8");
   const mainSource = await readFile(join(repoRoot, "extension/src/main.tsx"), "utf8");
   const appHtml = await readFile(join(repoRoot, "extension/index.html"), "utf8");
@@ -1348,7 +1349,9 @@ try {
   assert.match(appSource, /second: "2-digit"/, "the Home clock must display seconds");
   assert.doesNotMatch(appSource, /搜索应用、网站、笔记和任务|Search apps, sites, notes, and tasks/, "the Home web search must not imply that it searches local WhyNavo content");
   assert.match(appSource, /useState<WebSearchProvider>\("browser"\)/, "the new-tab search selector must start with Chrome's configured default provider");
-  assert.match(appSource, /search-provider-control[\s\S]*<option value="browser">[\s\S]*<option value="baidu">/, "the browser-default option must remain first while Baidu is an explicit secondary choice");
+  assert.match(appSource, /SEARCH_PROVIDER_OPTIONS[\s\S]*id: "browser"[\s\S]*id: "baidu"/, "the browser-default option must remain first while Baidu is an explicit secondary choice");
+  assert.match(appSource, /function SearchProviderControl[\s\S]*role="listbox"[\s\S]*role="option"/, "provider switching must use an explicit accessible dropdown instead of an ambiguous text toggle");
+  assert.match(appSource, /search-provider-setting[\s\S]*onSearchProviderChange/, "the provider must also be selectable from Settings");
   assert.doesNotMatch(appSource, /settings:\s*\{[\s\S]{0,320}searchProvider|searchEngine:\s*searchProvider/, "the optional provider choice must not become a synchronized default-search override");
   assert.match(browserSearchSource, /chrome\.search\.query\([\s\S]*disposition: "NEW_TAB"/, "default-provider searches must use Chrome's Search API in a new tab");
   assert.match(browserSearchSource, /provider === "baidu"[\s\S]*https:\/\/www\.baidu\.com\/s[\s\S]*openHttpUrlInNewTab/, "Baidu must be available only after an explicit provider selection and must open in a new tab");
@@ -1360,6 +1363,10 @@ try {
   assert.match(searchPolicyCss, /\.sample-a-hero \.hero-search[\s\S]*grid-template-columns: var\(--whynavo-search-provider-width\) minmax\(0, 1fr\) 44px/, "desktop Home search must reserve a stable provider slot without layout shift");
   assert.match(searchPolicyCss, /\.lucid-search-command[\s\S]*grid-template-columns: 26px var\(--whynavo-search-provider-width\) minmax\(0, 1fr\) 44px/, "desktop universal search must keep local-search affordance, provider choice, query, and action in stable tracks");
   assert.match(searchPolicyCss, /@media \(max-width: 620px\)[\s\S]*grid-template-columns: var\(--whynavo-search-provider-width\) minmax\(0, 1fr\) 42px/, "the provider selector and search action must remain contained on mobile");
+  assert.match(mainSource, /import "\.\/ui-v0928\.css"/, "the latest search and Spaces interaction layer must be loaded after legacy styles");
+  assert.match(searchInteractionCss, /\.search-provider-menu[\s\S]*backdrop-filter: blur\(22px\)/, "the provider menu must use a contained translucent surface");
+  assert.match(searchInteractionCss, /\.search-provider-option[\s\S]*min-height: 54px/, "provider choices must retain a comfortable keyboard and touch target");
+  assert.match(searchInteractionCss, /\.workspace\.page-shortcuts,[\s\S]*\.workspace\.page-custom[\s\S]*width: min\(92vw/, "wide Spaces must use the expanded reference canvas without changing mobile widths");
   assert.match(fluidLayoutCss, /--whynavo-fluid-content: min\(80vw, calc\(100% - clamp\(28px, 3vw, 112px\)\)\)/, "desktop content must follow the reference canvas ratio while expanding with the effective viewport");
   assert.match(fluidLayoutCss, /\.workspace\.page-shortcuts,[\s\S]*\.workspace\.page-tasks[\s\S]*width: var\(--whynavo-fluid-content\)/, "every major workspace must share the same zoom-responsive side gutters");
   assert.match(appSource, /folder-view-heading[\s\S]*folder-add-shortcut/, "folders must render as a dedicated icon canvas with an accessible add action");

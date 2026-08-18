@@ -85,7 +85,7 @@ import {
   Wind,
   X
 } from "lucide-react";
-import { createContext, lazy, Suspense, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, type FocusEvent, type KeyboardEvent, type MouseEvent, type PointerEvent as ReactPointerEvent } from "react";
+import { createContext, lazy, Suspense, useCallback, useContext, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type FocusEvent, type KeyboardEvent, type MouseEvent, type PointerEvent as ReactPointerEvent } from "react";
 import { createPortal } from "react-dom";
 import { accountScopedKey, adoptLegacyStateForAccount, clearLocalAccountDeletionPending, clearLocalDeletedAccountMarkerForVerifiedUser, commitAnonymousStateAdoption, deleteKey, deleteLocalAccountData, downloadJson, downloadText, hasLegacyUnscopedState, loadStateForAccount, markLocalAccountDeletionPending, mergeAndSaveStateForAccount, readKey, readPendingLocalAccountDeletionIds, saveStateForAccount, writeKey } from "./db";
 import { defaultNavigationOrder, defaultState, defaultWidgetOrder, defaultWidgetSizes, nowIso, uid } from "./defaultState";
@@ -194,6 +194,29 @@ const MAX_IMAGE_UPLOAD_BYTES = 12 * 1024 * 1024;
 const UiLanguageContext = createContext<UiLanguage>("zh-CN");
 const localized = (language: UiLanguage, zh: string, en: string) => language === "en-US" ? en : zh;
 const useUiLanguage = () => useContext(UiLanguageContext);
+
+const SEARCH_PROVIDER_OPTIONS: ReadonlyArray<{
+  id: WebSearchProvider;
+  zh: string;
+  en: string;
+  zhHint: string;
+  enHint: string;
+}> = [
+  {
+    id: "browser",
+    zh: "Chrome 默认",
+    en: "Chrome default",
+    zhHint: "遵循 Chrome 中的默认搜索设置",
+    enHint: "Uses Chrome's configured default"
+  },
+  {
+    id: "baidu",
+    zh: "百度",
+    en: "Baidu",
+    zhHint: "仅在你主动选择时打开百度",
+    enHint: "Opens Baidu only when you choose it"
+  }
+];
 
 const MAX_IMAGE_DATA_URL_LENGTH = 3 * 1024 * 1024;
 const MAX_BACKUP_IMPORT_BYTES = 64 * 1024 * 1024;
@@ -4590,6 +4613,8 @@ export default function App() {
         <SettingsDialog
           state={state}
           clock={clock}
+          searchProvider={searchProvider}
+          onSearchProviderChange={setSearchProvider}
           updateCheck={updateCheck}
           migrationBackupAvailable={migrationBackupAvailable}
           updateState={updateState}
@@ -5059,23 +5084,133 @@ function HomeShortcuts({ tiles, iconSize, editing, floating, onOpenFolder, onEdi
   );
 }
 
+function SearchProviderMark({ provider }: { provider: WebSearchProvider }) {
+  if (provider === "baidu") {
+    return <span className="search-provider-mark search-provider-mark-baidu" aria-hidden="true">du</span>;
+  }
+  return (
+    <span className="search-provider-mark search-provider-mark-browser" aria-hidden="true">
+      <Globe2 size={17} strokeWidth={1.8} />
+    </span>
+  );
+}
+
 function SearchProviderControl({ value, onChange }: { value: WebSearchProvider; onChange: (provider: WebSearchProvider) => void }) {
   const language = useUiLanguage();
   const text = (zh: string, en: string) => localized(language, zh, en);
-  const isBaidu = value === "baidu";
+  const containerRef = useRef<HTMLSpanElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const optionRefs = useRef<Array<HTMLButtonElement | null>>([]);
+  const [open, setOpen] = useState(false);
+  const menuId = useId();
+  const selectedIndex = Math.max(0, SEARCH_PROVIDER_OPTIONS.findIndex((option) => option.id === value));
+  const selected = SEARCH_PROVIDER_OPTIONS[selectedIndex] || SEARCH_PROVIDER_OPTIONS[0];
+
+  useEffect(() => {
+    if (!open) return;
+    const onPointerDown = (event: globalThis.PointerEvent) => {
+      if (!containerRef.current?.contains(event.target as Node)) setOpen(false);
+    };
+    const onKeyDown = (event: globalThis.KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setOpen(false);
+        triggerRef.current?.focus();
+      }
+    };
+    document.addEventListener("pointerdown", onPointerDown);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", onPointerDown);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+    const frame = window.requestAnimationFrame(() => optionRefs.current[selectedIndex]?.focus());
+    return () => window.cancelAnimationFrame(frame);
+  }, [open, selectedIndex]);
+
+  const focusOption = (index: number) => {
+    optionRefs.current[index]?.focus();
+  };
+
+  const chooseProvider = (provider: WebSearchProvider) => {
+    onChange(provider);
+    setOpen(false);
+    window.requestAnimationFrame(() => triggerRef.current?.focus());
+  };
+
+  const onTriggerKeyDown = (event: KeyboardEvent<HTMLButtonElement>) => {
+    if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
+    event.preventDefault();
+    setOpen(true);
+  };
+
+  const onOptionKeyDown = (event: KeyboardEvent<HTMLButtonElement>, index: number) => {
+    if (event.key === "ArrowDown") {
+      event.preventDefault();
+      focusOption((index + 1) % SEARCH_PROVIDER_OPTIONS.length);
+    } else if (event.key === "ArrowUp") {
+      event.preventDefault();
+      focusOption((index - 1 + SEARCH_PROVIDER_OPTIONS.length) % SEARCH_PROVIDER_OPTIONS.length);
+    } else if (event.key === "Home") {
+      event.preventDefault();
+      focusOption(0);
+    } else if (event.key === "End") {
+      event.preventDefault();
+      focusOption(SEARCH_PROVIDER_OPTIONS.length - 1);
+    } else if (event.key === "Tab") {
+      setOpen(false);
+    }
+  };
+
   return (
-    <span className="search-provider-control">
-      <select
-        className={`search-provider-select ${isBaidu ? "is-baidu" : "is-browser"}`}
-        value={value}
-        onChange={(event) => onChange(event.target.value as WebSearchProvider)}
-        aria-label={isBaidu ? text("当前使用百度搜索，选择可切换", "Baidu is selected; choose to switch") : text("当前使用浏览器默认搜索，选择可切换", "Chrome default search is selected; choose to switch")}
-        title={isBaidu ? text("百度搜索（点击可切换回默认）", "Baidu search (click to switch back to default)") : text("浏览器默认搜索（点击可切换到百度）", "Chrome default search (click to switch to Baidu)")}
+    <span className={`search-provider-control ${open ? "is-open" : ""}`} ref={containerRef}>
+      <button
+        ref={triggerRef}
+        type="button"
+        className="search-provider-trigger"
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        aria-controls={menuId}
+        aria-label={text("选择网页搜索引擎", "Choose web search provider")}
+        title={text("点击切换网页搜索引擎", "Click to switch web search provider")}
+        onClick={() => setOpen((current) => !current)}
+        onKeyDown={onTriggerKeyDown}
       >
-        <option value="browser">{text("默认", "Default")}</option>
-        <option value="baidu">{text("百度", "Baidu")}</option>
-      </select>
-      <ChevronDown className="search-provider-chevron" size={13} strokeWidth={1.8} aria-hidden="true" />
+        <SearchProviderMark provider={value} />
+        <span className="search-provider-label">{value === "browser" ? text("默认", "Default") : localized(language, selected.zh, selected.en)}</span>
+        <ChevronDown className="search-provider-chevron" size={14} strokeWidth={1.8} aria-hidden="true" />
+      </button>
+      {open && (
+        <div className="search-provider-menu" id={menuId} role="listbox" aria-label={text("网页搜索引擎", "Web search providers")}>
+          {SEARCH_PROVIDER_OPTIONS.map((option, index) => (
+            <button
+              ref={(node) => { optionRefs.current[index] = node; }}
+              type="button"
+              role="option"
+              aria-selected={value === option.id}
+              className={`search-provider-option ${value === option.id ? "is-selected" : ""}`}
+              data-provider={option.id}
+              onPointerDown={(event) => {
+                event.stopPropagation();
+                chooseProvider(option.id);
+              }}
+              onClick={() => chooseProvider(option.id)}
+              onKeyDown={(event) => onOptionKeyDown(event, index)}
+              key={option.id}
+            >
+              <SearchProviderMark provider={option.id} />
+              <span className="search-provider-option-copy">
+                <strong>{localized(language, option.zh, option.en)}</strong>
+                <small>{localized(language, option.zhHint, option.enHint)}</small>
+              </span>
+              {value === option.id && <Check size={15} aria-hidden="true" />}
+            </button>
+          ))}
+        </div>
+      )}
     </span>
   );
 }
@@ -7598,9 +7733,11 @@ function PageManagerDialog({
   );
 }
 
-function SettingsDialog({ state, clock, updateCheck, migrationBackupAvailable, updateState, onImport, onImportBackup, onExport, onRestoreMigrationBackup, onCheckUpdate, onOpenTimeZone, onOpenWallpapers, onWeatherUseLocationChange, onClose }: {
+function SettingsDialog({ state, clock, searchProvider, onSearchProviderChange, updateCheck, migrationBackupAvailable, updateState, onImport, onImportBackup, onExport, onRestoreMigrationBackup, onCheckUpdate, onOpenTimeZone, onOpenWallpapers, onWeatherUseLocationChange, onClose }: {
   state: AppState;
   clock: Date;
+  searchProvider: WebSearchProvider;
+  onSearchProviderChange: (provider: WebSearchProvider) => void;
   updateCheck: UpdateCheckResult;
   migrationBackupAvailable: boolean;
   updateState: (updater: (state: AppState) => AppState) => void;
@@ -7710,6 +7847,22 @@ function SettingsDialog({ state, clock, updateCheck, migrationBackupAvailable, u
                   <button type="button" role="radio" aria-checked={settings.theme === "dark"} className={settings.theme === "dark" ? "active" : ""} onClick={() => setSetting("theme", "dark")}><Moon size={15} />{text("深色", "Dark")}</button>
                 </div>
               </div>
+              <label className="lucid-setting-row search-provider-setting">
+                <div>
+                  <strong>{text("网页搜索", "Web search")}</strong>
+                  <span>{text("当前页面会话可切换；不会修改 Chrome 默认搜索设置", "Choose for this page session; Chrome's default search setting is unchanged")}</span>
+                </div>
+                <select
+                  className="lucid-compact-input"
+                  value={searchProvider}
+                  onChange={(event) => onSearchProviderChange(event.target.value as WebSearchProvider)}
+                  aria-label={text("网页搜索引擎", "Web search provider")}
+                >
+                  {SEARCH_PROVIDER_OPTIONS.map((option) => (
+                    <option value={option.id} key={option.id}>{localized(language, option.zh, option.en)}</option>
+                  ))}
+                </select>
+              </label>
               <div className="lucid-setting-row lucid-wallpaper-row">
                 <div><strong>{text("壁纸", "Wallpaper")}</strong><span>{text("当前背景与壁纸库", "Current background and wallpaper library")}</span></div>
                 <button type="button" className="lucid-wallpaper-button" onClick={onOpenWallpapers}>
