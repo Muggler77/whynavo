@@ -204,10 +204,10 @@ const SEARCH_PROVIDER_OPTIONS: ReadonlyArray<{
 }> = [
   {
     id: "browser",
-    zh: "Chrome 默认",
-    en: "Chrome default",
-    zhHint: "遵循 Chrome 中的默认搜索设置",
-    enHint: "Uses Chrome's configured default"
+    zh: "Google",
+    en: "Google",
+    zhHint: "遵循浏览器当前的默认搜索设置",
+    enHint: "Uses the browser's current default setting"
   },
   {
     id: "baidu",
@@ -4134,8 +4134,8 @@ export default function App() {
                 <button
                   type="submit"
                   className="search-submit"
-                  aria-label={searchProvider === "baidu" ? text("使用百度搜索", "Search with Baidu") : text("使用浏览器默认搜索引擎搜索", "Search with the browser's default search engine")}
-                  title={searchProvider === "baidu" ? text("使用百度搜索", "Search with Baidu") : text("使用浏览器默认搜索引擎", "Use the browser's default search engine")}
+                  aria-label={searchProvider === "baidu" ? text("使用百度搜索", "Search with Baidu") : text("使用 Google 搜索", "Search with Google")}
+                  title={searchProvider === "baidu" ? text("使用百度搜索", "Search with Baidu") : text("使用 Google 搜索", "Search with Google")}
                 ><Search size={18} /></button>
               </form>
             </>
@@ -5089,8 +5089,8 @@ function SearchProviderMark({ provider }: { provider: WebSearchProvider }) {
     return <span className="search-provider-mark search-provider-mark-baidu" aria-hidden="true">du</span>;
   }
   return (
-    <span className="search-provider-mark search-provider-mark-browser" aria-hidden="true">
-      <Globe2 size={17} strokeWidth={1.8} />
+    <span className="search-provider-mark search-provider-mark-google" aria-hidden="true">
+      <img src="./starter-icons/google.svg" alt="" width="18" height="18" draggable="false" />
     </span>
   );
 }
@@ -5180,7 +5180,7 @@ function SearchProviderControl({ value, onChange }: { value: WebSearchProvider; 
         onKeyDown={onTriggerKeyDown}
       >
         <SearchProviderMark provider={value} />
-        <span className="search-provider-label">{value === "browser" ? text("默认", "Default") : localized(language, selected.zh, selected.en)}</span>
+        <span className="search-provider-label">{localized(language, selected.zh, selected.en)}</span>
         <ChevronDown className="search-provider-chevron" size={14} strokeWidth={1.8} aria-hidden="true" />
       </button>
       {open && (
@@ -5265,8 +5265,8 @@ function SearchWorkspace({ query, onQueryChange, onWebSearch, searchProvider, on
         <button
           type="submit"
           className="lucid-search-web"
-          title={searchProvider === "baidu" ? text("使用百度搜索", "Search with Baidu") : text("使用浏览器默认搜索引擎", "Use the browser's default search engine")}
-          aria-label={searchProvider === "baidu" ? text("使用百度搜索网络", "Search the web with Baidu") : text("使用浏览器默认搜索引擎搜索网络", "Search the web with the browser's default search engine")}
+          title={searchProvider === "baidu" ? text("使用百度搜索", "Search with Baidu") : text("使用 Google 搜索", "Search with Google")}
+          aria-label={searchProvider === "baidu" ? text("使用百度搜索网络", "Search the web with Baidu") : text("使用 Google 搜索网络", "Search the web with Google")}
         ><Navigation size={17} /></button>
       </form>
 
@@ -7850,7 +7850,7 @@ function SettingsDialog({ state, clock, searchProvider, onSearchProviderChange, 
               <label className="lucid-setting-row search-provider-setting">
                 <div>
                   <strong>{text("网页搜索", "Web search")}</strong>
-                  <span>{text("当前页面会话可切换；不会修改 Chrome 默认搜索设置", "Choose for this page session; Chrome's default search setting is unchanged")}</span>
+                  <span>{text("当前页面会话可切换；Google 项遵循浏览器搜索设置", "Choose for this page session; Google follows the browser search setting")}</span>
                 </div>
                 <select
                   className="lucid-compact-input"

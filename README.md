@@ -4,13 +4,13 @@ WhyNavo is a local-first new tab dashboard for shortcuts, widgets, notes, todos,
 
 It is built as a Chrome / Edge Manifest V3 extension and as a responsive web app for mobile and tablet use. The core idea is simple: user data should work locally first, remain exportable, and only sync to the cloud after the user signs in.
 
-Current release candidate: **0.9.28**. See the [bilingual release notes](docs/releases/0.9.28.md).
+Current release candidate: **0.9.29**. See the [bilingual release notes](docs/releases/0.9.29.md).
 
-> **上线状态 / Launch status:** 正式域名、认证邮件、账号隔离同步、数据库迁移、生产监控和每日 R2 加密异地备份已经启用。Chrome 网上应用店的 `0.9.28` 合规修正版已准备好，当前商店审核状态以开发者后台为准；在商店恢复上架前，可使用在线版或 GitHub Release。重要数据仍建议保留完整 JSON 导出。
+> **上线状态 / Launch status:** 正式域名、认证邮件、账号隔离同步、数据库迁移、生产监控和每日 R2 加密异地备份已经启用。Chrome 网上应用店的 `0.9.29` 合规修正版已准备好，当前商店审核状态以开发者后台为准；在商店恢复上架前，可使用在线版或 GitHub Release。重要数据仍建议保留完整 JSON 导出。
 >
-> The production domain, authentication email, account-isolated synchronization, database migrations, monitoring, and daily encrypted R2 backups are active. The Chrome Web Store policy-correction build `0.9.28` is ready; the developer dashboard remains the source of truth for review status. Until the listing is restored, use the hosted app or the GitHub Release. Keep a complete JSON export for important data.
+> The production domain, authentication email, account-isolated synchronization, database migrations, monitoring, and daily encrypted R2 backups are active. The Chrome Web Store policy-correction build `0.9.29` is ready; the developer dashboard remains the source of truth for review status. Until the listing is restored, use the hosted app or the GitHub Release. Keep a complete JSON export for important data.
 
-![WhyNavo 0.9.28 local-first workspace](docs/images/whynavo-0.9.18-store-home.png)
+![WhyNavo 0.9.29 local-first workspace](docs/images/whynavo-0.9.18-store-home.png)
 
 ## Product and Framework
 
@@ -112,7 +112,7 @@ Sign-in is optional.
 - Registration and replacement passwords require at least 12 characters with uppercase letters, lowercase letters, and numbers. The login panel can send a password-reset email, and signed-in users can update their password only after confirming the current password.
 - Registration and replacement-password operations fail closed when the privacy-preserving leaked-password check is unavailable. A successful login remains available if that third-party check is down, but WhyNavo displays a warning; a known leaked login password also produces an immediate change-password warning. Only the first five characters of a locally computed SHA-1 digest are sent to the Pwned Passwords range API.
 - Public authentication actions include a Cloudflare Turnstile anti-abuse check in an isolated official-site frame; the one-time challenge token is never saved as user data, and the Turnstile vendor script is not part of the Manifest V3 extension package.
-- Chrome extension searches start with Chrome's Search API and the default provider selected by the user. The search field and Settings also offer an explicitly chosen Baidu option for the current page session; WhyNavo never changes or persists Chrome's default provider.
+- The initial search option is labelled Google in the interface. In the Chrome extension it still runs through Chrome's Search API and respects the provider configured by the user; Baidu is available only after an explicit choice for the current page session. WhyNavo never changes or persists Chrome's default provider.
 - Use the same account on another device to sync shortcuts, widgets, notes, todos, countdowns, settings, and layout.
 - If you created data before signing in, WhyNavo keeps it locally and carries it into your account when you sign in.
 - Public users only need an email and password. They do not need to prepare a backend, service address, API key, access key, or advanced connection setting.
@@ -146,7 +146,7 @@ https://whynavo.com/
 - 设置改为按字段合并；小组件开关、组件尺寸和日历按内部条目合并，避免两台设备同时修改不同设置时互相覆盖。
 - 自定义导航页面删除使用同步删除标记，旧设备不会把已删除页面重新带回来。
 - 快捷地址只允许 HTTP/HTTPS；备份或历史云端数据中的脚本、文件和 data URL 不会被打开。
-- Chrome/Edge 新标签页搜索默认使用浏览器默认搜索引擎；用户可以在搜索框或设置中主动选择百度用于当前页面会话，WhyNavo 不修改或持久化 Chrome 的默认搜索设置。
+- 搜索框首项在界面显示为 Google；在 Chrome/Edge 扩展中，该项仍通过 Chrome Search API 遵循用户配置的搜索服务。用户可在搜索框或设置中主动选择百度用于当前页面会话，WhyNavo 不修改或持久化浏览器默认搜索设置。
 - 图标候选源调整为公共图标缓存优先，并缩短失败超时；仍保留懒加载、文字占位和有界缓存。
 - 登录账号支持在再次验证邮箱和密码后永久删除账号、云端数据和当前设备上的账号数据。
 - 最低可同步版本提升为 0.5.6，旧版本只能在升级后继续云同步，防止旧合并算法覆盖新数据。

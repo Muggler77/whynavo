@@ -75,7 +75,7 @@
       <p>这些数据只用于提供本机仪表盘、账号验证、跨设备同步、故障恢复和反滥用保护。WhyNavo 不出售个人数据，不投放基于用户内容的广告，也不在应用中接入行为分析 SDK。托管、认证和安全服务可能保留必要的访问、投递和安全日志。</p>
 
       <h2>搜索与外部跳转</h2>
-      <p>搜索框初始使用 Chrome 默认搜索服务，并通过 Chrome Search API 在新标签页中打开结果。你也可以在搜索框或设置中主动选择百度用于当前页面会话；此时搜索词会直接发送给百度并在新标签页打开。WhyNavo 不修改 Chrome 的默认搜索设置，不把搜索词写入本地应用数据、云端同步或备份，也不会在未选择百度时把搜索词发送给百度。</p>
+      <p>搜索框第一项在界面显示为 Google；在 Chrome 扩展中，该项仍通过 Chrome Search API 使用浏览器当前配置的搜索服务，并在新标签页中打开结果。你也可以在搜索框或设置中主动选择百度用于当前页面会话；此时搜索词会直接发送给百度并在新标签页打开。WhyNavo 不修改浏览器默认搜索设置，不把搜索词写入本地应用数据、云端同步或备份，也不会在未选择百度时把搜索词发送给百度。</p>
 
       <h2>不会同步的内容</h2>
       <p>本机上传的照片、照片文件名、自定义壁纸、快捷图标和文件夹图标不会进入云端快照。同步数据不是端到端加密；云服务运营方在必要的系统管理场景下可能具备技术访问能力，因此不要在便签或标题中保存密码、恢复码或其他高度敏感秘密。</p>
@@ -87,7 +87,7 @@
         <li>邮件投递服务：发送注册验证、密码重置和账号安全邮件。</li>
         <li>Open-Meteo：根据你填写的城市，或在你主动开启当前位置后根据设备坐标，提供天气和地理编码。</li>
         <li>Simple Icons、DuckDuckGo 和 Google：开启自动图标查找时通过 HTTPS 获取网站图标；这会向相应提供方暴露被请求的网站主机名。</li>
-        <li>Chrome 默认搜索服务，或在你主动选择百度时使用的百度搜索：仅接收你提交的搜索词，搜索结果在新标签页打开。</li>
+        <li>浏览器当前配置的搜索服务（界面首项显示为 Google），或在你主动选择百度时使用的百度搜索：仅接收你提交的搜索词，搜索结果在新标签页打开。</li>
         <li>Cloudflare Pages：托管 WhyNavo 网页版本并提供 HTTPS 与安全响应头。</li>
         <li>Cloudflare R2：在私有存储桶中保留生产数据库的加密灾难恢复副本。</li>
         <li>Cloudflare Turnstile：在注册、登录、密码重置、修改密码和删除账号前进行反滥用验证。</li>
@@ -132,7 +132,7 @@
       <p>Data is processed only to provide the local dashboard, account verification, optional synchronization, recovery, and abuse prevention. WhyNavo does not sell personal data, use user content for targeted advertising, or include behavioral analytics SDKs. Hosting, authentication, email, and security providers may retain necessary delivery, access, and security logs.</p>
 
       <h2>Search and external navigation</h2>
-      <p>The search field initially uses Chrome's default search provider and opens results in a new tab through the Chrome Search API. You may explicitly choose Baidu from the search field or Settings for the current page session; that query is sent directly to Baidu and opened in a new tab. WhyNavo does not change Chrome's default search setting, store search terms in application data, cloud sync, or backups, or send terms to Baidu unless you choose Baidu.</p>
+      <p>The first search option is labelled Google in the interface. In the Chrome extension it still uses the provider currently configured in the browser through the Chrome Search API and opens results in a new tab. You may explicitly choose Baidu from the search field or Settings for the current page session; that query is sent directly to Baidu and opened in a new tab. WhyNavo does not change the browser's default search setting, store search terms in application data, cloud sync, or backups, or send terms to Baidu unless you choose Baidu.</p>
 
       <h2>Data that is not synchronized</h2>
       <p>Device-uploaded photos, photo filenames, custom wallpapers, shortcut icons, and folder icons are excluded from cloud snapshots. Synchronized data is not end-to-end encrypted. Cloud operators may have technical access when necessary to operate the service, so do not store passwords, recovery codes, or other highly sensitive secrets in titles or notes.</p>
@@ -146,7 +146,7 @@
         <li>Cloudflare R2 for encrypted production-database disaster-recovery copies in a private bucket.</li>
         <li>Open-Meteo for weather and geocoding based on the city you enter or, only after you enable current-location weather, the device coordinates.</li>
         <li>Simple Icons, DuckDuckGo, and Google for HTTPS site-icon requests when remote lookup is enabled; those requests disclose the requested hostname to the applicable provider.</li>
-        <li>Chrome's default search provider, or Baidu when you explicitly choose it; these providers receive only the search term you submit and open results in a new tab.</li>
+        <li>The provider currently configured in the browser (shown as Google in the first interface option), or Baidu when you explicitly choose it; these providers receive only the search term you submit and open results in a new tab.</li>
       </ul>
       <p>The selected city, current-location preference, weather response, and any device coordinates are cached only in the current account's local browser partition to reduce repeat requests. They are excluded from cloud snapshots and complete backups. Weather source links do not forward coordinates to an additional search provider.</p>
       <p>Turnstile processes browser, network, and interaction signals needed to issue a short-lived, single-use challenge token. WhyNavo uses that token only in page memory for the current authentication request.</p>

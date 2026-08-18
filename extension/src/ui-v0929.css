@@ -1,0 +1,87 @@
+/* WhyNavo 0.9.29: one wide-screen alignment rail and clearer Google search branding. */
+
+:root {
+  --whynavo-search-provider-width: 96px;
+}
+
+/* Keep the header and the borderless Spaces canvas on the same visual rail. */
+@media (min-width: 1181px) {
+  .shell {
+    --whynavo-wide-content: min(92vw, calc(100% - clamp(48px, 4vw, 128px)));
+  }
+
+  .topbar,
+  .workspace.page-shortcuts,
+  .workspace.page-custom {
+    width: var(--whynavo-wide-content);
+    max-width: none;
+    margin-inline: auto;
+  }
+}
+
+/* The action and the first/last icon columns now share the exact same edge. */
+.spaces-canvas-toolbar {
+  box-sizing: border-box;
+  width: 100%;
+  padding-inline: 4px;
+}
+
+.space-add-site {
+  margin-inline: auto 0;
+}
+
+.page-shortcuts .shortcut-grid,
+.page-custom .shortcut-grid,
+.page-shortcuts .shortcut-grid.compact,
+.page-custom .shortcut-grid.compact {
+  box-sizing: border-box;
+  padding-inline: 4px;
+}
+
+/* The browser-default search slot is branded as Google in the interface. */
+.search-provider-mark-google {
+  background: color-mix(in srgb, #ffffff 86%, var(--lucid-line, #dfe6e8));
+  border: 1px solid color-mix(in srgb, var(--lucid-line-strong, #cbd6d8) 70%, transparent);
+}
+
+.search-provider-mark-google img {
+  display: block;
+  width: 18px;
+  height: 18px;
+  object-fit: contain;
+}
+
+.search-provider-trigger {
+  padding-inline: 6px;
+  gap: 4px;
+}
+
+@media (max-width: 1180px) and (min-width: 701px) {
+  .spaces-canvas-toolbar {
+    padding-inline: 2px;
+  }
+
+  .page-shortcuts .shortcut-grid,
+  .page-custom .shortcut-grid,
+  .page-shortcuts .shortcut-grid.compact,
+  .page-custom .shortcut-grid.compact {
+    padding-inline: 2px;
+  }
+}
+
+@media (max-width: 620px) {
+  :root {
+    --whynavo-search-provider-width: 92px;
+  }
+
+  .search-provider-trigger {
+    padding-inline: 5px;
+    gap: 3px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .space-add-site {
+    transition: none;
+  }
+}
