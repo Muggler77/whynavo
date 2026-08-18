@@ -27,17 +27,23 @@
   }
 
   const revealItems = document.querySelectorAll(".reveal");
-  if ("IntersectionObserver" in window && !window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+  const motionAllowed = !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  if ("IntersectionObserver" in window && "animate" in Element.prototype && motionAllowed) {
     const observer = new IntersectionObserver((entries, currentObserver) => {
       entries.forEach((entry) => {
         if (!entry.isIntersecting) return;
-        entry.target.classList.add("is-visible");
+        entry.target.animate([
+          { opacity: 0, transform: "translateY(14px)" },
+          { opacity: 1, transform: "translateY(0)" }
+        ], {
+          duration: 360,
+          easing: "cubic-bezier(0.22, 0.8, 0.24, 1)",
+          fill: "none"
+        });
         currentObserver.unobserve(entry.target);
       });
     }, { threshold: 0.08, rootMargin: "0px 0px -8% 0px" });
     revealItems.forEach((item) => observer.observe(item));
-  } else {
-    revealItems.forEach((item) => item.classList.add("is-visible"));
   }
 
   const downloadLinks = document.querySelectorAll("[data-download-link]");
