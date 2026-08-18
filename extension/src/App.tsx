@@ -4332,12 +4332,6 @@ export default function App() {
             />
           ) : (
             <section className="shortcut-stage">
-              <div className="spaces-canvas-toolbar">
-                <button type="button" className="space-add-site" onClick={() => openNewShortcut(activeCustomNavPage?.groupId)}>
-                  <Plus size={17} />
-                  <span>{text("添加网站", "Add site")}</span>
-                </button>
-              </div>
               <section className="shortcuts-panel">
                 <div className={"shortcut-grid " + state.settings.gridDensity} style={{ "--icon": state.settings.iconSize + "px" } as React.CSSProperties}>
                   {renderedShortcutTiles.map((item) => {
@@ -4394,6 +4388,16 @@ export default function App() {
                       ? <div className="empty-shortcut search-empty"><Search size={22} />{text("没有匹配的网站或文件夹", "No matching sites or folders")}</div>
                       : null
                   )}
+                  <button
+                    type="button"
+                    className="shortcut-add-tile"
+                    aria-label={text("添加网站", "Add site")}
+                    title={text("添加网站", "Add site")}
+                    onClick={() => openNewShortcut(activeCustomNavPage?.groupId)}
+                  >
+                    <span className="shortcut-icon shortcut-add-icon" aria-hidden="true"><Plus size={Math.max(20, Math.round(state.settings.iconSize * 0.34))} strokeWidth={1.7} /></span>
+                    <span>{text("添加网站", "Add site")}</span>
+                  </button>
                 </div>
               </section>
             </section>
@@ -5086,7 +5090,11 @@ function HomeShortcuts({ tiles, iconSize, editing, floating, onOpenFolder, onEdi
 
 function SearchProviderMark({ provider }: { provider: WebSearchProvider }) {
   if (provider === "baidu") {
-    return <span className="search-provider-mark search-provider-mark-baidu" aria-hidden="true">du</span>;
+    return (
+      <span className="search-provider-mark search-provider-mark-baidu" aria-hidden="true">
+        <img src="./starter-icons/baidu.svg" alt="" width="18" height="18" draggable="false" />
+      </span>
+    );
   }
   return (
     <span className="search-provider-mark search-provider-mark-google" aria-hidden="true">
@@ -5174,7 +5182,7 @@ function SearchProviderControl({ value, onChange }: { value: WebSearchProvider; 
         aria-haspopup="listbox"
         aria-expanded={open}
         aria-controls={menuId}
-        aria-label={text("选择网页搜索引擎", "Choose web search provider")}
+        aria-label={text(`当前为${selected.zh}，点击切换网页搜索引擎`, `Current provider is ${selected.en}; click to switch`)}
         title={text("点击切换网页搜索引擎", "Click to switch web search provider")}
         onClick={() => setOpen((current) => !current)}
         onKeyDown={onTriggerKeyDown}

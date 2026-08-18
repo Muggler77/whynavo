@@ -35,12 +35,14 @@ data into a remote account.
   CSV shortcut lists.
 - Customizable spaces, navigation pages, icon choices, text icons, local image
   icons, wallpaper choices, language, and widget layout.
+- Spaces keeps site creation inside the shortcut canvas as a matching plus tile;
+  there is no detached toolbar competing with the icon grid.
 - Web search through Chrome's Search API. The initial interface option is
   labelled Google for familiarity, while the extension still lets Chrome use
   the search provider configured by the user. The provider can be selected
-  from the search dropdown or Settings for the current page session; users may
-  explicitly choose Baidu for an individual search. WhyNavo never changes or
-  persists Chrome's default search setting.
+  from the icon-only search trigger, dropdown, or Settings for the current page
+  session; users may explicitly choose Baidu for an individual search. WhyNavo
+  never changes or persists Chrome's default search setting.
 - Recurring task reminders through Chrome's local alarm and notification
   permissions, enabled only when the user requests them.
 - Responsive web support for desktop, tablet, and mobile browsers through the

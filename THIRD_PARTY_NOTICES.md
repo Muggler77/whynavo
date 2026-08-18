@@ -60,6 +60,6 @@ PERFORMANCE OF THIS SOFTWARE.
 
 ## Brand marks
 
-The Google, YouTube, X, Notion, Figma, Salesforce, Slack, and GitHub names and
+The Google, Baidu, YouTube, X, Notion, Figma, Salesforce, Slack, and GitHub names and
 logos are trademarks of their respective owners. Their inclusion identifies
 the corresponding third-party services and does not imply endorsement.
