@@ -97,7 +97,7 @@ import TurnstileChallenge, { type TurnstileChallengeHandle } from "./TurnstileCh
 import { fetchWeather, fetchWeatherByCoordinates, getCachedWeather, getDevicePosition, requestDeviceLocationPermission, weatherLabel } from "./weather";
 import { checkForUpdate, type UpdateCheckResult } from "./updates";
 import { APP_VERSION, DATA_SCHEMA_VERSION, UPDATE_TARGET_URL } from "./version";
-import { searchWithBrowserDefault } from "./browserSearch";
+import { searchWeb, type WebSearchProvider } from "./browserSearch";
 import {
   AccountDeletionOutcomeUnknownError,
   AccountDeletionRejectedError,
@@ -135,7 +135,7 @@ import {
   type SyncStatus
 } from "./sync";
 import type { AppState, Countdown, CustomNavPage, CustomNavPageIcon, Note, RatesState, Shortcut, ShortcutFolder, ShortcutLabelShadow, SystemNavPage, Todo, UiLanguage, WeatherState, WidgetKey, WidgetSize } from "./types";
-import { normalizeHttpUrl, safeHttpHref } from "./urls";
+import { normalizeHttpUrl, openHttpUrlInNewTab, safeHttpHref } from "./urls";
 
 type Dialog = "shortcut" | "folder" | "import" | "library" | "wallpapers" | "pages" | "settings" | "sync" | "timezone" | null;
 type ShortcutMenuState = { x: number; y: number; shortcutId: string } | null;
@@ -148,6 +148,12 @@ type HomeTilePosition = { x: number; y: number };
 type SyncMode = "merge" | "push" | "pull";
 type AuthResult = { status: "signed-in" | "verification-sent"; message: string };
 type ToastAction = { label: string; onClick: () => void };
+
+const openShortcutInNewTab = (event: MouseEvent<HTMLAnchorElement>, rawUrl: string) => {
+  if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+  event.preventDefault();
+  void openHttpUrlInNewTab(rawUrl).catch(() => undefined);
+};
 
 const friendlyAuthError = (error: unknown, fallback: string) => {
   const message = error instanceof Error ? error.message : "";
@@ -1457,6 +1463,7 @@ export default function App() {
   const [pageMenu, setPageMenu] = useState<PageMenuState>(null);
   const [widgetMenu, setWidgetMenu] = useState<WidgetMenuState>(null);
   const [searchText, setSearchText] = useState("");
+  const [searchProvider, setSearchProvider] = useState<WebSearchProvider>("browser");
   const [spaceSearchText, setSpaceSearchText] = useState("");
   const [clock, setClock] = useState(() => new Date());
   const [activeLayer, setActiveLayer] = useState("all");
@@ -3508,8 +3515,8 @@ export default function App() {
   const runSearch = () => {
     const query = searchText.trim();
     if (!query) return;
-    void searchWithBrowserDefault(query).catch(() => {
-      showToast(text("浏览器搜索暂时不可用", "Browser search is temporarily unavailable"));
+    void searchWeb(query, searchProvider).catch(() => {
+      showToast(text("搜索暂时不可用", "Search is temporarily unavailable"));
     });
   };
 
@@ -4092,6 +4099,16 @@ export default function App() {
                 <p>{text("把注意力留给真正重要的事。", "Focus on what matters. You’re in control.")}</p>
               </div>
               <form className="search hero-search" onSubmit={(event) => { event.preventDefault(); runSearch(); }}>
+                <select
+                  className="search-provider-select"
+                  value={searchProvider}
+                  onChange={(event) => setSearchProvider(event.target.value as WebSearchProvider)}
+                  aria-label={text("选择搜索引擎", "Choose search provider")}
+                  title={searchProvider === "browser" ? text("跟随 Chrome 默认搜索引擎", "Use Chrome's default search provider") : text("使用百度搜索", "Search with Baidu")}
+                >
+                  <option value="browser">{text("Chrome 默认", "Chrome default")}</option>
+                  <option value="baidu">{text("百度", "Baidu")}</option>
+                </select>
                 <input
                   ref={searchInputRef}
                   value={searchText}
@@ -4269,6 +4286,8 @@ export default function App() {
               query={searchText}
               onQueryChange={setSearchText}
               onWebSearch={runSearch}
+              searchProvider={searchProvider}
+              onSearchProviderChange={setSearchProvider}
               shortcuts={allShortcuts}
               notes={state.notes}
               todos={state.todos}
@@ -4340,7 +4359,7 @@ export default function App() {
                           setDragId(undefined);
                         }}
                       >
-                        <a href={safeHttpHref(shortcut.url)} title={shortcut.url} target="_blank" rel="noreferrer">
+                        <a href={safeHttpHref(shortcut.url)} title={shortcut.url} target="_blank" rel="noopener noreferrer" onClick={(event) => openShortcutInNewTab(event, shortcut.url)}>
                           <span className="shortcut-icon">
                             <ShortcutIconContent url={shortcut.url} iconUrl={shortcut.iconUrl} iconText={shortcut.iconText} iconColor={shortcut.iconColor} iconUpdatedAt={shortcut.iconUpdatedAt} title={shortcut.title} fallback={shortcut.title.slice(0, 1)} />
                           </span>
@@ -5031,7 +5050,8 @@ function HomeShortcuts({ tiles, iconSize, editing, floating, onOpenFolder, onEdi
             style={style}
             title={item.shortcut.url}
             target="_blank"
-            rel="noreferrer"
+            rel="noopener noreferrer"
+            onClick={(event) => openShortcutInNewTab(event, item.shortcut.url)}
           >
             {content}
           </a>
@@ -5047,10 +5067,12 @@ function HomeShortcuts({ tiles, iconSize, editing, floating, onOpenFolder, onEdi
   );
 }
 
-function SearchWorkspace({ query, onQueryChange, onWebSearch, shortcuts, notes, todos, onAddShortcut, onOpenNotes, onOpenTasks }: {
+function SearchWorkspace({ query, onQueryChange, onWebSearch, searchProvider, onSearchProviderChange, shortcuts, notes, todos, onAddShortcut, onOpenNotes, onOpenTasks }: {
   query: string;
   onQueryChange: (value: string) => void;
   onWebSearch: () => void;
+  searchProvider: WebSearchProvider;
+  onSearchProviderChange: (provider: WebSearchProvider) => void;
   shortcuts: Shortcut[];
   notes: Note[];
   todos: Todo[];
@@ -5084,6 +5106,16 @@ function SearchWorkspace({ query, onQueryChange, onWebSearch, shortcuts, notes, 
     <section className="lucid-search-workspace">
       <form className="lucid-search-command" onSubmit={(event) => { event.preventDefault(); onWebSearch(); }}>
         <Search size={23} aria-hidden="true" />
+        <select
+          className="search-provider-select"
+          value={searchProvider}
+          onChange={(event) => onSearchProviderChange(event.target.value as WebSearchProvider)}
+          aria-label={text("选择网络搜索引擎", "Choose web search provider")}
+          title={searchProvider === "browser" ? text("跟随 Chrome 默认搜索引擎", "Use Chrome's default search provider") : text("使用百度搜索", "Search with Baidu")}
+        >
+          <option value="browser">{text("Chrome 默认", "Chrome default")}</option>
+          <option value="baidu">{text("百度", "Baidu")}</option>
+        </select>
         <input
           autoFocus
           value={query}
@@ -5114,7 +5146,7 @@ function SearchWorkspace({ query, onQueryChange, onWebSearch, shortcuts, notes, 
           <header><span><Globe2 size={16} />{text("网站", "Sites")}</span><small>{matchedShortcuts.length}</small></header>
           <div className="lucid-site-results">
             {matchedShortcuts.map((shortcut, index) => (
-              <a href={safeHttpHref(shortcut.url)} target="_blank" rel="noreferrer" key={shortcut.id}>
+              <a href={safeHttpHref(shortcut.url)} target="_blank" rel="noopener noreferrer" onClick={(event) => openShortcutInNewTab(event, shortcut.url)} key={shortcut.id}>
                 <span className="lucid-result-icon">
                   <ShortcutIconContent url={shortcut.url} iconUrl={shortcut.iconUrl} iconText={shortcut.iconText} iconColor={shortcut.iconColor} iconUpdatedAt={shortcut.iconUpdatedAt} title={shortcut.title} fallback={shortcut.title.slice(0, 1)} priority={index < 8} />
                 </span>
@@ -5441,7 +5473,7 @@ function Dock({ shortcuts }: { shortcuts: Shortcut[] }) {
   return (
     <nav className="dock" aria-label={localized(language, "固定快捷入口", "Pinned shortcuts")}>
       {shortcuts.slice(0, 14).map((shortcut) => (
-        <a key={shortcut.id} data-shortcut-id={shortcut.id} href={safeHttpHref(shortcut.url)} title={shortcut.title} target="_blank" rel="noreferrer">
+        <a key={shortcut.id} data-shortcut-id={shortcut.id} href={safeHttpHref(shortcut.url)} title={shortcut.title} target="_blank" rel="noopener noreferrer" onClick={(event) => openShortcutInNewTab(event, shortcut.url)}>
           <ShortcutIconContent url={shortcut.url} iconUrl={shortcut.iconUrl} iconText={shortcut.iconText} iconColor={shortcut.iconColor} iconUpdatedAt={shortcut.iconUpdatedAt} title={shortcut.title} fallback={shortcut.title.slice(0, 1)} />
         </a>
       ))}
@@ -5521,7 +5553,7 @@ function ShortcutContextMenu({ menu, shortcut, onHome, onClose, onEdit, onToggle
   const position = contextMenuPosition(menu.x, menu.y, 188, 188);
   return createPortal(
     <div ref={surfaceRef} className="shortcut-menu" role="menu" aria-label={text(`${shortcut.title}快捷操作`, `${shortcut.title} actions`)} tabIndex={-1} style={position} onContextMenu={(event) => event.preventDefault()}>
-      <a role="menuitem" href={safeHttpHref(shortcut.url)} target="_blank" rel="noreferrer">{text("打开新标签页", "Open in new tab")}</a>
+      <a role="menuitem" href={safeHttpHref(shortcut.url)} target="_blank" rel="noopener noreferrer" onClick={(event) => openShortcutInNewTab(event, shortcut.url)}>{text("打开新标签页", "Open in new tab")}</a>
       <button type="button" role="menuitem" onClick={() => onToggleHome(shortcut)}><House size={15} /> {onHome ? text("从主页移除", "Remove from Home") : text("添加到主页", "Add to Home")}</button>
       <button type="button" role="menuitem" onClick={() => onEdit(shortcut)}><Edit3 size={15} /> {text("更换图标与信息", "Change icon and details")}</button>
       <button type="button" role="menuitem" className="danger" onClick={() => onDelete(shortcut.id)}><Trash2 size={15} /> {text("删除", "Delete")}</button>
@@ -6710,7 +6742,7 @@ function FolderView({ folder, shortcuts, onClose, onAdd, onEditFolder }: {
               key={shortcut.id}
               data-shortcut-id={shortcut.id}
             >
-              <a href={safeHttpHref(shortcut.url)} title={shortcut.url} target="_blank" rel="noreferrer">
+              <a href={safeHttpHref(shortcut.url)} title={shortcut.url} target="_blank" rel="noopener noreferrer" onClick={(event) => openShortcutInNewTab(event, shortcut.url)}>
                 <span className="shortcut-icon">
                   <ShortcutIconContent url={shortcut.url} iconUrl={shortcut.iconUrl} iconText={shortcut.iconText} iconColor={shortcut.iconColor} iconUpdatedAt={shortcut.iconUpdatedAt} title={shortcut.title} fallback={shortcut.title.slice(0, 1)} />
                 </span>

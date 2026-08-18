@@ -1,3 +1,7 @@
+import { openHttpUrlInNewTab } from "./urls";
+
+export type WebSearchProvider = "browser" | "baidu";
+
 const isExtensionPage = () => window.location.protocol === "chrome-extension:";
 
 export async function searchWithBrowserDefault(rawQuery: string): Promise<void> {
@@ -10,13 +14,26 @@ export async function searchWithBrowserDefault(rawQuery: string): Promise<void> 
     }
     await chrome.search.query({
       text: query,
-      disposition: "CURRENT_TAB"
+      disposition: "NEW_TAB"
     });
     return;
   }
 
   const hostedSearch = new URL("./web-search.html", window.location.href);
   hostedSearch.searchParams.set("q", query);
-  const opened = window.open(hostedSearch.toString(), "_blank", "noopener,noreferrer");
-  if (!opened) window.location.assign(hostedSearch);
+  await openHttpUrlInNewTab(hostedSearch.toString());
+}
+
+export async function searchWeb(rawQuery: string, provider: WebSearchProvider = "browser"): Promise<void> {
+  const query = rawQuery.trim();
+  if (!query) return;
+
+  if (provider === "baidu") {
+    const target = new URL("https://www.baidu.com/s");
+    target.searchParams.set("wd", query);
+    await openHttpUrlInNewTab(target.toString());
+    return;
+  }
+
+  await searchWithBrowserDefault(query);
 }

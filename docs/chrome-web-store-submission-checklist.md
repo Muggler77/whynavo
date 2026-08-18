@@ -18,8 +18,9 @@
 - [ ] Link support to `https://whynavo.com/support.html`.
 - [ ] Upload only clean screenshots without personal data.
 - [ ] Use the WhyNavo icon assets from `extension/public/icons/`.
-- [ ] Explain `alarms`, `storage`, optional `notifications`, and optional
-  `geolocation` exactly as listed; confirm the unused `search` permission is absent.
+- [ ] Explain `alarms`, `storage`, `search`, optional `notifications`, and
+  optional `geolocation` exactly as listed. The `search` permission is used by
+  `chrome.search.query`; it must not be described as changing Chrome settings.
 
 ## Final release controls
 

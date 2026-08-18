@@ -17,6 +17,7 @@ import "./ui-v0914.css";
 import "./ui-v0922.css";
 import "./ui-v0923.css";
 import "./ui-v0924.css";
+import "./ui-v0926.css";
 import "./ui-settings-refined.css";
 import "./ui-icon-consistency.css";
 

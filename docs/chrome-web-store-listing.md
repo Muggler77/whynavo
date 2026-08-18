@@ -35,8 +35,10 @@ data into a remote account.
   CSV shortcut lists.
 - Customizable spaces, navigation pages, icon choices, text icons, local image
   icons, wallpaper choices, language, and widget layout.
-- Web search through Chrome's Search API, which always respects the search
-  provider selected by the user in Chrome settings.
+- Web search through Chrome's Search API, with the Chrome-default provider as
+  the initial and first option. Users may explicitly choose Baidu for an
+  individual search; WhyNavo never changes or persists Chrome's default
+  search setting.
 - Recurring task reminders through Chrome's local alarm and notification
   permissions, enabled only when the user requests them.
 - Responsive web support for desktop, tablet, and mobile browsers through the
@@ -62,7 +64,7 @@ policy.
 | --- | --- |
 | `alarms` | Schedules recurring local task checks while the new-tab page is closed. |
 | `storage` | Stores the small local reminder schedule used by the background service worker. |
-| `search` | Sends a user-submitted query to Chrome's Search API so Chrome, not WhyNavo, chooses the configured default search provider. WhyNavo never changes that provider. |
+| `search` | Sends a user-submitted query to Chrome's Search API so Chrome, not WhyNavo, chooses the configured default search provider. A separately selected Baidu query opens directly in a new tab; WhyNavo never changes or persists Chrome's default provider. |
 | Optional `notifications` | Shows a reminder only after the user enables a task reminder. |
 | Optional `geolocation` | Lets the user choose current location for weather; it is never requested automatically. |
 | Host access to Open-Meteo | Retrieves weather and city data after the user enables the weather widget. |
@@ -72,8 +74,10 @@ policy.
 
 The extension has no content scripts, no `tabs`, browsing-history, or `favicon`
 permission, and no broad `http://*/*` access. It does not replace or modify the
-user's default search provider. Every network search from the new-tab surface
-is submitted through `chrome.search.query`.
+user's default search provider. The initial and first search option is always
+the browser default and is submitted through `chrome.search.query`; a user may
+explicitly choose the secondary Baidu option for an individual query. WhyNavo
+does not modify Chrome settings or store that choice as a browser default.
 
 ## Store privacy answers
 
@@ -104,7 +108,8 @@ is submitted through `chrome.search.query`.
    Pages-only files, including `captcha.html`, are not present in the extension
    zip.
 6. Search from Home or Search calls the Chrome Search API with
-   `disposition: CURRENT_TAB`; there is no search-provider setting or override.
+   `disposition: NEW_TAB`; the initial provider is Chrome's default, and there
+   is no search-provider setting override.
 
 ## Screenshot set
 

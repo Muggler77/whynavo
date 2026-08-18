@@ -1,23 +1,72 @@
-/* WhyNavo 0.9.24: Chrome-default search controls without provider switching. */
+/* WhyNavo 0.9.24-0.9.26: policy-safe search provider controls. */
 
 .sample-a-hero .hero-search {
-  grid-template-columns: minmax(0, 1fr) 44px;
+  grid-template-columns: auto minmax(0, 1fr) 44px;
+  padding-left: 10px;
 }
 
-.sample-a-hero .hero-search .search-submit {
+.sample-a-hero .hero-search .search-provider-select {
+  grid-column: 1;
+}
+
+.sample-a-hero .hero-search input {
   grid-column: 2;
 }
 
+.sample-a-hero .hero-search .search-submit {
+  grid-column: 3;
+}
+
 .lucid-search-command {
-  grid-template-columns: 26px minmax(0, 1fr) 44px;
+  grid-template-columns: 26px auto minmax(0, 1fr) 44px;
+}
+
+.search-provider-select {
+  min-width: 84px;
+  height: 44px;
+  padding: 0 8px;
+  color: var(--lucid-soft, var(--sample-soft));
+  background: transparent;
+  border: 0;
+  border-right: 1px solid var(--lucid-line, var(--sample-line));
+  border-radius: 0;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 620;
+  letter-spacing: 0;
+  cursor: pointer;
+}
+
+.search-provider-select:hover {
+  color: var(--lucid-ink, var(--sample-ink));
+}
+
+.search-provider-select:focus-visible {
+  color: var(--lucid-ink, var(--sample-ink));
+  outline: 2px solid color-mix(in srgb, var(--lucid-brand, #296c66) 68%, transparent);
+  outline-offset: -3px;
+  border-radius: 6px;
+}
+
+.search-provider-select option {
+  color: var(--lucid-ink, #151b20);
+  background: var(--lucid-surface-solid, #fbfcfc);
 }
 
 @media (max-width: 620px) {
   .sample-a-hero .hero-search {
-    grid-template-columns: minmax(0, 1fr) 42px;
+    grid-template-columns: auto minmax(0, 1fr) 42px;
+    padding-left: 8px;
   }
 
   .lucid-search-command {
-    grid-template-columns: 22px minmax(0, 1fr) 40px;
+    grid-template-columns: 22px auto minmax(0, 1fr) 40px;
+  }
+
+  .search-provider-select {
+    min-width: 68px;
+    padding-right: 4px;
+    padding-left: 4px;
+    font-size: 10px;
   }
 }
