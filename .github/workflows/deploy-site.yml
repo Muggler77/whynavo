@@ -1,0 +1,62 @@
+name: Deploy WhyNavo Website
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "site/**"
+      - "scripts/build-site.mjs"
+      - "scripts/verify-site.mjs"
+      - "package.json"
+      - "package-lock.json"
+      - ".github/workflows/deploy-site.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: whynavo-public-website
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    if: vars.WHYNAVO_SITE_DEPLOY_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Setup Node
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build website
+        env:
+          CHROME_STORE_APPROVED: ${{ vars.WHYNAVO_CHROME_STORE_APPROVED || 'false' }}
+          CHROME_STORE_URL: ${{ vars.WHYNAVO_CHROME_STORE_URL || '' }}
+        run: npm run build:site
+
+      - name: Verify website
+        run: npm run verify:site
+
+      - name: Verify Cloudflare credentials
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          test -n "$CLOUDFLARE_API_TOKEN" || { echo "::error::Missing CLOUDFLARE_API_TOKEN"; exit 1; }
+          test -n "$CLOUDFLARE_ACCOUNT_ID" || { echo "::error::Missing CLOUDFLARE_ACCOUNT_ID"; exit 1; }
+
+      - name: Deploy to the isolated Cloudflare Pages project
+        uses: cloudflare/wrangler-action@ebbaa1584979971c8614a24965b4405ff95890e0 # v4.0.0
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages deploy site/dist --project-name=whynavo-site --branch=main

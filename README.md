@@ -16,6 +16,28 @@ Current release candidate: **0.9.30**. See the [bilingual release notes](docs/re
 
 WhyNavo is both a ready-to-use product and a publicly auditable, configurable codebase.
 
+## Official Website
+
+The repository now contains an independent bilingual marketing website under
+[`site/`](site/). It is designed for the separate `www.whynavo.com` origin so
+the existing `https://whynavo.com/` hosted app can continue to own the PWA,
+authentication callbacks, email confirmation, CAPTCHA, version manifest, and
+origin-scoped browser data.
+
+- Website source: [`site/source`](site/source)
+- Website build: `npm run build:site`
+- Website safety and link check: `npm run verify:site`
+- Independent deployment workflow: [`.github/workflows/deploy-site.yml`](.github/workflows/deploy-site.yml)
+- Cloudflare domain and deployment checklist: [`docs/whynavo-website-deployment.md`](docs/whynavo-website-deployment.md)
+- Before Chrome Web Store approval, the website points desktop users to the
+  public GitHub Release archive and points everyone to the hosted web app.
+- Everyday users still do not need a service URL, access key, API key, or
+  advanced connection setting.
+
+The website uses real, sanitized WhyNavo product screenshots and repository
+licensed icon assets. It does not contain user bookmarks, account details,
+private credentials, behavioral analytics SDKs, or remote executable code.
+
 - For everyday users: use the official web app at `https://whynavo.com/`, register or sign in with email and password, and sync with the hosted WhyNavo service. No server setup, service URL, API key, or access key is required.
 - For developers and teams: the source and repository-authored visual assets
   are available under the [MIT License](LICENSE). Preserve the
