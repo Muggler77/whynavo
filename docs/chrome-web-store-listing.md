@@ -34,7 +34,8 @@ data into a remote account.
 - Import and export for WhyNavo JSON, WeTab `.data`, browser bookmark HTML, and
   CSV shortcut lists.
 - Customizable spaces, navigation pages, icon choices, text icons, local image
-  icons, wallpaper choices, language, and widget layout.
+  icons, static images and device-local MP4/WebM dynamic wallpapers, language,
+  and widget layout.
 - Spaces keeps site creation inside the shortcut canvas as a matching plus tile;
   there is no detached toolbar competing with the icon grid.
 - Web search through Chrome's Search API. The initial interface option is
@@ -52,8 +53,9 @@ data into a remote account.
 
 WhyNavo does not require an account for local use. Notes, tasks, shortcuts,
 layout, and settings stay in the browser profile unless the user signs in and
-chooses to synchronize. Private local images are not uploaded as part of normal
-sync. See the full privacy policy before installing.
+chooses to synchronize. Private local images and dynamic wallpaper video bytes
+are not uploaded as part of normal sync. See the full privacy policy before
+installing.
 
 ### Important limitations
 

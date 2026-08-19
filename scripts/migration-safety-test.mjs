@@ -128,9 +128,9 @@ try {
   const privacyNoticeSource = await readFile(join(repoRoot, "extension/public/privacy.html"), "utf8");
   const termsSource = await readFile(join(repoRoot, "extension/public/terms.html"), "utf8");
   const supportSource = await readFile(join(repoRoot, "extension/public/support.html"), "utf8");
-  assert.match(projectConfigSource, /LEGAL_DOCUMENT_VERSION = "2026-08-18"/, "registration consent must use the current public legal-document version");
-  assert.match(privacyNoticeSource, /更新日期：2026 年 8 月 18 日[\s\S]*Effective date: August 18, 2026/, "the bilingual privacy notice must expose the consent version date");
-  assert.match(termsSource, /更新日期：2026 年 8 月 18 日[\s\S]*Effective date: August 18, 2026/, "the bilingual terms must match the recorded consent version");
+  assert.match(projectConfigSource, /LEGAL_DOCUMENT_VERSION = "2026-08-19"/, "registration consent must use the current public legal-document version");
+  assert.match(privacyNoticeSource, /更新日期：2026 年 8 月 19 日[\s\S]*Effective date: August 19, 2026/, "the bilingual privacy notice must expose the consent version date");
+  assert.match(termsSource, /更新日期：2026 年 8 月 19 日[\s\S]*Effective date: August 19, 2026/, "the bilingual terms must match the recorded consent version");
   assert.match(privacyNoticeSource, /Cloudflare R2[\s\S]*35 天[\s\S]*Cloudflare R2[\s\S]*35 days/, "the bilingual privacy notice must disclose active encrypted off-site backup storage and retention");
   assert.doesNotMatch(privacyNoticeSource, /当前不会把 WhyNavo 数据库导出|does not currently retain independent off-site exports/, "the public notice must not deny the active encrypted backup service");
   assert.match(supportSource, /请勿在公开 Issue[\s\S]*Do not place email addresses/, "the support page must keep personal data out of public reports in both languages");
@@ -361,6 +361,36 @@ try {
     /自定义壁纸/,
     "active SVG content must not be persisted as a custom local image"
   );
+  const validVideoWallpaper = {
+    id: "custom-video-safe",
+    name: "Local motion",
+    kind: "video",
+    posterDataUrl: "data:image/jpeg;base64,aGVsbG8=",
+    mimeType: "video/mp4",
+    sizeBytes: 48 * 1024 * 1024,
+    durationSeconds: 12.5,
+    width: 1920,
+    height: 1080,
+    createdAt: now
+  };
+  assert.doesNotThrow(
+    () => validateAppStatePayload({
+      ...migrated.state,
+      settings: { ...migrated.state.settings, customWallpapers: [validVideoWallpaper] }
+    }, "test state"),
+    "bounded MP4 metadata with a raster poster must be accepted without embedding video bytes"
+  );
+  assert.throws(
+    () => validateAppStatePayload({
+      ...migrated.state,
+      settings: {
+        ...migrated.state.settings,
+        customWallpapers: [{ ...validVideoWallpaper, sizeBytes: 101 * 1024 * 1024 }]
+      }
+    }, "test state"),
+    /自定义壁纸/,
+    "oversized dynamic wallpaper metadata must be rejected before persistence"
+  );
 
   const backup = createStateBackup("测试备份", legacyState, "user-1");
   assert.equal(backup.state.shortcuts[0].url, "https://openai.com", "manual backup must preserve shortcuts");
@@ -496,8 +526,11 @@ try {
       photoFrameTitle: "private-photo-filename",
       wallpaper: "data:image/webp;base64,private-wallpaper",
       wallpaperPreset: "custom-private",
-      wallpaperCollection: ["aurora-lake", "custom-private"],
-      customWallpapers: [{ id: "custom-private", name: "私人壁纸", dataUrl: "data:image/webp;base64,private-wallpaper", createdAt: now }],
+      wallpaperCollection: ["aurora-lake", "custom-private", validVideoWallpaper.id],
+      customWallpapers: [
+        { id: "custom-private", name: "私人壁纸", dataUrl: "data:image/webp;base64,private-wallpaper", createdAt: now },
+        validVideoWallpaper
+      ],
       city: "Hangzhou",
       weatherUseLocation: true,
       fieldUpdatedAt: {
@@ -574,6 +607,30 @@ try {
   assert.equal(completeBackup.settings.supabaseUrl, undefined, "complete backups must exclude service URLs");
   assert.equal(completeBackup.sync.deviceId, "backup", "complete backups must exclude the originating device identifier");
 
+  const dynamicWallpaperBackupSource = normalizeState({
+    ...completeBackupSource,
+    settings: {
+      ...completeBackupSource.settings,
+      wallpaper: undefined,
+      wallpaperPreset: validVideoWallpaper.id,
+      wallpaperRotation: true,
+      wallpaperCollection: [validVideoWallpaper.id],
+      customWallpapers: [
+        ...(completeBackupSource.settings.customWallpapers || []),
+        validVideoWallpaper
+      ]
+    }
+  });
+  const dynamicWallpaperBackup = prepareCompleteBackupState(dynamicWallpaperBackupSource);
+  assert.equal(
+    dynamicWallpaperBackup.settings.customWallpapers?.some((wallpaper) => wallpaper.kind === "video"),
+    false,
+    "JSON data backups must not imply that device-local video bytes were embedded"
+  );
+  assert.equal(dynamicWallpaperBackup.settings.wallpaperPreset, "lucid-room", "a device-only active video must receive a portable backup fallback");
+  assert.deepEqual(dynamicWallpaperBackup.settings.wallpaperCollection, [], "video-only rotation entries must not become broken backup references");
+  assert.equal(dynamicWallpaperBackup.settings.wallpaperRotation, false, "video-only backup rotation must disable itself when no portable entries remain");
+
   const currentBackupDevice = normalizeState({
     ...completeBackupSource,
     settings: {
@@ -598,6 +655,20 @@ try {
   assert.equal(restoredBackup.settings.city, currentBackupDevice.settings.city, "backup restore must preserve the current device weather city");
   assert.equal(restoredBackup.settings.weatherUseLocation, currentBackupDevice.settings.weatherUseLocation, "backup restore must preserve the current device location preference");
   assert.deepEqual(restoredBackup.sync, currentBackupDevice.sync, "backup restore must preserve the current device sync partition and revision");
+  const currentVideoDevice = normalizeState({
+    ...currentBackupDevice,
+    settings: {
+      ...currentBackupDevice.settings,
+      customWallpapers: [validVideoWallpaper],
+      wallpaperCollection: [validVideoWallpaper.id]
+    }
+  });
+  const restoredWithCurrentVideo = restoreCompleteBackupForDevice(completeBackup, currentVideoDevice);
+  assert.equal(
+    restoredWithCurrentVideo.settings.customWallpapers?.some((wallpaper) => wallpaper.id === validVideoWallpaper.id),
+    true,
+    "restoring a JSON backup must not delete dynamic wallpaper media already stored on the current device"
+  );
 
   const mergedWithRemote = mergeRemote(localMediaState, normalizeState({
     ...legacyState,
@@ -1217,6 +1288,8 @@ try {
     /\/captcha\n[\s\S]*?frame-ancestors 'self' chrome-extension:[\s\S]*?Cross-Origin-Resource-Policy: cross-origin/,
     "the canonical Pages CAPTCHA route must remain embeddable by the official extension"
   );
+  assert.match(cloudflareHeaders, /media-src 'self' blob:/, "the hosted app CSP must allow only local Blob-backed dynamic wallpaper media");
+  assert.doesNotMatch(cloudflareHeaders, /media-src[^;]*https:/, "the hosted app must not load remote dynamic wallpaper videos");
   assert.match(
     cloudflareHeaders,
     /\/confirm\n\s+Cache-Control: no-store/,
@@ -1266,6 +1339,8 @@ try {
   const alignmentCss = await readFile(join(repoRoot, "extension/src/ui-v0929.css"), "utf8");
   const iconControlCss = await readFile(join(repoRoot, "extension/src/ui-v0930.css"), "utf8");
   const responsiveLayoutCss = await readFile(join(repoRoot, "extension/src/ui-v0931.css"), "utf8");
+  const dynamicWallpaperCss = await readFile(join(repoRoot, "extension/src/ui-v0932.css"), "utf8");
+  const wallpaperMediaSource = await readFile(join(repoRoot, "extension/src/wallpaperMedia.ts"), "utf8");
   const refinedSettingsCss = await readFile(join(repoRoot, "extension/src/ui-settings-refined.css"), "utf8");
   const mainSource = await readFile(join(repoRoot, "extension/src/main.tsx"), "utf8");
   const appHtml = await readFile(join(repoRoot, "extension/index.html"), "utf8");
@@ -1276,6 +1351,11 @@ try {
     String(extensionManifest.content_security_policy?.extension_pages || ""),
     /object-src 'none'; base-uri 'self'/,
     "extension pages must reject object embedding and injected base URLs"
+  );
+  assert.match(
+    String(extensionManifest.content_security_policy?.extension_pages || ""),
+    /media-src 'self' blob:/,
+    "extension pages must permit device-local Blob-backed dynamic wallpapers without allowing remote video"
   );
   assert.match(appSource, /sharedIconObserver[\s\S]*rootMargin: "1600px 0px"/, "shortcut icons must share one generous preload observer so scrolling never outruns image preparation");
   assert.match(appSource, /RESOLVED_ICON_CACHE_KEY_PREFIX[\s\S]*user:\$\{userId\}/, "resolved icon choices must be stored in an account-scoped cache");
@@ -1341,7 +1421,7 @@ try {
   assert.match(mainSource, /import "\.\/ui-settings-refined\.css";[\s\S]*import "\.\/ui-icon-consistency\.css";/, "the final icon-consistency layer must override every legacy page-specific icon rule");
   assert.match(appSource, /<details className="lucid-setting-disclosure shortcut-label-setting">[\s\S]*shortcut-label-summary-value/, "advanced shortcut-label styling must use progressive disclosure instead of dominating the initial settings view");
   assert.match(appSource, /className="lucid-range-control"[\s\S]*<output>\{settings\.iconSize\}px<\/output>[\s\S]*<output>\{settings\.glass\}%<\/output>/, "settings sliders must show their current value without requiring precision guessing");
-  assert.match(appSource, /type="file" aria-label=\{text\("选择完整备份文件", "Choose a complete backup file"\)\}/, "backup restore must expose a keyboard and screen-reader accessible file control");
+  assert.match(appSource, /type="file" aria-label=\{text\("选择数据备份文件", "Choose a data backup file"\)\}/, "backup restore must expose a keyboard and screen-reader accessible file control");
   assert.match(refinedSettingsCss, /\.lucid-settings-layout \{[\s\S]*grid-template-columns: 164px minmax\(0, 1fr\)/, "desktop settings must use a quiet sidebar and one continuous content pane");
   assert.match(refinedSettingsCss, /\.lucid-setting-row \.lucid-switch \{[\s\S]*width: 52px;[\s\S]*height: 44px;/, "settings switches must retain a 44px interaction target");
   assert.match(refinedSettingsCss, /\.lucid-data-action input\[type="file"\] \{[\s\S]*display: block;[\s\S]*opacity: 0;/, "the backup file input must remain focusable instead of being removed from keyboard navigation");
@@ -1473,6 +1553,12 @@ try {
   assert.equal(appSource.includes("const cssImageUrl ="), true, "dynamic images must use a dedicated CSS URL serializer");
   assert.equal(appSource.includes('"--wallpaper-image": cssImageUrl(activeWallpaper)'), true, "dynamic wallpaper CSS URLs must use the escaped URL serializer");
   assert.match(appSource, /"--photo-image": cssImageUrl\(image\)/, "dynamic photo CSS URLs must use the same escaped URL serializer");
+  assert.match(appSource, /document\.hidden[\s\S]*video\.pause\(\)[\s\S]*video\.play\(\)/, "dynamic wallpaper playback must pause in hidden tabs and resume only when visible");
+  assert.match(appSource, /autoPlay[\s\S]*muted[\s\S]*loop[\s\S]*playsInline/, "dynamic wallpapers must remain silent, looping, and compatible with inline mobile playback");
+  assert.match(wallpaperMediaSource, /MAX_VIDEO_WALLPAPER_BYTES = 100 \* 1024 \* 1024/, "dynamic wallpaper uploads must have a bounded byte size");
+  assert.match(wallpaperMediaSource, /MAX_VIDEO_WALLPAPER_DURATION_SECONDS = 120/, "dynamic wallpaper uploads must have a bounded duration");
+  assert.match(wallpaperMediaSource, /URL\.revokeObjectURL\(objectUrl\)/, "temporary video inspection URLs must always be released");
+  assert.match(dynamicWallpaperCss, /prefers-reduced-motion: reduce[\s\S]*\.wallpaper-video[\s\S]*display: none/, "reduced-motion users must receive the static poster instead of continuous playback");
   const uiCss = await readFile(join(repoRoot, "extension/src/ui-v040.css"), "utf8");
   assert.match(uiCss, /\.overlay\s*\{[\s\S]*?overflow: hidden;/, "dialog overlays must not steal scroll from their content panes");
   assert.match(uiCss, /\.dialog\s*\{[\s\S]*?overflow: clip;/, "dialog headers must remain fixed while content scrolls");
@@ -1499,6 +1585,10 @@ try {
   assert.match(dbSource, /adoptLegacyStateForAccount[\s\S]*store\.delete\(STATE_KEY\)/, "legacy state must be deleted only by the explicit adoption transaction");
   assert.match(dbSource, /adoptLegacyStateForAccount[\s\S]*deletedAccountMarkerKey\(userId\)[\s\S]*blockedByDeletion/, "legacy adoption must honor account deletion markers");
   assert.match(dbSource, /commitAnonymousStateAdoption[\s\S]*store\.put\(state, accountStateKey\(userId\)\);[\s\S]*store\.put\(emptyAnonymousState, ANONYMOUS_STATE_KEY\)/, "anonymous data adoption must save the account copy and clear the consumed anonymous partition atomically");
+  assert.match(dbSource, /commitAnonymousStateAdoption[\s\S]*wallpaper\.kind === "video"[\s\S]*store\.put\(mediaRequest\.result, targetKey\)[\s\S]*store\.delete\(sourceKey\)/, "anonymous dynamic wallpaper blobs must move into the adopted account partition");
+  assert.match(dbSource, /cleanupLocalWallpaperMedia[\s\S]*activeIds[\s\S]*cursor\.delete\(\)/, "unreferenced dynamic wallpaper blobs must be cleaned only after durable state no longer uses them");
+  assert.match(dbSource, /deleteLocalAccountData[\s\S]*wallpaperMediaPrefixForScope\(userId\)[\s\S]*cursor\.delete\(\)/, "permanent account deletion must remove its local dynamic wallpaper blobs");
+  assert.match(appSource, /persistenceOperation[\s\S]*cleanupLocalWallpaperMedia\(activeVideoIds, persistenceUserId\)/, "video cleanup must wait until the matching account state has been saved successfully");
   assert.match(
     appSource,
     /commitAnonymousStateAdoption\([\s\S]*?localFallback,[\s\S]*?user\.id,[\s\S]*?normalizeState\(defaultState\(\)\)[\s\S]*?anonymousAdopted = true[\s\S]*?pullSnapshot\(next, user\.id\)/,
@@ -1668,7 +1758,7 @@ try {
     /const withDeviceLocalState[\s\S]*city: source\.settings\.city[\s\S]*weatherUseLocation: source\.settings\.weatherUseLocation/,
     "authoritative cloud pulls must preserve device-local weather choices"
   );
-  assert.match(appSource, /prepareCompleteBackupState\(stateRef\.current\)/, "complete backups must use the tested privacy boundary");
+  assert.match(appSource, /const currentState = stateRef\.current;[\s\S]*prepareCompleteBackupState\(currentState\)/, "data backups must use the tested privacy boundary");
   assert.match(appSource, /restoreCompleteBackupForDevice\(parsed\.state, current\)/, "backup imports must restore backed-up media without overwriting device-local identity");
   assert.match(syncSource, /pull_sync_snapshot_for_user[\s\S]*p_user_id: expectedUserId/, "snapshot reads must be restricted to the account expected by the current UI partition");
   assert.match(syncSource, /authData\.user\?\.id !== expectedUserId/, "snapshot reads must verify the server-side Auth account after each request");

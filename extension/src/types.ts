@@ -107,7 +107,14 @@ export type CustomNavPage = {
 export type CustomWallpaper = {
   id: string;
   name: string;
-  dataUrl: string;
+  kind?: "image" | "video";
+  dataUrl?: string;
+  posterDataUrl?: string;
+  mimeType?: "video/mp4" | "video/webm";
+  sizeBytes?: number;
+  durationSeconds?: number;
+  width?: number;
+  height?: number;
   createdAt: string;
 };
 
@@ -119,6 +126,7 @@ export type Settings = {
   wallpaper?: string;
   wallpaperPreset?: string;
   wallpaperRotation?: boolean;
+  wallpaperMotion?: boolean;
   photoFrameImage?: string;
   customWallpapers?: CustomWallpaper[];
   wallpaperCollection?: string[];

@@ -14,11 +14,22 @@ const accountStateKey = (userId?: string) => userId ? `app-state:user:${userId}`
 const deletedAccountMarkerKey = (userId: string) => `deleted-account:user:${userId}`;
 const pendingAccountDeletionKey = (userId: string) => `pending-account-deletion:user:${userId}`;
 const PENDING_ACCOUNT_DELETION_PREFIX = "pending-account-deletion:user:";
+const WALLPAPER_MEDIA_PREFIX = "wallpaper-media:";
 const RATES_KEY = "rates-cache";
 const WEATHER_KEY = "weather-cache";
 export const CORRUPT_STATE_BACKUP_KEY = "corrupt-state-backup";
 
 export const accountScopedKey = (base: string, userId?: string) => `${base}:${userId ? `user:${userId}` : "anonymous"}`;
+const wallpaperMediaScope = (userId?: string) => userId ? `user:${userId}` : "anonymous";
+export const wallpaperMediaKey = (wallpaperId: string, userId?: string) => `${WALLPAPER_MEDIA_PREFIX}${wallpaperMediaScope(userId)}:${wallpaperId}`;
+const wallpaperMediaPrefixForScope = (userId?: string) => `${WALLPAPER_MEDIA_PREFIX}${wallpaperMediaScope(userId)}:`;
+
+export type LocalWallpaperMedia = {
+  blob: Blob;
+  mimeType: string;
+  sizeBytes: number;
+  savedAt: string;
+};
 
 let dbPromise: Promise<IDBDatabase> | undefined;
 
@@ -196,6 +207,55 @@ export async function deleteKey(key: string): Promise<void> {
     tx.oncomplete = () => resolve();
     tx.onerror = () => reject(tx.error);
     tx.onabort = () => reject(tx.error || new Error("IndexedDB transaction aborted"));
+  });
+}
+
+export async function saveLocalWallpaperMedia(wallpaperId: string, blob: Blob, userId?: string, mimeType = blob.type): Promise<void> {
+  const storedBlob = blob.type ? blob : blob.slice(0, blob.size, mimeType);
+  await writeKey<LocalWallpaperMedia>(wallpaperMediaKey(wallpaperId, userId), {
+    blob: storedBlob,
+    mimeType,
+    sizeBytes: storedBlob.size,
+    savedAt: new Date().toISOString()
+  });
+}
+
+export async function readLocalWallpaperMedia(wallpaperId: string, userId?: string): Promise<LocalWallpaperMedia | undefined> {
+  const record = await readKey<LocalWallpaperMedia>(wallpaperMediaKey(wallpaperId, userId));
+  if (
+    !record
+    || !(record.blob instanceof Blob)
+    || !record.mimeType.startsWith("video/")
+    || record.sizeBytes !== record.blob.size
+  ) return undefined;
+  return record;
+}
+
+export async function deleteLocalWallpaperMedia(wallpaperId: string, userId?: string): Promise<void> {
+  await deleteKey(wallpaperMediaKey(wallpaperId, userId));
+}
+
+export async function cleanupLocalWallpaperMedia(activeWallpaperIds: Iterable<string>, userId?: string): Promise<void> {
+  const activeIds = new Set(activeWallpaperIds);
+  const prefix = wallpaperMediaPrefixForScope(userId);
+  const db = await openDb();
+  await new Promise<void>((resolve, reject) => {
+    const tx = db.transaction(STORE, "readwrite");
+    const store = tx.objectStore(STORE);
+    const cursorRequest = store.openCursor();
+    cursorRequest.onsuccess = () => {
+      const cursor = cursorRequest.result;
+      if (!cursor) return;
+      if (typeof cursor.key === "string" && cursor.key.startsWith(prefix)) {
+        const wallpaperId = cursor.key.slice(prefix.length);
+        if (!activeIds.has(wallpaperId)) cursor.delete();
+      }
+      cursor.continue();
+    };
+    cursorRequest.onerror = () => tx.abort();
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+    tx.onabort = () => reject(tx.error || cursorRequest.error || new Error("IndexedDB media cleanup aborted"));
   });
 }
 
@@ -447,6 +507,19 @@ export async function commitAnonymousStateAdoption(
       }
       store.put(state, accountStateKey(userId));
       store.put(emptyAnonymousState, ANONYMOUS_STATE_KEY);
+      (state.settings.customWallpapers || [])
+        .filter((wallpaper) => wallpaper.kind === "video")
+        .forEach((wallpaper) => {
+          const sourceKey = wallpaperMediaKey(wallpaper.id);
+          const targetKey = wallpaperMediaKey(wallpaper.id, userId);
+          const mediaRequest = store.get(sourceKey);
+          mediaRequest.onsuccess = () => {
+            if (!mediaRequest.result) return;
+            store.put(mediaRequest.result, targetKey);
+            store.delete(sourceKey);
+          };
+          mediaRequest.onerror = () => tx.abort();
+        });
     };
     markerRequest.onerror = () => tx.abort();
     tx.oncomplete = () => resolve();
@@ -474,6 +547,15 @@ export async function deleteLocalAccountData(userId: string): Promise<void> {
     const store = tx.objectStore(STORE);
     store.put({ deletedAt: new Date().toISOString() }, deletedAccountMarkerKey(userId));
     keys.forEach((key) => store.delete(key));
+    const wallpaperMediaPrefix = wallpaperMediaPrefixForScope(userId);
+    const cursorRequest = store.openCursor();
+    cursorRequest.onsuccess = () => {
+      const cursor = cursorRequest.result;
+      if (!cursor) return;
+      if (typeof cursor.key === "string" && cursor.key.startsWith(wallpaperMediaPrefix)) cursor.delete();
+      cursor.continue();
+    };
+    cursorRequest.onerror = () => tx.abort();
     tx.oncomplete = () => resolve();
     tx.onerror = () => reject(tx.error);
     tx.onabort = () => reject(tx.error || new Error("IndexedDB transaction aborted"));

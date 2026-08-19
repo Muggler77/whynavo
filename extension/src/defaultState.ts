@@ -86,6 +86,7 @@ export const defaultState = (): AppState => {
       language: "zh-CN",
       wallpaperPreset: "lucid-room",
       wallpaperRotation: false,
+      wallpaperMotion: true,
       customWallpapers: [],
       wallpaperCollection: ["lucid-room", "coastal-glass", "neon-rain", "aurora-lake"],
       quickNote: "",

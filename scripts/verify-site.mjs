@@ -69,6 +69,23 @@ for (const file of htmlFiles) {
   }
 }
 
+const englishHome = await readFile(path.join(outputRoot, "en/index.html"), "utf8");
+const chineseHome = await readFile(path.join(outputRoot, "zh-cn/index.html"), "utf8");
+if (!englishHome.includes("LOCAL-FIRST · NO ACCOUNT REQUIRED") || !englishHome.includes("Start without an account")) {
+  fail("English first viewport does not state the no-account local-first promise");
+}
+if (!chineseHome.includes("本地优先 · 无需登录") || !chineseHome.includes("无需登录，直接使用")) {
+  fail("Chinese first viewport does not state the no-login local-first promise");
+}
+if (!englishHome.includes("dynamic wallpaper videos") || !chineseHome.includes("动态壁纸视频")) {
+  fail("homepage privacy copy does not disclose device-local dynamic wallpaper media");
+}
+
+const styles = await readFile(path.join(outputRoot, "styles.css"), "utf8");
+if (!/\.site-header\s*\{[\s\S]*?width:\s*100%;[\s\S]*?padding-right:\s*max\(/.test(styles)) {
+  fail("site header background is not full-width with constrained inner gutters");
+}
+
 const headers = await readFile(path.join(outputRoot, "_headers"), "utf8");
 for (const requiredHeader of ["Content-Security-Policy", "Strict-Transport-Security", "Referrer-Policy", "Permissions-Policy", "X-Content-Type-Options"]) {
   if (!headers.includes(requiredHeader)) fail(`_headers is missing ${requiredHeader}`);

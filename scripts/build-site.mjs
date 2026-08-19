@@ -164,8 +164,8 @@ const shell = ({locale, page, copy, title, description, body, bodyClass = ""}) =
 
 const renderHero = (copy) => {
   const titleMarkup = copy.lang === "en"
-    ? "Own your <em>new tab.</em>"
-    : "把新标签页，<em>变成你的空间。</em>";
+    ? "Your new tab.<br /><em>Your data.</em>"
+    : "你的新标签页，<br /><em>数据也属于你。</em>";
   const productImage = copy.lang === "en" ? "product-sample-a.png" : "product-home.png";
   const productDimensions = copy.lang === "en" ? [1536, 1024] : [1280, 800];
   return `<section class="hero" aria-labelledby="hero-title">

@@ -37,7 +37,7 @@ This document defines the release gates for the official WhyNavo service. A sour
 - Cloud reads and writes are bound to the account ID expected by the visible local partition; an in-flight Auth account change fails closed in both the client and database.
 - Cloud reads and writes verify the Auth session in the database and enforce a 90-day maximum lifetime plus a 30-day inactivity timeout per device session.
 - Restore points, update backups, icon caches, weather caches, and migration backups are account scoped.
-- Private photos, uploaded icons, filenames, custom wallpaper image data, weather city, and current-location preference stay on the device and are excluded from cloud snapshots.
+- Private photos, uploaded icons, filenames, custom wallpaper image data, dynamic wallpaper video files, weather city, and current-location preference stay on the device and are excluded from cloud snapshots. Dynamic wallpaper video bytes are also excluded from JSON data backups and must be selected again on a new device.
 - Full JSON backup includes the complete supported app state and clearly warns that the file can contain private content.
 - Password-protected account deletion is verified by the server and removes cloud data plus the current device's account partition.
 

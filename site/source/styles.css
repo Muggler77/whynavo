@@ -111,9 +111,11 @@ img {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  width: min(var(--max), calc(100% - (var(--pad) * 2)));
+  width: 100%;
   min-height: 84px;
-  margin: 0 auto;
+  margin: 0;
+  padding-right: max(var(--pad), calc((100vw - var(--max)) / 2));
+  padding-left: max(var(--pad), calc((100vw - var(--max)) / 2));
   border-bottom: 1px solid transparent;
   transition: background-color 200ms var(--ease), border-color 200ms var(--ease);
 }
@@ -1516,7 +1518,9 @@ img {
   }
 
   .site-header {
-    width: calc(100% - 36px);
+    width: 100%;
+    padding-right: 18px;
+    padding-left: 18px;
   }
 
   .brand {

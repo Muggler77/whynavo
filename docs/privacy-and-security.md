@@ -13,7 +13,7 @@ Without login, user data is stored in the current browser profile through Indexe
 - Notes
 - Countdowns
 - Theme and appearance settings
-- Private photo-frame images and custom wallpaper image data
+- Private photo-frame images, custom wallpaper image data, and dynamic wallpaper video files
 - Uploaded shortcut and folder icon image data
 - Local photo filenames
 - Local sync metadata
@@ -34,7 +34,7 @@ Cloud sync includes:
 - Countdowns
 - Settings
 
-Private photo-frame images and filenames, inline wallpaper data, uploaded custom wallpapers, and uploaded shortcut or folder icons are deliberately removed from cloud snapshots. They remain on the device and can be moved through a user-created complete backup.
+Private photo-frame images and filenames, inline wallpaper data, uploaded custom wallpapers, dynamic wallpaper videos, and uploaded shortcut or folder icons are deliberately removed from cloud snapshots. Static local media can be moved through a user-created JSON data backup. Dynamic wallpaper video bytes remain in the current browser's IndexedDB and must be selected again on a new device; the export includes only a device-only asset notice, not the video bytes.
 
 Supabase Auth maintains browser-local access and refresh session tokens so a signed-in device can keep its session. WhyNavo does not place those tokens in application state, IndexedDB, exported backups, or synchronization snapshots. Local sign-out removes the current device session; global sign-out revokes the account's refresh sessions. Cloud-data reads and writes also enforce a server-side 90-day maximum session lifetime and a 30-day inactivity limit.
 
@@ -108,7 +108,7 @@ Never commit:
 - Build-time environment injection for public config
 - Supabase Auth for account identity
 - Supabase Row Level Security for cloud data
-- Complete local JSON export and restore for user-controlled backups
+- Local JSON data export and restore for user-controlled backups; dynamic wallpaper video bytes remain device-only
 - Account-scoped restore points and migration backups
 - Server-revision conflict detection for multi-device writes
 - Per-field setting clocks for concurrent settings, widget configuration, and calendar changes
@@ -116,7 +116,7 @@ Never commit:
 - Account-operation cancellation guards during login, logout, and sync
 - Client and server 2 MB cloud snapshot limits
 - Account-bound snapshot read and write RPCs with server-enforced session limits
-- Device-local handling for private photos and custom wallpaper data
+- Device-local handling for private photos, custom wallpaper data, and dynamic wallpaper video files
 - Bounded external icon caches and explicit local persistence errors
 - CSP, HSTS, frame blocking, and browser permission policy on the hosted app
 - No tracked personal migration data

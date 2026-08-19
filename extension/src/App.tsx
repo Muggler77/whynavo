@@ -87,7 +87,7 @@ import {
 } from "lucide-react";
 import { createContext, lazy, Suspense, useCallback, useContext, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type FocusEvent, type KeyboardEvent, type MouseEvent, type PointerEvent as ReactPointerEvent } from "react";
 import { createPortal } from "react-dom";
-import { accountScopedKey, adoptLegacyStateForAccount, clearLocalAccountDeletionPending, clearLocalDeletedAccountMarkerForVerifiedUser, commitAnonymousStateAdoption, deleteKey, deleteLocalAccountData, downloadJson, downloadText, hasLegacyUnscopedState, loadStateForAccount, markLocalAccountDeletionPending, mergeAndSaveStateForAccount, readKey, readPendingLocalAccountDeletionIds, saveStateForAccount, writeKey } from "./db";
+import { accountScopedKey, adoptLegacyStateForAccount, cleanupLocalWallpaperMedia, clearLocalAccountDeletionPending, clearLocalDeletedAccountMarkerForVerifiedUser, commitAnonymousStateAdoption, deleteKey, deleteLocalAccountData, deleteLocalWallpaperMedia, downloadJson, downloadText, hasLegacyUnscopedState, loadStateForAccount, markLocalAccountDeletionPending, mergeAndSaveStateForAccount, readKey, readLocalWallpaperMedia, readPendingLocalAccountDeletionIds, saveLocalWallpaperMedia, saveStateForAccount, writeKey } from "./db";
 import { defaultNavigationOrder, defaultState, defaultWidgetOrder, defaultWidgetSizes, nowIso, uid } from "./defaultState";
 import { MAX_IMPORTED_SHORTCUTS, MAX_IMPORT_TEXT_CHARS, colorFor, curatedIconCount, curatedIconFor, faviconCandidatesFor, fallbackFaviconFor, faviconFor, importedToShortcuts, normalizeIconReference, parseImportText, siteIconCandidatesFor } from "./importers";
 import { MIGRATION_BACKUP_KEY, type StateBackup } from "./migrations";
@@ -135,8 +135,9 @@ import {
   validateAppStatePayload,
   type SyncStatus
 } from "./sync";
-import type { AppState, Countdown, CustomNavPage, CustomNavPageIcon, Note, RatesState, Shortcut, ShortcutFolder, ShortcutLabelShadow, SystemNavPage, Todo, UiLanguage, WeatherState, WidgetKey, WidgetSize } from "./types";
+import type { AppState, Countdown, CustomNavPage, CustomNavPageIcon, CustomWallpaper, Note, RatesState, Shortcut, ShortcutFolder, ShortcutLabelShadow, SystemNavPage, Todo, UiLanguage, WeatherState, WidgetKey, WidgetSize } from "./types";
 import { normalizeHttpUrl, openHttpUrlInNewTab, safeHttpHref } from "./urls";
+import { inspectVideoWallpaper, isVideoWallpaper, isVideoWallpaperFile } from "./wallpaperMedia";
 
 type Dialog = "shortcut" | "folder" | "import" | "library" | "wallpapers" | "pages" | "settings" | "sync" | "timezone" | null;
 type ShortcutMenuState = { x: number; y: number; shortcutId: string } | null;
@@ -262,6 +263,76 @@ const cssImageUrl = (value: string) => {
     .replace(/[\r\n\f]/g, "");
   return `url("${escaped}")`;
 };
+
+function LocalVideoWallpaper({ wallpaper, ownerId, enabled = true }: { wallpaper?: CustomWallpaper; ownerId?: string; enabled?: boolean }) {
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const [source, setSource] = useState<string>();
+  const [playbackFailed, setPlaybackFailed] = useState(false);
+  const [reduceMotion, setReduceMotion] = useState(() => window.matchMedia("(prefers-reduced-motion: reduce)").matches);
+
+  useEffect(() => {
+    let cancelled = false;
+    let objectUrl: string | undefined;
+    setSource(undefined);
+    setPlaybackFailed(false);
+    if (!enabled || !isVideoWallpaper(wallpaper)) return undefined;
+    void readLocalWallpaperMedia(wallpaper.id, ownerId)
+      .then((record) => {
+        if (cancelled || !record) return;
+        objectUrl = URL.createObjectURL(record.blob);
+        setSource(objectUrl);
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [enabled, ownerId, wallpaper?.id]);
+
+  useEffect(() => {
+    const media = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const update = () => setReduceMotion(media.matches);
+    update();
+    media.addEventListener("change", update);
+    return () => media.removeEventListener("change", update);
+  }, []);
+
+  useEffect(() => {
+    const syncPlayback = () => {
+      const video = videoRef.current;
+      if (!video) return;
+      if (document.hidden || reduceMotion || playbackFailed) {
+        video.pause();
+        return;
+      }
+      void video.play().catch(() => setPlaybackFailed(true));
+    };
+    syncPlayback();
+    document.addEventListener("visibilitychange", syncPlayback);
+    return () => document.removeEventListener("visibilitychange", syncPlayback);
+  }, [playbackFailed, reduceMotion, source]);
+
+  if (!enabled || !source || reduceMotion || playbackFailed || !isVideoWallpaper(wallpaper)) return null;
+  return (
+    <video
+      ref={videoRef}
+      className="wallpaper-video"
+      src={source}
+      poster={wallpaper.posterDataUrl}
+      autoPlay
+      muted
+      loop
+      playsInline
+      preload="auto"
+      disablePictureInPicture
+      aria-hidden="true"
+      onLoadedData={() => {
+        if (!document.hidden) void videoRef.current?.play().catch(() => setPlaybackFailed(true));
+      }}
+      onError={() => setPlaybackFailed(true)}
+    />
+  );
+}
 
 const shortcutLabelShadowCss = (value?: ShortcutLabelShadow) => {
   if (value === "soft") return "0 1px 3px rgba(0, 0, 0, 0.28)";
@@ -1518,6 +1589,7 @@ export default function App() {
   const externalDataRequestRef = useRef<symbol | undefined>();
   const persistenceErrorShownRef = useRef(false);
   const persistenceQueueRef = useRef<Promise<void>>(Promise.resolve());
+  const wallpaperMediaCleanupSignatureRef = useRef<string>();
   const undoSnapshotRef = useRef<AppState | undefined>();
   const lastSyncedUpdatedAtRef = useRef<string | undefined>();
   const toastTimerRef = useRef<number | undefined>();
@@ -1721,7 +1793,7 @@ export default function App() {
           syncing: false,
           message: "登录会话已失效，但本机数据尚未安全保存"
         }));
-        showToast("登录会话已失效；为避免丢失数据，当前内容仍保留，请先导出完整备份");
+        showToast("登录会话已失效；为避免丢失数据，当前内容仍保留，请先导出数据备份");
         return false;
       }
     }
@@ -1943,7 +2015,7 @@ export default function App() {
             autoSync: previousState.sync.autoSync,
             message: "账号切换已暂停；当前数据只保留在内存中，存储恢复后会重试"
           }));
-          showToast("当前账号数据无法安全保存，已暂停切换；请立即导出完整备份");
+          showToast("当前账号数据无法安全保存，已暂停切换；请立即导出数据备份");
           throw error;
         }
         if (error instanceof AuthAccountChangedError) {
@@ -2303,6 +2375,20 @@ export default function App() {
         const merged = mergeLocalPeerState(current, saved);
         if (!localStatesEquivalent(current, merged)) applyState(merged);
         broadcastLocalStateSaved(persistenceUserId);
+        const activeVideoIds = (saved.settings.customWallpapers || [])
+          .filter(isVideoWallpaper)
+          .map((wallpaper) => wallpaper.id)
+          .sort();
+        const cleanupSignature = `${persistenceUserId || "anonymous"}:${activeVideoIds.join("|")}`;
+        if (wallpaperMediaCleanupSignatureRef.current !== cleanupSignature) {
+          void cleanupLocalWallpaperMedia(activeVideoIds, persistenceUserId)
+            .then(() => {
+              if (isCurrentAccountOperation(persistenceEpoch, persistenceUserId)) {
+                wallpaperMediaCleanupSignatureRef.current = cleanupSignature;
+              }
+            })
+            .catch(() => undefined);
+        }
       })
       .catch(() => {
         if (!isCurrentAccountOperation(persistenceEpoch, persistenceUserId)) return;
@@ -3472,16 +3558,28 @@ export default function App() {
   };
 
   const exportData = () => {
-    const backupState = prepareCompleteBackupState(stateRef.current);
+    const currentState = stateRef.current;
+    const dynamicWallpapers = (currentState.settings.customWallpapers || []).filter(isVideoWallpaper);
+    const backupState = prepareCompleteBackupState(currentState);
     downloadJson(`whynavo-backup-${new Date().toISOString().slice(0, 10)}.json`, {
       source: "whynavo-backup",
       version: 1,
       exportedAt: nowIso(),
       appVersion: APP_VERSION,
       dataSchemaVersion: DATA_SCHEMA_VERSION,
+      deviceOnlyAssets: dynamicWallpapers.length ? {
+        dynamicWallpapers: dynamicWallpapers.map((wallpaper) => ({
+          name: wallpaper.name,
+          mimeType: wallpaper.mimeType,
+          sizeBytes: wallpaper.sizeBytes
+        })),
+        notice: "Dynamic wallpaper video bytes remain on this device and are not embedded in the JSON backup."
+      } : undefined,
       state: backupState
     });
-    showToast("已导出完整本地备份");
+    showToast(dynamicWallpapers.length
+      ? "数据备份已导出；动态壁纸视频仍保留在本机，不包含在 JSON 中"
+      : "已导出完整本地备份");
   };
 
   const importBackup = async (file: File) => {
@@ -3501,7 +3599,7 @@ export default function App() {
       throw new Error("备份文件不是有效的 JSON 文件");
     }
     if (parsed.source !== "whynavo-backup" || !parsed.state) {
-      throw new Error("这不是有效的 WhyNavo 完整备份文件");
+      throw new Error("这不是有效的 WhyNavo 数据备份文件");
     }
     validateAppStatePayload(parsed.state, "备份数据");
     if ((parsed.state.dataSchemaVersion || 1) > DATA_SCHEMA_VERSION) {
@@ -3523,7 +3621,7 @@ export default function App() {
     const finalState = mergeLocalPeerState(restored, persisted);
     applyState(finalState);
     broadcastLocalStateSaved(importingUserId);
-    showToast("完整备份已恢复；登录状态和当前设备信息保持不变");
+    showToast("数据备份已恢复；登录状态和当前设备信息保持不变");
   };
 
   const showToast = (message: string, action?: ToastAction) => {
@@ -3898,16 +3996,28 @@ export default function App() {
     if (!id) return undefined;
     const builtIn = builtInWallpapers.find((wallpaper) => wallpaper.id === id);
     return (compact ? builtIn?.mobileUrl : undefined) || builtIn?.url
-      || customWallpapers.find((wallpaper) => wallpaper.id === id)?.dataUrl;
+      || (() => {
+        const custom = customWallpapers.find((wallpaper) => wallpaper.id === id);
+        return isVideoWallpaper(custom) ? custom.posterDataUrl : custom?.dataUrl;
+      })();
   };
   const wallpaperCollection = (state.settings.wallpaperCollection || [])
     .map((id) => ({ id, url: wallpaperUrlForId(id, useCompactAssets) }))
     .filter((item): item is { id: string; url: string } => Boolean(item.url));
   const rotatingWallpaper = wallpaperCollection.length
-    ? wallpaperCollection[Math.floor(Date.now() / 86400000) % wallpaperCollection.length].url
-    : (useCompactAssets ? dailyWallpaper().mobileUrl : undefined) || dailyWallpaper().url;
+    ? wallpaperCollection[Math.floor(Date.now() / 86400000) % wallpaperCollection.length]
+    : {
+        id: dailyWallpaper().id,
+        url: (useCompactAssets ? dailyWallpaper().mobileUrl : undefined) || dailyWallpaper().url
+      };
+  const activeWallpaperId = state.settings.wallpaperRotation
+    ? rotatingWallpaper.id
+    : state.settings.wallpaperPreset;
+  const activeVideoWallpaper = state.settings.wallpaper
+    ? undefined
+    : customWallpapers.find((wallpaper) => wallpaper.id === activeWallpaperId && isVideoWallpaper(wallpaper));
   const activeWallpaper = state.settings.wallpaper
-    || (state.settings.wallpaperRotation ? rotatingWallpaper : wallpaperUrlForId(state.settings.wallpaperPreset, useCompactAssets) || builtInWallpapers[0].url);
+    || (state.settings.wallpaperRotation ? rotatingWallpaper.url : wallpaperUrlForId(state.settings.wallpaperPreset, useCompactAssets) || builtInWallpapers[0].url);
   const backgroundStyle = {
     backgroundImage: cssImageUrl(activeWallpaper),
     "--wallpaper-image": cssImageUrl(activeWallpaper),
@@ -4002,7 +4112,7 @@ export default function App() {
         broadcastLocalStateSaved(signingOutUserId);
       } catch {
         if (accountEpochRef.current === signOutEpoch) accountEpochRef.current = signOutEpoch - 1;
-        throw new Error("当前账号数据无法安全保存，已取消退出。请先导出完整备份并检查浏览器存储空间。");
+        throw new Error("当前账号数据无法安全保存，已取消退出。请先导出数据备份并检查浏览器存储空间。");
       }
     }
     localAuthTransitionRef.current = true;
@@ -4060,6 +4170,7 @@ export default function App() {
         style={backgroundStyle}
         onContextMenuCapture={handleAppContextMenu}
       >
+      <LocalVideoWallpaper wallpaper={activeVideoWallpaper} ownerId={sync.user?.id} enabled={state.settings.wallpaperMotion !== false} />
       <a className="skip-link" href="#whynavo-workspace">{text("跳到主要内容", "Skip to main content")}</a>
       <div className="shell" ref={shellRef}>
         <header className="topbar">
@@ -4533,7 +4644,7 @@ export default function App() {
               MAX_IMPORTED_SHORTCUTS - state.shortcutFolders.length
             ));
             if (!availableRecords) {
-              showToast("当前数据已达到安全导入上限，请先导出完整备份并删除不再需要的内容");
+              showToast("当前数据已达到安全导入上限，请先导出数据备份并删除不再需要的内容");
               return;
             }
             const importRows = rows.slice(0, availableRecords);
@@ -4585,6 +4696,7 @@ export default function App() {
       {(dialog === "library" || dialog === "wallpapers") && (
         <ResourceCenterDialog
           state={state}
+          ownerId={sync.user?.id}
           updateState={updateState}
           shortcuts={allShortcuts}
           initialTab={dialog === "wallpapers" ? "wallpapers" : "widgets"}
@@ -7246,8 +7358,9 @@ function ImportDialog({ existingShortcuts, onClose, onImport }: {
   );
 }
 
-function ResourceCenterDialog({ state, shortcuts, updateState, initialTab = "widgets", onEditShortcut, onClose }: {
+function ResourceCenterDialog({ state, ownerId, shortcuts, updateState, initialTab = "widgets", onEditShortcut, onClose }: {
   state: AppState;
+  ownerId?: string;
   shortcuts: Shortcut[];
   updateState: (updater: (state: AppState) => AppState) => void;
   initialTab?: "widgets" | "wallpapers" | "icons";
@@ -7263,6 +7376,7 @@ function ResourceCenterDialog({ state, shortcuts, updateState, initialTab = "wid
   const [iconQuery, setIconQuery] = useState("");
   const [iconRenderLimit, setIconRenderLimit] = useState(ICON_MANAGER_RENDER_BATCH);
   const [appliedWallpaperId, setAppliedWallpaperId] = useState<string>();
+  const [wallpaperUploading, setWallpaperUploading] = useState(false);
   const settings = state.settings;
   const sizes = { ...defaultWidgetSizes, ...(settings.widgetSizes || {}) };
   const normalizedQuery = query.trim().toLowerCase();
@@ -7336,8 +7450,18 @@ function ResourceCenterDialog({ state, shortcuts, updateState, initialTab = "wid
   const customWallpapers = settings.customWallpapers || [];
   const wallpaperCollection = settings.wallpaperCollection || [];
   const wallpaperItems = [
-    ...builtInWallpapers.map((wallpaper) => ({ ...wallpaper, url: wallpaper.mobileUrl || wallpaper.url, custom: false })),
-    ...customWallpapers.map((wallpaper) => ({ id: wallpaper.id, name: wallpaper.name, url: wallpaper.dataUrl, category: "我的" as const, custom: true }))
+    ...builtInWallpapers.map((wallpaper) => ({ ...wallpaper, url: wallpaper.mobileUrl || wallpaper.url, custom: false, kind: "image" as const })),
+    ...customWallpapers.flatMap((wallpaper) => {
+      const url = isVideoWallpaper(wallpaper) ? wallpaper.posterDataUrl : wallpaper.dataUrl;
+      return url ? [{
+        id: wallpaper.id,
+        name: wallpaper.name,
+        url,
+        category: "我的" as const,
+        custom: true,
+        kind: isVideoWallpaper(wallpaper) ? "video" as const : "image" as const
+      }] : [];
+    })
   ];
   const visibleWallpapers = wallpaperItems.filter((wallpaper) => wallpaperCategory === "全部" || wallpaper.category === wallpaperCategory);
   const selectedWallpaperCount = wallpaperItems.filter((wallpaper) => wallpaperCollection.includes(wallpaper.id)).length;
@@ -7357,17 +7481,44 @@ function ResourceCenterDialog({ state, shortcuts, updateState, initialTab = "wid
       window.alert(text(`最多保存 ${MAX_CUSTOM_WALLPAPERS} 张自定义壁纸，请先删除旧壁纸。`, `You can save up to ${MAX_CUSTOM_WALLPAPERS} custom wallpapers. Remove an older one first.`));
       return;
     }
-    let additions: NonNullable<AppState["settings"]["customWallpapers"]>;
+    const additions: NonNullable<AppState["settings"]["customWallpapers"]> = [];
+    const savedVideoIds: string[] = [];
+    setWallpaperUploading(true);
     try {
-      additions = await Promise.all(Array.from(files).slice(0, remaining).map(async (file) => ({
-        id: `custom-${uid()}`,
-        name: (file.name.replace(/\.[^.]+$/, "") || text("我的壁纸", "My wallpaper")).slice(0, 500),
-        dataUrl: await shrinkImage(file, 1600, 0.82, language),
-        createdAt: nowIso()
-      })));
+      for (const file of Array.from(files).slice(0, remaining)) {
+        const id = `custom-${uid()}`;
+        const common = {
+          id,
+          name: (file.name.replace(/\.[^.]+$/, "") || text("我的壁纸", "My wallpaper")).slice(0, 500),
+          createdAt: nowIso()
+        };
+        const looksLikeVideo = file.type.startsWith("video/") || /\.(?:m4v|mov|mp4|webm)$/i.test(file.name);
+        if (looksLikeVideo || isVideoWallpaperFile(file)) {
+          const inspection = await inspectVideoWallpaper(file, {
+            unsupported: text("动态壁纸仅支持 MP4 或 WebM 文件。", "Dynamic wallpapers support MP4 or WebM files only."),
+            tooLarge: text("动态壁纸不能超过 100 MB。", "A dynamic wallpaper cannot exceed 100 MB."),
+            decodeFailed: text("浏览器无法解码这个视频，请改用常见的 H.264 MP4 或 VP9 WebM。", "This browser cannot decode the video. Try a standard H.264 MP4 or VP9 WebM file."),
+            tooLong: text("动态壁纸最长支持 2 分钟，建议使用 5 至 30 秒的无缝循环。", "Dynamic wallpapers can be up to 2 minutes. A seamless 5-30 second loop is recommended."),
+            tooDetailed: text("动态壁纸最高支持 4K，请先降低视频分辨率。", "Dynamic wallpapers support up to 4K. Reduce the video resolution first."),
+            storageFull: text("本机浏览器存储空间不足，无法安全保存这个动态壁纸。", "There is not enough browser storage to save this dynamic wallpaper safely.")
+          });
+          await saveLocalWallpaperMedia(id, file, ownerId, inspection.mimeType);
+          savedVideoIds.push(id);
+          additions.push({ ...common, kind: "video", ...inspection });
+        } else {
+          additions.push({
+            ...common,
+            kind: "image",
+            dataUrl: await shrinkImage(file, 1600, 0.82, language)
+          });
+        }
+      }
     } catch (error) {
+      await Promise.all(savedVideoIds.map((id) => deleteLocalWallpaperMedia(id, ownerId).catch(() => undefined)));
       window.alert(error instanceof Error ? error.message : text("壁纸处理失败", "Wallpaper processing failed"));
       return;
+    } finally {
+      setWallpaperUploading(false);
     }
     updateState((current) => ({
       ...current,
@@ -7452,11 +7603,19 @@ function ResourceCenterDialog({ state, shortcuts, updateState, initialTab = "wid
       {tab === "wallpapers" && (
         <>
           <div className="resource-section-head">
-            <div><strong>{text("每日轮换壁纸", "Daily rotation wallpapers")}</strong><small>{text(`已加入 ${selectedWallpaperCount} 张 · 自定义壁纸仅保存在本机`, `${selectedWallpaperCount} included · Custom wallpapers stay on this device`)}</small></div>
+            <div><strong>{text("每日轮换壁纸", "Daily rotation wallpapers")}</strong><small>{text(`已加入 ${selectedWallpaperCount} 张 · 自定义图片和视频仅保存在本机`, `${selectedWallpaperCount} included · Custom images and videos stay on this device`)}</small></div>
             <div className="wallpaper-actions">
-              <label className="file-pick compact-upload">
-                <Upload size={15} />{text("上传多张", "Upload images")}
-                <input type="file" accept="image/*" multiple onChange={(event) => { void addCustomWallpapers(event.target.files); event.currentTarget.value = ""; }} />
+              <label className={`file-pick compact-upload ${wallpaperUploading ? "is-uploading" : ""}`} aria-busy={wallpaperUploading}>
+                {wallpaperUploading ? <RefreshCcw size={15} /> : <Upload size={15} />}{wallpaperUploading ? text("正在处理", "Processing") : text("上传壁纸", "Upload wallpapers")}
+                <input disabled={wallpaperUploading} type="file" accept="image/avif,image/gif,image/jpeg,image/png,image/webp,video/mp4,video/webm,.mp4,.webm" multiple onChange={(event) => { void addCustomWallpapers(event.target.files); event.currentTarget.value = ""; }} />
+              </label>
+              <label className="resource-switch">
+                <input
+                  type="checkbox"
+                  checked={settings.wallpaperMotion !== false}
+                  onChange={(event) => setSetting("wallpaperMotion", event.target.checked)}
+                />
+                {text("播放动态效果", "Play motion")}
               </label>
               <label className="resource-switch">
                 <input
@@ -7478,7 +7637,9 @@ function ResourceCenterDialog({ state, shortcuts, updateState, initialTab = "wid
           </div>
           <p className="resource-wallpaper-status" role="status" aria-live="polite">
             <Check size={14} />
-            {appliedWallpaperId
+            {wallpaperUploading
+              ? text("正在本机生成预览并保存媒体，请保持此窗口打开", "Creating a local preview and saving the media. Keep this window open")
+              : appliedWallpaperId
               ? text(`已应用「${appliedWallpaper?.name || "所选壁纸"}」并自动保存`, `${appliedWallpaper?.name || "Selected wallpaper"} applied and saved automatically`)
               : text("点击任意壁纸即可立即应用并自动保存", "Select any wallpaper to apply and save it instantly")}
           </p>
@@ -7504,6 +7665,7 @@ function ResourceCenterDialog({ state, shortcuts, updateState, initialTab = "wid
                     aria-pressed={selected}
                   >
                     <img src={wallpaper.url} alt="" loading="lazy" decoding="async" />
+                    {wallpaper.kind === "video" && <span className="wallpaper-video-badge"><Video size={12} />{text("动态", "Motion")}</span>}
                     <span className="wallpaper-name">{wallpaperLabel}</span>
                     {selected && (
                       <span className="wallpaper-selected" aria-hidden="true"><Check size={14} />{text("当前", "Current")}</span>
@@ -7990,11 +8152,11 @@ function SettingsDialog({ state, clock, searchProvider, onSearchProviderChange, 
               <div className="lucid-data-actions">
                 <button type="button" onClick={onImport}><Import size={17} /><span><strong>{text("导入网站", "Import sites")}</strong><small>{text("支持 WeTab、浏览器书签与文本", "Supports WeTab, browser bookmarks, and text")}</small></span></button>
                 <button type="button" onClick={exportNotesMarkdown}><FileText size={17} /><span><strong>{text("导出笔记", "Export notes")}</strong><small>{text("生成通用 Markdown 文件", "Creates a portable Markdown file")}</small></span></button>
-                <button type="button" onClick={onExport}><Download size={17} /><span><strong>{text("导出完整备份", "Export complete backup")}</strong><small>{text("包含网站、笔记、任务和设置", "Includes sites, notes, tasks, and settings")}</small></span></button>
-                <label className="lucid-data-action"><Upload size={17} /><span><strong>{text("恢复完整备份", "Restore complete backup")}</strong><small>{text("从 WhyNavo JSON 文件恢复", "Restore from a WhyNavo JSON file")}</small></span><input type="file" aria-label={text("选择完整备份文件", "Choose a complete backup file")} accept="application/json,.json" onChange={(event) => { const file = event.target.files?.[0]; if (file) void onImportBackup(file).catch((error) => window.alert(error instanceof Error ? error.message : text("备份恢复失败", "Backup restore failed"))); event.currentTarget.value = ""; }} /></label>
+                <button type="button" onClick={onExport}><Download size={17} /><span><strong>{text("导出数据备份", "Export data backup")}</strong><small>{text("包含数据与静态本机媒体，不嵌入动态壁纸视频", "Includes data and static local media; video wallpaper bytes stay on this device")}</small></span></button>
+                <label className="lucid-data-action"><Upload size={17} /><span><strong>{text("恢复数据备份", "Restore data backup")}</strong><small>{text("从 WhyNavo JSON 文件恢复", "Restore from a WhyNavo JSON file")}</small></span><input type="file" aria-label={text("选择数据备份文件", "Choose a data backup file")} accept="application/json,.json" onChange={(event) => { const file = event.target.files?.[0]; if (file) void onImportBackup(file).catch((error) => window.alert(error instanceof Error ? error.message : text("备份恢复失败", "Backup restore failed"))); event.currentTarget.value = ""; }} /></label>
                 <button type="button" disabled={!migrationBackupAvailable} onClick={onRestoreMigrationBackup}><TimerReset size={17} /><span><strong>{text("回到更新前数据", "Restore pre-update data")}</strong><small>{migrationBackupAvailable ? text("恢复本设备最近迁移点", "Restore the latest migration point on this device") : text("当前没有迁移恢复点", "No migration restore point is available")}</small></span></button>
               </div>
-              <p className="lucid-data-notice"><ShieldCheck size={15} /> {text("备份可能包含私人便签、待办、照片和壁纸，请像保护私人文件一样保管。", "Backups may contain private notes, tasks, photos, and wallpapers. Protect them like private files.")}</p>
+              <p className="lucid-data-notice"><ShieldCheck size={15} /> {text("备份可能包含私人便签、待办、照片和静态壁纸，请像保护私人文件一样保管；动态壁纸视频只保存在当前设备。", "Backups may contain private notes, tasks, photos, and static wallpapers. Protect them like private files; dynamic wallpaper videos remain on this device.")}</p>
               {noteConflicts.length > 0 && (
                 <div className="lucid-conflict-panel">
                   <strong>{text(`${noteConflicts.length} 条笔记包含同步冲突副本`, `${noteConflicts.length} notes contain sync conflict copies`)}</strong>
@@ -8528,7 +8690,7 @@ function SyncDialog({ state, sync, updateState, legacyStateAvailable, onAdoptLeg
           {showDeleteAccount && (
             <div className="sync-delete-account">
               <strong>{text("永久删除账号与云端数据", "Permanently delete account and cloud data")}</strong>
-              <p>{text("此操作会删除账号、云端同步数据和此设备上的账号数据，且无法恢复。请先导出完整备份。", "This permanently deletes the account, cloud sync data, and account data on this device. Export a complete backup first.")}</p>
+              <p>{text("此操作会删除账号、云端同步数据和此设备上的账号数据，且无法恢复。请先导出数据备份。", "This permanently deletes the account, cloud sync data, and account data on this device. Export a data backup first.")}</p>
               <input
                 type="email"
                 autoComplete="off"

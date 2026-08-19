@@ -4,6 +4,7 @@ import { defaultWidgetSizes, nowIso, observeIsoTimestamp, uid } from "./defaultS
 import type { AppState, Countdown, Note, Settings, Shortcut, ShortcutFolder, ShortcutGroup, Todo, WidgetKey } from "./types";
 import { compareVersions } from "./updates";
 import { APP_VERSION, DATA_SCHEMA_VERSION, MIN_SUPPORTED_APP_VERSION } from "./version";
+import { isVideoWallpaper, MAX_VIDEO_WALLPAPER_BYTES, MAX_VIDEO_WALLPAPER_DURATION_SECONDS, MAX_VIDEO_WALLPAPER_PIXELS } from "./wallpaperMedia";
 
 export { nowIso };
 
@@ -413,6 +414,7 @@ const SETTINGS_KEYS = new Set([
   "wallpaper",
   "wallpaperPreset",
   "wallpaperRotation",
+  "wallpaperMotion",
   "customWallpapers",
   "wallpaperCollection",
   "quickNote",
@@ -764,6 +766,7 @@ export function validateAppStatePayload(value: unknown, label = "数据"): asser
     || !validOptionalNumberInRange(settings.visualRefreshVersion, 0, 1000)
     || (settings.visualRefreshVersion !== undefined && !Number.isSafeInteger(settings.visualRefreshVersion))
     || !validOptionalBoolean(settings.wallpaperRotation)
+    || !validOptionalBoolean(settings.wallpaperMotion)
     || !validOptionalBoolean(settings.weatherUseLocation)
     || !validOptionalBoolean(settings.remoteIconLookup)
     || !validOptionalBoolean(settings.homeSiteFloating)
@@ -874,15 +877,58 @@ export function validateAppStatePayload(value: unknown, label = "数据"): asser
       || settings.customWallpapers.some((entry) => {
         if (
           !isRecord(entry)
-          || !hasOnlyKeys(entry, new Set(["id", "name", "dataUrl", "createdAt"]))
+          || !hasOnlyKeys(entry, new Set([
+            "id",
+            "name",
+            "kind",
+            "dataUrl",
+            "posterDataUrl",
+            "mimeType",
+            "sizeBytes",
+            "durationSeconds",
+            "width",
+            "height",
+            "createdAt"
+          ]))
           || !validRequiredString(entry.id, MAX_STATE_ID_LENGTH)
           || !(entry.id as string).length
           || !validRequiredString(entry.name, 500)
           || !(entry.name as string).trim()
-          || !validRasterDataUrl(entry.dataUrl)
           || !validTimestamp(entry.createdAt)
           || wallpaperIds.has(entry.id as string)
         ) return true;
+        const kind = entry.kind === undefined ? "image" : entry.kind;
+        if (kind === "image") {
+          if (
+            !validRasterDataUrl(entry.dataUrl)
+            || entry.posterDataUrl !== undefined
+            || entry.mimeType !== undefined
+            || entry.sizeBytes !== undefined
+            || entry.durationSeconds !== undefined
+            || entry.width !== undefined
+            || entry.height !== undefined
+          ) return true;
+        } else if (kind === "video") {
+          if (
+            entry.dataUrl !== undefined
+            || !validRasterDataUrl(entry.posterDataUrl, 1024 * 1024)
+            || !["video/mp4", "video/webm"].includes(String(entry.mimeType))
+            || !validOptionalNumberInRange(entry.sizeBytes, 1, MAX_VIDEO_WALLPAPER_BYTES)
+            || entry.sizeBytes === undefined
+            || !Number.isSafeInteger(entry.sizeBytes)
+            || !validOptionalNumberInRange(entry.durationSeconds, 0.01, MAX_VIDEO_WALLPAPER_DURATION_SECONDS)
+            || entry.durationSeconds === undefined
+            || !validOptionalNumberInRange(entry.width, 1, 4096)
+            || entry.width === undefined
+            || !Number.isSafeInteger(entry.width)
+            || !validOptionalNumberInRange(entry.height, 1, 4096)
+            || entry.height === undefined
+            || !Number.isSafeInteger(entry.height)
+            || Number(entry.width) * Number(entry.height) > MAX_VIDEO_WALLPAPER_PIXELS
+          ) return true;
+        } else {
+          return true;
+        }
         wallpaperIds.add(entry.id as string);
         return false;
       })
@@ -980,6 +1026,13 @@ export function prepareCloudState(state: AppState): AppState {
 
 export function prepareCompleteBackupState(state: AppState): AppState {
   const normalized = normalizeState(state);
+  const videoWallpaperIds = new Set(
+    (normalized.settings.customWallpapers || [])
+      .filter(isVideoWallpaper)
+      .map((wallpaper) => wallpaper.id)
+  );
+  const wallpaperCollection = (normalized.settings.wallpaperCollection || [])
+    .filter((id) => !videoWallpaperIds.has(id));
   const fieldUpdatedAt = { ...(normalized.settings.fieldUpdatedAt || {}) };
   delete fieldUpdatedAt.city;
   delete fieldUpdatedAt.weatherUseLocation;
@@ -987,6 +1040,12 @@ export function prepareCompleteBackupState(state: AppState): AppState {
     ...normalized,
     settings: {
       ...normalized.settings,
+      customWallpapers: (normalized.settings.customWallpapers || []).filter((wallpaper) => !isVideoWallpaper(wallpaper)),
+      wallpaperPreset: videoWallpaperIds.has(normalized.settings.wallpaperPreset || "")
+        ? "lucid-room"
+        : normalized.settings.wallpaperPreset,
+      wallpaperCollection,
+      wallpaperRotation: Boolean(normalized.settings.wallpaperRotation && wallpaperCollection.length),
       city: CLOUD_NEUTRAL_WEATHER_CITY,
       weatherUseLocation: false,
       supabaseUrl: undefined,
@@ -1007,10 +1066,26 @@ export function prepareCompleteBackupState(state: AppState): AppState {
 export function restoreCompleteBackupForDevice(backup: AppState, current: AppState): AppState {
   const normalizedBackup = normalizeState(backup);
   const normalizedCurrent = normalizeState(current);
+  const currentVideoWallpapers = (normalizedCurrent.settings.customWallpapers || []).filter(isVideoWallpaper);
+  const currentVideoIds = new Set(currentVideoWallpapers.map((wallpaper) => wallpaper.id));
+  const restoredCustomWallpapers = [
+    ...(normalizedBackup.settings.customWallpapers || []).filter((wallpaper) => !isVideoWallpaper(wallpaper)),
+    ...currentVideoWallpapers
+  ];
   return normalizeState({
     ...normalizedBackup,
     settings: {
       ...normalizedBackup.settings,
+      customWallpapers: restoredCustomWallpapers,
+      wallpaperPreset: isVideoWallpaper(
+        (normalizedBackup.settings.customWallpapers || []).find((wallpaper) => wallpaper.id === normalizedBackup.settings.wallpaperPreset)
+      ) ? "lucid-room" : normalizedBackup.settings.wallpaperPreset,
+      wallpaperCollection: Array.from(new Set([
+        ...(normalizedBackup.settings.wallpaperCollection || []).filter((id) => !(
+          normalizedBackup.settings.customWallpapers || []
+        ).some((wallpaper) => wallpaper.id === id && isVideoWallpaper(wallpaper))),
+        ...(normalizedCurrent.settings.wallpaperCollection || []).filter((id) => currentVideoIds.has(id))
+      ])),
       city: normalizedCurrent.settings.city,
       weatherUseLocation: normalizedCurrent.settings.weatherUseLocation,
       supabaseUrl: normalizedCurrent.settings.supabaseUrl,
@@ -1517,6 +1592,7 @@ export function normalizeState(state: AppState): AppState {
         ? "aurora-lake"
         : state.settings.wallpaperPreset || "lucid-room",
     wallpaperRotation: visualVersion < 5 ? false : state.settings.wallpaperRotation ?? false,
+    wallpaperMotion: state.settings.wallpaperMotion ?? true,
     visualRefreshVersion: 18,
     iconSize: Math.min(80, Math.max(48, visualVersion < 8 && state.settings.iconSize === 64 ? 58 : state.settings.iconSize || 58)),
     glass: Math.min(88, Math.max(28, state.settings.glass || 42)),

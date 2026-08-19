@@ -59,11 +59,11 @@
   <body>
     <main>
       <h1>WhyNavo 隐私与数据说明</h1>
-      <p class="meta">更新日期：2026 年 8 月 18 日</p>
+      <p class="meta">更新日期：2026 年 8 月 19 日</p>
       <p class="notice">WhyNavo 采用本地优先设计。你无需登录即可使用，登录仅用于可选的跨设备同步。</p>
 
       <h2>本机数据</h2>
-      <p>快捷方式、小组件、便签、待办、倒计时、日历、布局和设置默认保存在当前浏览器的 IndexedDB 中。清理浏览器网站数据、卸载扩展、删除浏览器配置文件或系统回收存储空间，都可能影响仅存在本机的数据。请定期使用完整 JSON 备份。</p>
+      <p>快捷方式、小组件、便签、待办、倒计时、日历、布局和设置默认保存在当前浏览器的 IndexedDB 中。自定义动态壁纸视频也保存在 IndexedDB 的独立本机媒体记录中。清理浏览器网站数据、卸载扩展、删除浏览器配置文件或系统回收存储空间，都可能影响仅存在本机的数据。请定期导出 JSON 数据备份；动态壁纸视频文件不会嵌入 JSON，换设备时需要重新选择。</p>
       <p>WhyNavo 不会对 IndexedDB 中的应用内容额外实施端到端或字段级加密。本机数据的静态保护依赖浏览器配置文件、操作系统账号、设备锁和磁盘加密；请勿在共享或未受保护的设备上保存敏感内容。</p>
       <p>当你主动为固定任务启用提醒时，扩展会把该任务的标题、周期和提醒时间复制到浏览器扩展的本机存储，并使用浏览器的定时与通知能力在设定时间提醒。该提醒副本不会发送给额外的提醒服务；关闭通知权限或删除任务会停止相应提醒。</p>
 
@@ -78,7 +78,7 @@
       <p>搜索框第一项在界面显示为 Google；在 Chrome 扩展中，该项仍通过 Chrome Search API 使用浏览器当前配置的搜索服务，并在新标签页中打开结果。你也可以在搜索框或设置中主动选择百度用于当前页面会话；此时搜索词会直接发送给百度并在新标签页打开。WhyNavo 不修改浏览器默认搜索设置，不把搜索词写入本地应用数据、云端同步或备份，也不会在未选择百度时把搜索词发送给百度。</p>
 
       <h2>不会同步的内容</h2>
-      <p>本机上传的照片、照片文件名、自定义壁纸、快捷图标和文件夹图标不会进入云端快照。同步数据不是端到端加密；云服务运营方在必要的系统管理场景下可能具备技术访问能力，因此不要在便签或标题中保存密码、恢复码或其他高度敏感秘密。</p>
+      <p>本机上传的照片、照片文件名、自定义图片、动态壁纸视频、快捷图标和文件夹图标不会进入云端快照。同步数据不是端到端加密；云服务运营方在必要的系统管理场景下可能具备技术访问能力，因此不要在便签或标题中保存密码、恢复码或其他高度敏感秘密。</p>
 
       <h2>外部服务</h2>
       <ul>
@@ -102,9 +102,9 @@
       <p>登录同步时，数据会由所使用的云服务区域和网络节点处理，位置可能不同于你所在的国家或地区。不同网页域名的浏览器本机存储彼此隔离；未同步的本机数据不会仅因更换访问域名而自动迁移。</p>
 
       <h2>你的选择</h2>
-      <p>你可以不登录、关闭自动同步、关闭第三方图标查找、导出完整备份并在其他浏览器恢复。新安装默认不读取定位；只有你主动开启“使用当前位置”后，应用才会调用浏览器定位，浏览器或操作系统可能显示权限提示。普通“退出登录”只退出当前设备，并切换到未登录空白数据；“退出所有设备”会撤销该账号的其他刷新会话，其他设备会在会话刷新后退出。</p>
+      <p>你可以不登录、关闭自动同步、关闭第三方图标查找、导出 JSON 数据备份并在其他浏览器恢复。静态本机媒体可包含在数据备份中；动态壁纸视频文件仍留在原设备，需要在新设备重新选择。新安装默认不读取定位；只有你主动开启“使用当前位置”后，应用才会调用浏览器定位，浏览器或操作系统可能显示权限提示。普通“退出登录”只退出当前设备，并切换到未登录空白数据；“退出所有设备”会撤销该账号的其他刷新会话，其他设备会在会话刷新后退出。</p>
       <p>登录后可在“账号与云同步”中永久删除账号。删除前需要再次输入当前邮箱和密码并完成安全验证；当前密码会通过 HTTPS 发送给 WhyNavo 的账号删除云函数，并仅用于向 Supabase Auth 重新验证当前账号，函数不会保存或记录该密码。完成后会删除 Supabase Auth 账号、该账号的云端同步数据，以及此设备上的账号数据、账号备份、图标解析缓存和位置天气缓存。此操作无法恢复，建议先导出完整 JSON 备份。</p>
-      <p>你可以通过完整备份查看并携带自己的 WhyNavo 内容，也可以直接修改或删除记录。敏感的数据请求或安全问题不要写入公开 Issue，请使用 GitHub 的私密漏洞报告渠道。</p>
+      <p>你可以通过数据备份查看并携带自己的 WhyNavo 内容，也可以直接修改或删除记录；备份清单会明确提示未嵌入的动态壁纸视频。敏感的数据请求或安全问题不要写入公开 Issue，请使用 GitHub 的私密漏洞报告渠道。</p>
 
       <h2>未成年人</h2>
       <p>账号同步服务不面向未满 16 周岁，或未达到所在地可独立同意网络服务年龄的用户。达到当地要求前，请勿创建同步账号。</p>
@@ -116,11 +116,11 @@
 
       <hr class="divider" />
       <h1 id="english">WhyNavo Privacy and Data Notice</h1>
-      <p class="meta">Effective date: August 18, 2026</p>
+      <p class="meta">Effective date: August 19, 2026</p>
       <p class="notice">WhyNavo is local-first. You can use it without an account; signing in is only required for optional cross-device synchronization.</p>
 
       <h2>Data on your device</h2>
-      <p>Shortcuts, widgets, notes, todos, countdowns, calendar entries, layout, and settings are stored in the current browser's IndexedDB by default. Clearing site data, removing the extension, deleting the browser profile, or operating-system storage cleanup can remove device-only data. Use the complete JSON backup regularly.</p>
+      <p>Shortcuts, widgets, notes, todos, countdowns, calendar entries, layout, and settings are stored in the current browser's IndexedDB by default. Custom dynamic wallpaper videos are stored as separate local media records in IndexedDB. Clearing site data, removing the extension, deleting the browser profile, or operating-system storage cleanup can remove device-only data. Export JSON data backups regularly; video wallpaper bytes are not embedded in JSON and must be selected again on a new device.</p>
       <p>WhyNavo does not add end-to-end or field-level encryption to application content in IndexedDB. Protection of data at rest depends on the browser profile, operating-system account, device lock, and disk encryption. Do not keep sensitive content on a shared or unprotected device.</p>
       <p>When you explicitly enable a reminder for a recurring task, the extension copies that task's title, recurrence, and reminder time to local extension storage and uses the browser's alarm and notification APIs at the scheduled time. This reminder copy is not sent to an additional reminder service. Revoking notification permission or deleting the task stops the corresponding reminder.</p>
 
@@ -135,7 +135,7 @@
       <p>The first search option is labelled Google in the interface. In the Chrome extension it still uses the provider currently configured in the browser through the Chrome Search API and opens results in a new tab. You may explicitly choose Baidu from the search field or Settings for the current page session; that query is sent directly to Baidu and opened in a new tab. WhyNavo does not change the browser's default search setting, store search terms in application data, cloud sync, or backups, or send terms to Baidu unless you choose Baidu.</p>
 
       <h2>Data that is not synchronized</h2>
-      <p>Device-uploaded photos, photo filenames, custom wallpapers, shortcut icons, and folder icons are excluded from cloud snapshots. Synchronized data is not end-to-end encrypted. Cloud operators may have technical access when necessary to operate the service, so do not store passwords, recovery codes, or other highly sensitive secrets in titles or notes.</p>
+      <p>Device-uploaded photos, photo filenames, custom images, dynamic wallpaper videos, shortcut icons, and folder icons are excluded from cloud snapshots. Synchronized data is not end-to-end encrypted. Cloud operators may have technical access when necessary to operate the service, so do not store passwords, recovery codes, or other highly sensitive secrets in titles or notes.</p>
 
       <h2>Service providers</h2>
       <ul>
@@ -152,7 +152,7 @@
       <p>Turnstile processes browser, network, and interaction signals needed to issue a short-lived, single-use challenge token. WhyNavo uses that token only in page memory for the current authentication request.</p>
 
       <h2>Retention, deletion, and your choices</h2>
-      <p>Device data remains until you overwrite it or remove the relevant browser storage. Online account data remains until the account is permanently deleted and is removed immediately from the live Auth and application tables. WhyNavo creates a daily production-database export for disaster recovery, encrypts it with AES-256-GCM before upload, and stores only the encrypted envelope and checksum in a private Cloudflare R2 bucket. The recovery private key is kept separately from the cloud services and upload credential. A lifecycle rule deletes encrypted copies after no more than 35 days, so a copy created before account deletion may remain until that period expires. Disaster recovery must not selectively restore a deleted account and must reapply deletions made after the restored backup. Security and email-delivery logs may follow their providers' limited retention periods. You can use WhyNavo without signing in, disable automatic sync and remote icon lookup, and export a complete backup.</p>
+      <p>Device data remains until you overwrite it or remove the relevant browser storage. Online account data remains until the account is permanently deleted and is removed immediately from the live Auth and application tables. WhyNavo creates a daily production-database export for disaster recovery, encrypts it with AES-256-GCM before upload, and stores only the encrypted envelope and checksum in a private Cloudflare R2 bucket. The recovery private key is kept separately from the cloud services and upload credential. A lifecycle rule deletes encrypted copies after no more than 35 days, so a copy created before account deletion may remain until that period expires. Disaster recovery must not selectively restore a deleted account and must reapply deletions made after the restored backup. Security and email-delivery logs may follow their providers' limited retention periods. You can use WhyNavo without signing in, disable automatic sync and remote icon lookup, and export a JSON data backup. Static local media can be included; dynamic wallpaper video files remain on the current device and must be selected again on another device.</p>
       <p>You can permanently delete an account after confirming the current email and password and completing the security challenge. The current password is sent over HTTPS to WhyNavo's account-deletion function and used only to reauthenticate the account with Supabase Auth; the function does not store or log it. Successful deletion removes the Supabase Auth account, its cloud snapshot, and that account's data and caches on the current device.</p>
       <p>Ordinary sign-out affects only the current device and switches it to an empty signed-out data area. “Sign out all devices” revokes the account's other refresh sessions; other devices sign out when their sessions refresh. Different web origins have separate browser storage, so device-only data does not automatically move when a domain changes.</p>
 
