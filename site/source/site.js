@@ -14,14 +14,16 @@
     menuToggle.addEventListener("click", () => {
       const open = nav.classList.toggle("is-open");
       menuToggle.setAttribute("aria-expanded", String(open));
-      menuToggle.textContent = open ? menuToggle.dataset.closeLabel : menuToggle.dataset.openLabel;
+      menuToggle.setAttribute("aria-label", open ? menuToggle.dataset.closeLabel : menuToggle.dataset.openLabel);
+      menuToggle.classList.toggle("is-open", open);
     });
 
     nav.querySelectorAll("a").forEach((link) => {
       link.addEventListener("click", () => {
         nav.classList.remove("is-open");
         menuToggle.setAttribute("aria-expanded", "false");
-        menuToggle.textContent = menuToggle.dataset.openLabel;
+        menuToggle.setAttribute("aria-label", menuToggle.dataset.openLabel);
+        menuToggle.classList.remove("is-open");
       });
     });
   }

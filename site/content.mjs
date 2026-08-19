@@ -18,7 +18,7 @@ export const CONTENT = {
       download: "Download",
       updates: "Updates",
       help: "Help",
-      openApp: "Web App · No install",
+      openApp: "Open Web App",
       menu: "Open menu",
       closeMenu: "Close menu"
     },
@@ -33,8 +33,13 @@ export const CONTENT = {
       secondaryPending: "Install Desktop Extension",
       secondaryApproved: "Add to Chrome",
       heroNote: "No account and no installation are required for the web app. Install the desktop extension only to replace every Chrome or Edge new tab.",
+      productPreview: "Actual product interface · local-first workspace",
       index: ["01 Canvas", "02 Local", "03 Sync"],
-      trust: ["No account required", "Local by default", "Optional sync"],
+      trust: [
+        ["01", "No account required", "Open the full local workspace immediately."],
+        ["02", "Local by default", "Signed-out data stays in this browser profile."],
+        ["03", "Sync when you choose", "Connect an account only when it helps."]
+      ],
       canvas: {
         kicker: "01 / CANVAS",
         title: "Make the web feel like yours.",
@@ -171,7 +176,7 @@ export const CONTENT = {
       download: "下载",
       updates: "更新",
       help: "帮助",
-      openApp: "网页版 · 无需安装",
+      openApp: "打开网页版",
       menu: "打开菜单",
       closeMenu: "关闭菜单"
     },
@@ -186,8 +191,13 @@ export const CONTENT = {
       secondaryPending: "安装桌面扩展",
       secondaryApproved: "安装 Chrome 插件",
       heroNote: "网页版无需账号、无需安装；只有希望 WhyNavo 自动接管 Chrome 或 Edge 的每个新标签页时，才需要安装桌面扩展。",
+      productPreview: "真实产品界面 · 本地优先工作台",
       index: ["01 画布", "02 本机", "03 同步"],
-      trust: ["无需账号", "默认本地保存", "按需同步"],
+      trust: [
+        ["01", "无需账号", "打开即可使用完整的本地工作台。"],
+        ["02", "默认本地保存", "未登录数据保留在当前浏览器配置文件中。"],
+        ["03", "需要时再同步", "只有真正需要多设备使用时才连接账号。"]
+      ],
       canvas: {
         kicker: "01 / 画布",
         title: "让网页真正属于你。",

@@ -41,11 +41,11 @@ const header = (locale, copy, page) => {
   const nav = copy.nav;
   const link = (key, label) => `<a class="nav-link" href="${pagePath(locale, key)}"${page === key ? ' aria-current="page"' : ""}>${escapeHtml(label)}</a>`;
   return `<header class="site-header">
-  <a class="brand" href="${pagePath(locale)}" aria-label="WhyNavo home">
+  <a class="brand" href="${pagePath(locale)}" aria-label="${escapeHtml(copy.lang === "en" ? "WhyNavo home" : "WhyNavo 首页")}">
     <img src="${asset("logo.svg")}" alt="" width="30" height="30" />
     <span>WhyNavo</span>
   </a>
-  <nav class="site-nav" id="site-navigation" aria-label="Primary navigation">
+  <nav class="site-nav" id="site-navigation" aria-label="${escapeHtml(copy.lang === "en" ? "Primary navigation" : "主要导航")}">
     ${link("features", nav.features)}
     ${link("privacy", nav.privacy)}
     ${link("download", nav.download)}
@@ -54,7 +54,7 @@ const header = (locale, copy, page) => {
     <a class="nav-link" href="${copy.altHref}">${escapeHtml(copy.altLang)}</a>
   </nav>
   <a class="header-cta" href="${SITE.appUrl}" ${externalAttrs}>${escapeHtml(nav.openApp)} <span aria-hidden="true">↗</span></a>
-  <button class="menu-toggle" type="button" aria-expanded="false" aria-controls="site-navigation" data-open-label="${escapeHtml(nav.menu)}" data-close-label="${escapeHtml(nav.closeMenu)}">${escapeHtml(nav.menu)}</button>
+  <button class="menu-toggle" type="button" aria-expanded="false" aria-controls="site-navigation" aria-label="${escapeHtml(nav.menu)}" data-open-label="${escapeHtml(nav.menu)}" data-close-label="${escapeHtml(nav.closeMenu)}"><span class="menu-toggle-lines" aria-hidden="true"><i></i><i></i></span></button>
 </header>`;
 };
 
@@ -64,7 +64,7 @@ const footer = (locale, copy) => `<footer class="site-footer">
       <a class="footer-brand" href="${pagePath(locale)}"><img src="${asset("logo.svg")}" alt="" width="26" height="26" /> <span>WhyNavo</span></a>
       <p class="footer-meta">${escapeHtml(copy.lang === "en" ? `Local-first new tab workspace · v${releaseVersion}` : `本地优先的新标签页工作台 · v${releaseVersion}`)}</p>
     </div>
-    <nav class="footer-links" aria-label="Footer navigation">
+    <nav class="footer-links" aria-label="${escapeHtml(copy.lang === "en" ? "Footer navigation" : "页脚导航")}">
       <a href="${pagePath(locale, "features")}">${escapeHtml(copy.nav.features)}</a>
       <a href="${pagePath(locale, "privacy")}">${escapeHtml(copy.nav.privacy)}</a>
       <a href="${pagePath(locale, "download")}">${escapeHtml(copy.nav.download)}</a>
@@ -163,16 +163,14 @@ const shell = ({locale, page, copy, title, description, body, bodyClass = ""}) =
 };
 
 const renderHero = (copy) => {
-  const titleMarkup = copy.lang === "en"
-    ? "Your new tab.<br /><em>Your data.</em>"
-    : "你的新标签页，<br /><em>数据也属于你。</em>";
   const productImage = copy.lang === "en" ? "product-sample-a.png" : "product-home.png";
   const productDimensions = copy.lang === "en" ? [1536, 1024] : [1280, 800];
   return `<section class="hero" aria-labelledby="hero-title">
     <div class="hero-inner">
       <div class="hero-copy reveal">
         <p class="eyebrow">${escapeHtml(copy.home.eyebrow)}</p>
-        <h1 id="hero-title">${titleMarkup}</h1>
+        <h1 id="hero-title">WhyNavo</h1>
+        <p class="hero-title">${escapeHtml(copy.home.heroTitle)}</p>
         <p class="hero-lede">${escapeHtml(copy.home.heroText)}</p>
         <p class="hero-detail">${escapeHtml(copy.home.heroDetail)}</p>
         <div class="hero-actions">
@@ -183,18 +181,14 @@ const renderHero = (copy) => {
       </div>
       <figure class="hero-product reveal" aria-label="${escapeHtml(copy.lang === "en" ? "WhyNavo product preview" : "WhyNavo 产品预览")}">
         <img src="${asset(`images/${productImage}`)}" alt="${escapeHtml(copy.lang === "en" ? "WhyNavo workspace with shortcuts, weather, focus and calendar widgets" : "WhyNavo 工作台，展示快捷入口、天气、专注和日历小组件")}" width="${productDimensions[0]}" height="${productDimensions[1]}" fetchpriority="high" />
+        <figcaption><span>${escapeHtml(copy.home.productPreview)}</span><span>v${escapeHtml(SITE.version)}</span></figcaption>
       </figure>
-      <nav class="hero-index" aria-label="${escapeHtml(copy.lang === "en" ? "Homepage sections" : "首页章节")}">
-        <a href="#canvas">${escapeHtml(copy.home.index[0])}</a>
-        <a href="#privacy">${escapeHtml(copy.home.index[1])}</a>
-        <a href="#platforms">${escapeHtml(copy.home.index[2])}</a>
-      </nav>
     </div>
   </section>`;
 };
 
 const renderTrust = (copy) => `<div class="trust-strip" aria-label="${escapeHtml(copy.lang === "en" ? "WhyNavo principles" : "WhyNavo 原则")}">
-  ${copy.home.trust.map((item) => `<div class="trust-item">${escapeHtml(item)}</div>`).join("")}
+  <div class="trust-strip-inner">${copy.home.trust.map(([number, title, text]) => `<div class="trust-item"><span class="trust-number">${escapeHtml(number)}</span><span class="trust-copy"><strong>${escapeHtml(title)}</strong><small>${escapeHtml(text)}</small></span></div>`).join("")}</div>
 </div>`;
 
 const renderCanvas = (copy) => `<section class="section section-light" id="canvas" aria-labelledby="canvas-title">
@@ -227,7 +221,10 @@ const renderCanvas = (copy) => `<section class="section section-light" id="canva
   </div>
 </section>`;
 
-const renderWidgets = (copy) => `<section class="section section-quiet" id="widgets" aria-labelledby="widgets-title">
+const renderWidgets = (copy) => {
+  const forecastDays = copy.lang === "en" ? ["Mon", "Tue", "Wed", "Thu"] : ["周一", "周二", "周三", "周四"];
+  const calendarDays = copy.lang === "en" ? ["M", "T", "W", "T", "F", "S", "S"] : ["一", "二", "三", "四", "五", "六", "日"];
+  return `<section class="section section-quiet" id="widgets" aria-labelledby="widgets-title">
   <div class="section-inner chapter-grid reverse reveal">
     <div class="chapter-copy">
       <p class="chapter-kicker">${escapeHtml(copy.home.widgets.kicker)}</p>
@@ -241,7 +238,7 @@ const renderWidgets = (copy) => `<section class="section section-quiet" id="widg
           <h3>${escapeHtml(copy.lang === "en" ? "Weather" : "天气")}</h3>
           <p>${escapeHtml(copy.lang === "en" ? "Shanghai · Partly cloudy" : "上海 · 多云")}</p>
           <div class="temperature">26°</div>
-          <div class="forecast"><span>Mon<br /><strong>27°</strong></span><span>Tue<br /><strong>28°</strong></span><span>Wed<br /><strong>26°</strong></span><span>Thu<br /><strong>27°</strong></span></div>
+          <div class="forecast">${forecastDays.map((day, index) => `<span>${escapeHtml(day)}<br /><strong>${[27, 28, 26, 27][index]}°</strong></span>`).join("")}</div>
         </article>
         <article class="widget widget-focus">
           <h3>${escapeHtml(copy.lang === "en" ? "Focus" : "专注")}</h3>
@@ -250,7 +247,7 @@ const renderWidgets = (copy) => `<section class="section section-quiet" id="widg
         </article>
         <article class="widget widget-calendar">
           <h3>${escapeHtml(copy.lang === "en" ? "Calendar" : "日历")}</h3>
-          <div class="calendar-grid">${["M", "T", "W", "T", "F", "S", "S", "18", "19", "20", "21", "22", "23", "24", "25", "26", "27", "28", "29", "30", "31"].map((item) => `<span>${item}</span>`).join("")}</div>
+          <div class="calendar-grid">${[...calendarDays, "18", "19", "20", "21", "22", "23", "24", "25", "26", "27", "28", "29", "30", "31"].map((item) => `<span>${escapeHtml(item)}</span>`).join("")}</div>
         </article>
         <article class="widget widget-note">
           <h3>${escapeHtml(copy.lang === "en" ? "Notes" : "笔记")}</h3>
@@ -261,6 +258,7 @@ const renderWidgets = (copy) => `<section class="section section-quiet" id="widg
     </div>
   </div>
 </section>`;
+};
 
 const renderPrivacy = (copy) => `<section class="section section-light section-privacy" id="privacy" aria-labelledby="privacy-title">
   <div class="section-inner">
