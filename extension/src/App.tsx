@@ -4239,7 +4239,7 @@ export default function App() {
         >
           {activePage === "widgets" ? (
             <section className={`home-dashboard sample-a-home ${layoutEditing ? "is-editing" : ""}`}>
-              <div className="sample-a-canvas">
+              <div className={`sample-a-canvas ${homeShortcutTiles.length ? "with-sites" : "without-sites"}`}>
                   <section className={`sample-a-sites-panel ${state.settings.homeSiteFloating !== false ? "sites-floating" : "sites-still"} ${layoutEditing ? "layout-editing" : ""}`}>
                     <header>
                       <div>

@@ -1265,6 +1265,7 @@ try {
   const searchInteractionCss = await readFile(join(repoRoot, "extension/src/ui-v0928.css"), "utf8");
   const alignmentCss = await readFile(join(repoRoot, "extension/src/ui-v0929.css"), "utf8");
   const iconControlCss = await readFile(join(repoRoot, "extension/src/ui-v0930.css"), "utf8");
+  const responsiveLayoutCss = await readFile(join(repoRoot, "extension/src/ui-v0931.css"), "utf8");
   const refinedSettingsCss = await readFile(join(repoRoot, "extension/src/ui-settings-refined.css"), "utf8");
   const mainSource = await readFile(join(repoRoot, "extension/src/main.tsx"), "utf8");
   const appHtml = await readFile(join(repoRoot, "extension/index.html"), "utf8");
@@ -1368,7 +1369,7 @@ try {
   assert.match(searchPolicyCss, /\.sample-a-hero \.hero-search[\s\S]*grid-template-columns: var\(--whynavo-search-provider-width\) minmax\(0, 1fr\) 44px/, "desktop Home search must reserve a stable provider slot without layout shift");
   assert.match(searchPolicyCss, /\.lucid-search-command[\s\S]*grid-template-columns: 26px var\(--whynavo-search-provider-width\) minmax\(0, 1fr\) 44px/, "desktop universal search must keep local-search affordance, provider choice, query, and action in stable tracks");
   assert.match(searchPolicyCss, /@media \(max-width: 620px\)[\s\S]*grid-template-columns: var\(--whynavo-search-provider-width\) minmax\(0, 1fr\) 42px/, "the provider selector and search action must remain contained on mobile");
-  assert.match(mainSource, /import "\.\/ui-v0928\.css";[\s\S]*import "\.\/ui-v0929\.css";[\s\S]*import "\.\/ui-v0930\.css";/, "the final icon-control layer must load after the search and Spaces alignment layers");
+  assert.match(mainSource, /import "\.\/ui-v0928\.css";[\s\S]*import "\.\/ui-v0929\.css";[\s\S]*import "\.\/ui-v0930\.css";[\s\S]*import "\.\/ui-v0931\.css";/, "the responsive layout safety layer must load after the search, alignment, and icon-control layers");
   assert.match(searchInteractionCss, /\.search-provider-menu[\s\S]*backdrop-filter: blur\(22px\)/, "the provider menu must use a contained translucent surface");
   assert.match(searchInteractionCss, /\.search-provider-option[\s\S]*min-height: 54px/, "provider choices must retain a comfortable keyboard and touch target");
   assert.match(searchInteractionCss, /\.workspace\.page-shortcuts,[\s\S]*\.workspace\.page-custom[\s\S]*width: min\(92vw/, "wide Spaces must use the expanded reference canvas without changing mobile widths");
@@ -1377,6 +1378,9 @@ try {
   assert.match(alignmentCss, /\.spaces-canvas-toolbar[\s\S]*padding-inline: 4px[\s\S]*\.page-shortcuts \.shortcut-grid,[\s\S]*padding-inline: 4px/, "the Add site action and shortcut grid must share the same content edge");
   assert.match(iconControlCss, /--whynavo-search-provider-width: 44px[\s\S]*\.search-provider-trigger \.search-provider-label[\s\S]*clip: rect\(0, 0, 0, 0\)/, "search provider triggers must use icon-only visuals while retaining accessible names");
   assert.match(iconControlCss, /\.shortcut-add-tile[\s\S]*\.shortcut-add-icon[\s\S]*border: 1px dashed/, "the integrated Add site tile must share the icon canvas language");
+  assert.match(appSource, /sample-a-canvas \$\{homeShortcutTiles\.length \? "with-sites" : "without-sites"\}/, "Home must expose an explicit empty-canvas state instead of reserving an invisible shortcut column");
+  assert.match(responsiveLayoutCss, /\.sample-a-canvas\.without-sites[\s\S]*grid-template-columns: minmax\(0, 1fr\)[\s\S]*\.home-sites-empty[\s\S]*position: static/, "an empty Home canvas must collapse to a compact add action before the widget grid");
+  assert.match(responsiveLayoutCss, /\.lucid-settings-content[\s\S]*overflow-x: clip[\s\S]*\.lucid-settings-section[\s\S]*container-type: inline-size[\s\S]*@container \(max-width: 560px\)/, "Settings must prevent horizontal scrolling and stack controls according to their real container width");
   assert.match(fluidLayoutCss, /--whynavo-fluid-content: min\(80vw, calc\(100% - clamp\(28px, 3vw, 112px\)\)\)/, "desktop content must follow the reference canvas ratio while expanding with the effective viewport");
   assert.match(fluidLayoutCss, /\.workspace\.page-shortcuts,[\s\S]*\.workspace\.page-tasks[\s\S]*width: var\(--whynavo-fluid-content\)/, "every major workspace must share the same zoom-responsive side gutters");
   assert.match(appSource, /folder-view-heading[\s\S]*folder-add-shortcut/, "folders must render as a dedicated icon canvas with an accessible add action");

@@ -1,0 +1,161 @@
+/* WhyNavo 0.9.31: compact empty Home state and overflow-safe settings. */
+
+/* An empty shortcut canvas is an action row, not a permanently reserved column. */
+.sample-a-canvas.without-sites {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 24px;
+}
+
+.sample-a-canvas.without-sites .sample-a-sites-panel {
+  display: grid;
+  width: 100%;
+  height: auto;
+  min-height: 56px;
+  padding: 0 4px 12px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 16px;
+  border-bottom: 1px solid color-mix(in srgb, var(--lucid-line-strong, var(--wt-line-strong)) 64%, transparent);
+}
+
+.sample-a-canvas.without-sites .sample-a-sites-panel > header {
+  min-width: 0;
+  min-height: 44px;
+  margin: 0;
+}
+
+.sample-a-canvas.without-sites .sample-a-sites-panel > header button {
+  display: none;
+}
+
+.sample-a-canvas.without-sites .home-sites-canvas,
+.sample-a-canvas.without-sites .home-shortcuts-row {
+  width: auto;
+  height: auto;
+  min-height: 0;
+}
+
+.sample-a-canvas.without-sites .home-shortcuts-row {
+  display: none;
+}
+
+.sample-a-canvas.without-sites .home-sites-empty {
+  position: static;
+  inset: auto;
+  display: inline-flex;
+  width: auto;
+  min-width: 164px;
+  min-height: 44px;
+  padding: 0 14px;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  color: var(--lucid-ink, var(--wt-text));
+  background: color-mix(in srgb, var(--lucid-surface-solid, var(--wt-surface)) 72%, transparent);
+  border: 1px solid var(--lucid-line-strong, var(--wt-line-strong));
+  border-radius: 7px;
+  place-content: normal;
+  box-shadow: 0 8px 24px rgba(20, 34, 40, 0.06);
+}
+
+.sample-a-canvas.without-sites .home-sites-empty:hover,
+.sample-a-canvas.without-sites .home-sites-empty:focus-visible {
+  color: var(--lucid-brand-strong, var(--lucid-brand, var(--wt-brand)));
+  background: color-mix(in srgb, var(--lucid-brand, var(--wt-brand)) 10%, var(--lucid-surface-solid, var(--wt-surface)));
+  border-color: color-mix(in srgb, var(--lucid-brand, var(--wt-brand)) 48%, var(--lucid-line-strong, var(--wt-line-strong)));
+}
+
+.sample-a-canvas.without-sites .sample-a-primary-widgets {
+  width: min(1120px, 100%);
+  margin-inline: auto;
+}
+
+/* Settings own one vertical scroll region. Every descendant must fit its column. */
+.lucid-settings-content {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: clip;
+}
+
+.lucid-settings-section {
+  width: min(620px, 100%);
+  max-width: 100%;
+  min-width: 0;
+  margin-inline: auto;
+  container-type: inline-size;
+}
+
+.lucid-settings-section *,
+.lucid-setting-row > *,
+.shortcut-label-editor > * {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.lucid-setting-row .settings-segments,
+.lucid-setting-row .lucid-compact-input,
+.lucid-setting-row .lucid-inline-button,
+.lucid-setting-row .lucid-range-control,
+.lucid-setting-row input[type="range"] {
+  width: 100% !important;
+  max-width: 100%;
+}
+
+.shortcut-label-editor {
+  width: 100%;
+  max-width: 100%;
+  grid-template-columns: minmax(120px, 140px) minmax(0, 1fr);
+}
+
+.shortcut-label-color-control code {
+  overflow-wrap: anywhere;
+}
+
+@media (min-width: 761px) {
+  .lucid-settings-overlay .dialog {
+    width: min(860px, calc(100vw - 40px));
+  }
+
+  .lucid-setting-row {
+    grid-template-columns: minmax(0, 1fr) minmax(180px, 252px);
+    gap: clamp(16px, 3vw, 24px);
+  }
+}
+
+@container (max-width: 560px) {
+  .lucid-setting-row {
+    min-height: 0;
+    padding-block: 13px;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 10px;
+  }
+
+  .lucid-setting-row.lucid-toggle-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .lucid-setting-row .lucid-switch {
+    justify-self: end;
+  }
+
+  .shortcut-label-editor {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 480px) {
+  .sample-a-canvas.without-sites .sample-a-sites-panel {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 6px;
+  }
+
+  .sample-a-canvas.without-sites .home-sites-empty {
+    width: 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sample-a-canvas.without-sites .home-sites-empty {
+    transition: none;
+  }
+}

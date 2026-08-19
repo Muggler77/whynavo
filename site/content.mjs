@@ -4,7 +4,7 @@ export const SITE = {
   appUrl: "https://whynavo.com/",
   githubUrl: "https://github.com/Muggler77/whynavo",
   releaseUrl: "https://github.com/Muggler77/whynavo/releases/latest",
-  version: "0.9.30"
+  version: "0.9.31"
 };
 
 export const CONTENT = {
@@ -18,7 +18,7 @@ export const CONTENT = {
       download: "Download",
       updates: "Updates",
       help: "Help",
-      openApp: "Open Web App",
+      openApp: "Web App · No install",
       menu: "Open menu",
       closeMenu: "Close menu"
     },
@@ -29,10 +29,10 @@ export const CONTENT = {
       heroTitle: "Own your new tab.",
       heroText: "Private by default. Powerful when connected.",
       heroDetail: "A calmer place for shortcuts, widgets, notes and everyday focus.",
-      primary: "Open Web App",
-      secondaryPending: "Get Desktop Extension",
+      primary: "Use Web App · No install",
+      secondaryPending: "Install Desktop Extension",
       secondaryApproved: "Add to Chrome",
-      heroNote: "Works locally before you sign in.",
+      heroNote: "The web app needs no installation. Install the desktop extension only to replace every Chrome or Edge new tab.",
       index: ["01 Canvas", "02 Private", "03 Sync"],
       trust: ["Local-first", "Optional sync", "Export anytime"],
       canvas: {
@@ -76,6 +76,7 @@ export const CONTENT = {
         secondary: "Read the privacy guide"
       },
       faq: [
+        ["Do I need the extension?", "No. The web app works directly in any modern browser. Install the desktop extension only when you want WhyNavo to open automatically on every Chrome or Edge new tab."],
         ["Do I need an account?", "No. WhyNavo works without an account and keeps signed-out content in the current browser. Sign in only when you want supported fields to sync."],
         ["Does sync upload my photos and custom wallpapers?", "No. Device-uploaded photos, custom wallpapers and uploaded shortcut or folder images are excluded from cloud snapshots and remain on the device."],
         ["Can I use WhyNavo on a phone?", "Yes. Open the web app in Safari, Chrome or another modern browser and add it to the home screen. It is a dashboard experience, not a claim to replace a mobile browser's new-tab system."],
@@ -137,8 +138,8 @@ export const CONTENT = {
       heading: "A product that explains its changes.",
       intro: "The public repository is the source of truth for release notes, security documentation and build provenance.",
       current: "Current release",
-      versionText: "0.9.30",
-      versionSummary: "WhyNavo identity, workspace stability, icon handling and production safeguards are consolidated in the current release candidate.",
+      versionText: "0.9.31",
+      versionSummary: "The current release removes the empty Home canvas gap, keeps Settings complete at every supported width, and clearly separates the no-install web app from the desktop new-tab extension.",
       viewRelease: "Read the release notes",
       viewGithub: "View the public repository",
       cadenceTitle: "How updates work",
@@ -170,7 +171,7 @@ export const CONTENT = {
       download: "下载",
       updates: "更新",
       help: "帮助",
-      openApp: "打开在线版",
+      openApp: "网页版 · 无需安装",
       menu: "打开菜单",
       closeMenu: "关闭菜单"
     },
@@ -181,10 +182,10 @@ export const CONTENT = {
       heroTitle: "把新标签页，变成你的空间。",
       heroText: "默认保护隐私，需要时再连接更多能力。",
       heroDetail: "让快捷入口、小组件、笔记和日常专注回到一个安静、可掌控的页面。",
-      primary: "打开在线版",
-      secondaryPending: "获取桌面插件",
+      primary: "打开网页版 · 无需安装",
+      secondaryPending: "安装桌面扩展",
       secondaryApproved: "安装 Chrome 插件",
-      heroNote: "登录之前，也可以完整使用本地功能。",
+      heroNote: "网页版无需安装；只有希望 WhyNavo 自动接管 Chrome 或 Edge 的每个新标签页时，才需要安装桌面扩展。",
       index: ["01 画布", "02 隐私", "03 同步"],
       trust: ["本地优先", "可选同步", "随时导出"],
       canvas: {
@@ -228,6 +229,7 @@ export const CONTENT = {
         secondary: "阅读隐私说明"
       },
       faq: [
+        ["必须安装扩展吗？", "不需要。网页版可以在任何现代浏览器中直接使用。只有希望 WhyNavo 自动出现在 Chrome 或 Edge 的每个新标签页时，才需要安装桌面扩展。"],
         ["必须注册账号吗？", "不需要。WhyNavo 无需账号即可使用，未登录内容保存在当前浏览器。只有需要同步支持的字段时才登录。"],
         ["照片和自定义壁纸会上传吗？", "不会。本机照片、自定义壁纸以及上传的快捷图标和文件夹图标不会进入云端快照，会保留在设备上。"],
         ["手机可以使用吗？", "可以。在 Safari、Chrome 或其他现代浏览器打开在线版，再添加到主屏幕。它是个人工作台，不宣称替换手机浏览器的新标签页系统。"],
@@ -289,8 +291,8 @@ export const CONTENT = {
       heading: "每次变化，都应该说清楚。",
       intro: "公开仓库是版本说明、安全文档和构建来源证明的真实来源。",
       current: "当前版本",
-      versionText: "0.9.30",
-      versionSummary: "当前版本整合了 WhyNavo 品牌、工作台稳定性、图标处理和生产环境安全保护。",
+      versionText: "0.9.31",
+      versionSummary: "当前版本消除了空主页的巨大留白，让设置在所有支持宽度下完整显示，并明确区分无需安装的网页版与桌面新标签页扩展。",
       viewRelease: "阅读版本说明",
       viewGithub: "查看公开仓库",
       cadenceTitle: "更新如何工作",

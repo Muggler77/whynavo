@@ -1,7 +1,7 @@
 {
   "name": "whynavo",
   "private": true,
-  "version": "0.9.30",
+  "version": "0.9.31",
   "description": "WhyNavo browser new tab extension workspace",
   "scripts": {
     "dev": "npm --workspace extension run dev",
