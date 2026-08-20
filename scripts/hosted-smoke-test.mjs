@@ -2,6 +2,9 @@ import { readFile } from "node:fs/promises";
 
 const origin = (process.env.WHYNAVO_ORIGIN || "https://whynavo.com").replace(/\/$/, "");
 const packageJson = JSON.parse(await readFile(new URL("../package.json", import.meta.url), "utf8"));
+const publishedVersionManifest = JSON.parse(
+  await readFile(new URL("../extension/public/latest-version.json", import.meta.url), "utf8")
+);
 const allowPreviousVersionManifest = process.env.ALLOW_PREVIOUS_VERSION_MANIFEST === "1";
 const releasePattern = /^\d+\.\d+\.\d+$/;
 const compareVersions = (left, right) => {
@@ -194,7 +197,8 @@ const isExpectedVersionManifest = (version) => {
   }
   return (
     version.latestVersion === packageJson.version
-    && version.minimumSupportedVersion === packageJson.version
+    && version.minimumSupportedVersion === publishedVersionManifest.minimumSupportedVersion
+    && Number(version.dataSchemaVersion) === Number(publishedVersionManifest.dataSchemaVersion)
   );
 };
 const { json: version } = await fetchJsonUntil(

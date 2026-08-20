@@ -2046,6 +2046,7 @@ try {
   const hostedSmokeTest = await readFile(join(repoRoot, "scripts/hosted-smoke-test.mjs"), "utf8");
   assert.match(hostedSmokeTest, /REQUIRE_PRODUCTION_CONFIG/, "production monitoring must fail instead of skipping account checks when secrets are missing");
   assert.match(hostedSmokeTest, /ALLOW_PREVIOUS_VERSION_MANIFEST[\s\S]*safe predecessor/, "staged production checks must accept only a validated older update manifest");
+  assert.match(hostedSmokeTest, /publishedVersionManifest[\s\S]*minimumSupportedVersion/, "final hosted checks must preserve the declared backward-compatibility floor");
   assert.match(hostedSmokeTest, /app\.webmanifest\?v=\$\{packageJson\.version\}[\s\S]*Hosted home page is not the WhyNavo/, "hosted checks must wait for the release-specific index instead of accepting a stale deployment");
   assert.match(hostedSmokeTest, /for \(const path of new Set\(assetPaths\)\)[\s\S]*fetchTextUntil[\s\S]*did not propagate with its expected content type/, "hosted checks must wait for Cloudflare asset propagation instead of treating fallback HTML as a valid bundle");
   assert.match(hostedSmokeTest, /fetchTextUntil\([\s\S]*"\/sw\.js"[\s\S]*whynavo-shell-v\$\{packageJson\.version\}[\s\S]*cache-control[\s\S]*no-store/, "hosted checks must wait for a release-matched non-cacheable Service Worker");
