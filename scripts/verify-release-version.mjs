@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 
 import { resolveReleaseVersion } from "./release-version.mjs";
+import { compareReleaseVersions } from "./version-manifest.mjs";
 
 const readJson = async (path) => JSON.parse(await readFile(new URL(path, import.meta.url), "utf8"));
 const rootPackage = await readJson("../package.json");
@@ -11,6 +12,7 @@ assert.match(releaseVersion, /^\d+\.\d+\.\d+$/, "release tag or package version 
 const extensionPackage = await readJson("../extension/package.json");
 const manifest = await readJson("../extension/public/manifest.json");
 const latestVersion = await readJson("../extension/public/latest-version.json");
+const versionSource = await readFile(new URL("../extension/src/version.ts", import.meta.url), "utf8");
 const serviceWorker = await readFile(new URL("../extension/public/sw.js", import.meta.url), "utf8");
 const indexHtml = await readFile(new URL("../extension/index.html", import.meta.url), "utf8");
 const releaseNotes = await readFile(new URL(`../docs/releases/${releaseVersion}.md`, import.meta.url), "utf8");
@@ -25,11 +27,15 @@ for (const [label, version] of [
   ["root package", rootPackage.version],
   ["extension package", extensionPackage.version],
   ["extension manifest", manifest.version],
-  ["latest version manifest", latestVersion.latestVersion],
-  ["minimum supported version", latestVersion.minimumSupportedVersion]
+  ["latest version manifest", latestVersion.latestVersion]
 ]) {
   assert.equal(version, releaseVersion, `${label} must match release tag ${releaseVersion}`);
 }
+
+const minimumSupportedVersion = versionSource.match(/MIN_SUPPORTED_APP_VERSION = "(\d+\.\d+\.\d+)"/)?.[1];
+assert.ok(minimumSupportedVersion, "version.ts must declare a semantic minimum supported app version");
+assert.equal(latestVersion.minimumSupportedVersion, minimumSupportedVersion, "update manifest minimum must match the client sync compatibility floor");
+assert.ok(compareReleaseVersions(minimumSupportedVersion, releaseVersion) <= 0, "minimum supported version cannot exceed the release version");
 
 const escapedVersion = releaseVersion.replaceAll(".", "\\.");
 assert.match(serviceWorker, new RegExp(`whynavo-shell-v${escapedVersion}`));

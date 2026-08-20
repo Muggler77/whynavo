@@ -123,7 +123,7 @@ try {
   const { normalizeHttpUrl, safeHttpHref } = await import(pathToFileURL(urlsOutput).href);
   const { MAX_IMPORTED_SHORTCUTS, curatedIconFor, fallbackFaviconFor, faviconCandidatesFor, faviconFor, faviconHostFor, importedToShortcuts, normalizeIconReference, parseBookmarksHtml, parseImportText, siteIconCandidatesFor } = await import(pathToFileURL(importersOutput).href);
   const { isRecurringTodoDueOn, isTodoCompletedForDate, localDateKey, nextTodoCompletion, recurrenceLabel } = await import(pathToFileURL(remindersOutput).href);
-  const { CHROME_WEB_STORE_EXTENSION_ID, checkForUpdate, isChromeWebStoreInstall, reloadChromeWebStoreExtension, requestChromeWebStoreUpdate } = await import(pathToFileURL(updatesOutput).href);
+  const { CHROME_WEB_STORE_EXTENSION_ID, checkForUpdate, compareVersions, isChromeWebStoreInstall, reloadChromeWebStoreExtension, requestChromeWebStoreUpdate } = await import(pathToFileURL(updatesOutput).href);
   const projectConfigSource = await readFile(join(repoRoot, "extension/src/projectConfig.ts"), "utf8");
   const privacyNoticeSource = await readFile(join(repoRoot, "extension/public/privacy.html"), "utf8");
   const termsSource = await readFile(join(repoRoot, "extension/public/terms.html"), "utf8");
@@ -1297,7 +1297,11 @@ try {
   const latestVersionManifest = JSON.parse(await readFile(join(repoRoot, "extension/public/latest-version.json"), "utf8"));
   assert.equal(extensionManifest.version, packageManifest.version, "extension manifest version must match the workspace release");
   assert.equal(latestVersionManifest.latestVersion, packageManifest.version, "hosted version manifest must match the workspace release");
-  assert.equal(latestVersionManifest.minimumSupportedVersion, packageManifest.version, "minimum sync version must match this security release");
+  const versionSource = await readFile(join(repoRoot, "extension/src/version.ts"), "utf8");
+  const minimumSupportedAppVersion = versionSource.match(/MIN_SUPPORTED_APP_VERSION = "(\d+\.\d+\.\d+)"/)?.[1];
+  assert.ok(minimumSupportedAppVersion, "client version metadata must declare a semantic compatibility floor");
+  assert.equal(latestVersionManifest.minimumSupportedVersion, minimumSupportedAppVersion, "minimum sync version must match the client compatibility floor");
+  assert.ok(compareVersions(minimumSupportedAppVersion, packageManifest.version) <= 0, "minimum sync version must not exceed the current release");
   assert.match(latestVersionManifest.updateUrl, /\/releases\/latest$/, "extension update checks must lead ordinary users to the latest downloadable release");
   assert.equal(extensionManifest.permissions.includes("storage"), true, "recurring reminders must persist only their local scheduling copy");
   assert.equal(extensionManifest.permissions.includes("alarms"), true, "recurring reminders must continue while the new-tab page is closed");
@@ -2061,7 +2065,7 @@ try {
   const versionManifestLibrary = await readFile(join(repoRoot, "scripts/version-manifest.mjs"), "utf8");
   const previousVersionManifest = JSON.parse(await readFile(join(repoRoot, "extension/public/previous-version.json"), "utf8"));
   assert.match(stagedVersionManifest, /previous-version\.json[\s\S]*validatePublishedPredecessorManifest[\s\S]*writeFile/, "staged deployment must use the reviewed repository predecessor manifest instead of writing network responses");
-  assert.equal(previousVersionManifest.latestVersion, "0.9.17", "the current predecessor manifest must track the last public release until activation");
+  assert.equal(previousVersionManifest.latestVersion, "0.9.32", "the current predecessor manifest must track the last public release until activation");
   assert.ok(!/fetch\(/.test(stagedVersionManifest), "staged manifest generation must not fetch untrusted network content");
   assert.match(versionManifestLibrary, /compareReleaseVersions\(latestVersion, nextVersion\) >= 0/, "the staged manifest validator must reject current and newer versions");
   assert.match(versionManifestLibrary, /latestVersion[\s\S]*minimumSupportedVersion[\s\S]*dataSchemaVersion: 1[\s\S]*releaseNotesUrl: OFFICIAL_RELEASE_URL[\s\S]*updateUrl: OFFICIAL_RELEASE_URL/, "the staged manifest must be rebuilt from the official public release destination");
