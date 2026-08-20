@@ -19,7 +19,32 @@ export type UpdateCheckResult =
   | { status: "unsupported"; manifest: VersionManifest; checkedAt: string }
   | { status: "error"; message: string; checkedAt: string };
 
+type ChromeUpdateRuntime = {
+  id?: string;
+  requestUpdateCheck?: () => Promise<{ status: string; version?: string }>;
+  onUpdateAvailable?: {
+    addListener: (listener: (details: { version?: string }) => void) => void;
+    removeListener?: (listener: (details: { version?: string }) => void) => void;
+  };
+  reload?: () => void;
+};
+
+export type ChromeWebStoreUpdateResult =
+  | { status: "unavailable" }
+  | { status: "no_update"; checkedAt: string }
+  | { status: "update_available"; checkedAt: string; version?: string }
+  | { status: "update_ready"; checkedAt: string; version?: string }
+  | { status: "throttled"; checkedAt: string }
+  | { status: "error"; checkedAt: string; message: string };
+
+export type ChromeWebStoreUpdateState = ChromeWebStoreUpdateResult
+  | { status: "idle" }
+  | { status: "checking" }
+  | { status: "installing"; version?: string };
+
 const RELEASE_VERSION = /^\d+\.\d+\.\d+$/;
+export const CHROME_WEB_STORE_EXTENSION_ID = "paepohbilpilnaaobeeadkjbobkldhke";
+const UPDATE_READY_TIMEOUT_MS = 15_000;
 const UPDATE_SEVERITIES = new Set<UpdateSeverity>(["normal", "important", "critical"]);
 const MAX_UPDATE_MANIFEST_BYTES = 64 * 1024;
 const requestTimeout = (milliseconds: number) => {
@@ -50,6 +75,82 @@ const trustedReleaseUrl = (value: unknown) => {
     return undefined;
   }
 };
+
+const currentChromeRuntime = (): ChromeUpdateRuntime | undefined => (
+  typeof chrome === "undefined" ? undefined : chrome.runtime
+);
+
+const currentProtocol = () => (typeof location === "undefined" ? "" : location.protocol);
+
+export function isChromeWebStoreInstall(
+  runtime: ChromeUpdateRuntime | undefined = currentChromeRuntime(),
+  protocol = currentProtocol()
+) {
+  return protocol === "chrome-extension:"
+    && runtime?.id === CHROME_WEB_STORE_EXTENSION_ID
+    && typeof runtime.requestUpdateCheck === "function";
+}
+
+export async function requestChromeWebStoreUpdate(
+  runtime: ChromeUpdateRuntime | undefined = currentChromeRuntime(),
+  protocol = currentProtocol(),
+  readyTimeoutMs = UPDATE_READY_TIMEOUT_MS
+): Promise<ChromeWebStoreUpdateResult> {
+  if (!isChromeWebStoreInstall(runtime, protocol) || !runtime?.requestUpdateCheck) {
+    return { status: "unavailable" };
+  }
+  const checkedAt = new Date().toISOString();
+  let readyTimer: ReturnType<typeof setTimeout> | undefined;
+  let readyListener: ((details: { version?: string }) => void) | undefined;
+  const updateReady = runtime.onUpdateAvailable
+    ? new Promise<string | undefined>((resolve) => {
+        let settled = false;
+        const finish = (version?: string) => {
+          if (settled) return;
+          settled = true;
+          if (readyTimer !== undefined) clearTimeout(readyTimer);
+          resolve(version);
+        };
+        readyListener = (details) => finish(details.version);
+        runtime.onUpdateAvailable?.addListener(readyListener);
+        readyTimer = setTimeout(() => finish(), Math.max(0, readyTimeoutMs));
+      })
+    : undefined;
+  try {
+    const result = await runtime.requestUpdateCheck();
+    if (result.status === "no_update" || result.status === "throttled") {
+      return { status: result.status, checkedAt };
+    }
+    if (result.status === "update_available") {
+      const version = RELEASE_VERSION.test(String(result.version || "")) ? result.version : undefined;
+      const readyVersion = updateReady ? await updateReady : undefined;
+      return readyVersion !== undefined
+        ? { status: "update_ready", checkedAt, version: RELEASE_VERSION.test(readyVersion) ? readyVersion : version }
+        : { status: "update_available", checkedAt, version };
+    }
+    return { status: "error", checkedAt, message: "Chrome 返回了未知的更新状态" };
+  } catch (error) {
+    return {
+      status: "error",
+      checkedAt,
+      message: error instanceof Error ? error.message : "Chrome 暂时无法检查商店更新"
+    };
+  } finally {
+    if (readyTimer !== undefined) clearTimeout(readyTimer);
+    if (readyListener && runtime.onUpdateAvailable?.removeListener) {
+      runtime.onUpdateAvailable.removeListener(readyListener);
+    }
+  }
+}
+
+export function reloadChromeWebStoreExtension(
+  runtime: ChromeUpdateRuntime | undefined = currentChromeRuntime(),
+  protocol = currentProtocol()
+) {
+  if (!isChromeWebStoreInstall(runtime, protocol) || typeof runtime?.reload !== "function") return false;
+  runtime.reload();
+  return true;
+}
 
 export function compareVersions(left: string, right: string) {
   const leftParts = left.split(".").map((part) => Number.parseInt(part, 10) || 0);

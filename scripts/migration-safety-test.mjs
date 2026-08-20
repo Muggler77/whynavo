@@ -123,7 +123,7 @@ try {
   const { normalizeHttpUrl, safeHttpHref } = await import(pathToFileURL(urlsOutput).href);
   const { MAX_IMPORTED_SHORTCUTS, curatedIconFor, fallbackFaviconFor, faviconCandidatesFor, faviconFor, faviconHostFor, importedToShortcuts, normalizeIconReference, parseBookmarksHtml, parseImportText, siteIconCandidatesFor } = await import(pathToFileURL(importersOutput).href);
   const { isRecurringTodoDueOn, isTodoCompletedForDate, localDateKey, nextTodoCompletion, recurrenceLabel } = await import(pathToFileURL(remindersOutput).href);
-  const { checkForUpdate } = await import(pathToFileURL(updatesOutput).href);
+  const { CHROME_WEB_STORE_EXTENSION_ID, checkForUpdate, isChromeWebStoreInstall, reloadChromeWebStoreExtension, requestChromeWebStoreUpdate } = await import(pathToFileURL(updatesOutput).href);
   const projectConfigSource = await readFile(join(repoRoot, "extension/src/projectConfig.ts"), "utf8");
   const privacyNoticeSource = await readFile(join(repoRoot, "extension/public/privacy.html"), "utf8");
   const termsSource = await readFile(join(repoRoot, "extension/public/terms.html"), "utf8");
@@ -828,6 +828,43 @@ try {
     headers: { "content-length": String(65 * 1024) }
   }));
   assert.equal(oversizedUpdateManifest.status, "error", "oversized update metadata must be rejected before parsing");
+  let storeCheckCalls = 0;
+  let storeReloadCalls = 0;
+  const storeRuntime = {
+    id: CHROME_WEB_STORE_EXTENSION_ID,
+    requestUpdateCheck: async () => {
+      storeCheckCalls += 1;
+      return { status: "update_available", version: "9.9.9" };
+    },
+    reload: () => { storeReloadCalls += 1; }
+  };
+  assert.equal(isChromeWebStoreInstall(storeRuntime, "chrome-extension:"), true, "the official store ID must enable user-initiated Chrome update checks");
+  assert.equal(isChromeWebStoreInstall({ ...storeRuntime, id: "unpacked-extension" }, "chrome-extension:"), false, "unpacked extensions must not claim Chrome Web Store auto-update support");
+  const storeUpdate = await requestChromeWebStoreUpdate(storeRuntime, "chrome-extension:");
+  assert.deepEqual(storeUpdate.status, "update_available", "the official Chrome update result must reach the settings workflow");
+  assert.equal(storeUpdate.status === "update_available" ? storeUpdate.version : undefined, "9.9.9", "the Chrome-provided update version must be retained");
+  assert.equal(storeCheckCalls, 1, "a user-initiated store check must make exactly one Chrome runtime request");
+  let readyListener;
+  let readyRemoveCalls = 0;
+  const readyRuntime = {
+    ...storeRuntime,
+    onUpdateAvailable: {
+      addListener: (listener) => {
+        readyListener = listener;
+        queueMicrotask(() => listener({ version: "9.9.9" }));
+      },
+      removeListener: () => { readyRemoveCalls += 1; }
+    }
+  };
+  const readyUpdate = await requestChromeWebStoreUpdate(readyRuntime, "chrome-extension:", 50);
+  assert.deepEqual(readyUpdate.status, "update_ready", "the store workflow must wait for Chrome to finish downloading the update");
+  assert.equal(readyUpdate.status === "update_ready" ? readyUpdate.version : undefined, "9.9.9", "the ready event version must be retained");
+  assert.equal(typeof readyListener, "function", "the store workflow must subscribe to Chrome's ready event");
+  assert.equal(readyRemoveCalls, 1, "the ready event listener must be removed after the check");
+  assert.equal(reloadChromeWebStoreExtension(storeRuntime, "chrome-extension:"), true, "a downloaded store update must reload the official extension");
+  assert.equal(storeReloadCalls, 1, "installing a downloaded update must reload exactly once");
+  assert.equal((await requestChromeWebStoreUpdate({ ...storeRuntime, id: "unpacked-extension" }, "chrome-extension:")).status, "unavailable", "unpacked builds must fall back to the signed release workflow");
+  assert.equal(storeCheckCalls, 2, "the unpacked fallback must never call the Chrome Web Store update endpoint");
   const futureClock = "2030-01-01T00:00:00.000Z";
   normalizeState({ ...legacyState, updatedAt: futureClock });
   assert.ok(new Date(logicalNowIso()).getTime() > new Date(futureClock).getTime(), "logical mutation clocks must advance beyond timestamps already observed from another device");
@@ -1796,7 +1833,11 @@ try {
   );
   assert.match(appSource, /maxLength=\{MAX_CALENDAR_RECORD_CHARS\}/, "calendar input length must match the persisted data model");
   assert.match(appSource, /maxLength=\{MAX_QUICK_NOTE_CHARS\}/, "memo input length must match the persisted data model");
-  assert.match(appSource, /label: "获取更新"[\s\S]*result\.manifest\.updateUrl[\s\S]*noopener,noreferrer/, "unpacked extensions must expose a direct trusted update action");
+  assert.match(appSource, /label: text\("获取更新", "Get update"\)[\s\S]*result\.manifest\.updateUrl[\s\S]*noopener,noreferrer/, "unpacked extensions must expose a direct trusted update action");
+  assert.match(appSource, /chromeWebStoreInstall[\s\S]*一键检查并更新[\s\S]*Check and update/, "official store installs must expose a user-initiated one-click update control");
+  assert.match(appSource, /!shouldCheckChromeStore\)[\s\S]*setChromeStoreUpdate\(\{ status: "idle" \}\)/, "a current manifest must release the Chrome Store update button from its checking state");
+  assert.match(appSource, /storeResult\?\.status === "update_ready"[\s\S]*persistenceQueueRef\.current[\s\S]*mergeAndSaveStateForAccount\(stateRef\.current, activeUserIdRef\.current\)[\s\S]*reloadChromeWebStoreExtension/, "store updates must wait for a ready package, merge and persist current local data before reloading the extension");
+  assert.match(appSource, /catch \(error\) \{[\s\S]*本机数据尚未安全保存[\s\S]*return;/, "store updates must refuse to reload when local persistence fails");
   assert.match(appSource, /当前版本已停止云同步，请先升级/, "unsupported clients must receive an explicit automatic sync cutoff notice");
   assert.match(appSource, /event\.key !== "Tab"/, "dialogs must keep keyboard focus inside the active modal");
   assert.match(appSource, /previouslyFocused\?\.focus\(\)/, "closing a dialog must restore the user's prior keyboard focus");

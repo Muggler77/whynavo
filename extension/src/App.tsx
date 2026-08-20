@@ -96,7 +96,7 @@ import { checkWebTaskReminders, isRecurringTodoDueOn, isTodoCompletedForDate, ne
 import { CAPTCHA_CONFIGURED, DEFAULT_AUTH_REDIRECT_URL } from "./projectConfig";
 import TurnstileChallenge, { type TurnstileChallengeHandle } from "./TurnstileChallenge";
 import { fetchWeather, fetchWeatherByCoordinates, getCachedWeather, getDevicePosition, requestDeviceLocationPermission, weatherLabel } from "./weather";
-import { checkForUpdate, type UpdateCheckResult } from "./updates";
+import { checkForUpdate, isChromeWebStoreInstall, reloadChromeWebStoreExtension, requestChromeWebStoreUpdate, type ChromeWebStoreUpdateState, type UpdateCheckResult } from "./updates";
 import { APP_VERSION, DATA_SCHEMA_VERSION, UPDATE_TARGET_URL } from "./version";
 import { searchWeb, type WebSearchProvider } from "./browserSearch";
 import {
@@ -1573,6 +1573,7 @@ export default function App() {
   const [weatherRefreshing, setWeatherRefreshing] = useState(false);
   const [sync, setSync] = useState<SyncStatus>({ message: "未登录", syncing: false });
   const [updateCheck, setUpdateCheck] = useState<UpdateCheckResult>({ status: "idle" });
+  const [chromeStoreUpdate, setChromeStoreUpdate] = useState<ChromeWebStoreUpdateState>({ status: "idle" });
   const [toast, setToast] = useState("");
   const [toastAction, setToastAction] = useState<ToastAction | undefined>();
   const [undoLabel, setUndoLabel] = useState("");
@@ -1605,6 +1606,7 @@ export default function App() {
   const localStatePeerIdRef = useRef(uid());
   const shellRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const chromeWebStoreInstall = useMemo(() => isChromeWebStoreInstall(), []);
 
   useEffect(() => {
     stateRef.current = state;
@@ -2581,14 +2583,65 @@ export default function App() {
 
   const runUpdateCheck = useCallback(async (feedback = false) => {
     setUpdateCheck((old) => ({ status: "checking", checkedAt: old.checkedAt }));
+    if (feedback && chromeWebStoreInstall) setChromeStoreUpdate({ status: "checking" });
     const result = await checkForUpdate();
     setUpdateCheck(result);
+    const shouldCheckChromeStore = feedback
+      && chromeWebStoreInstall
+      && (result.status === "available" || result.status === "unsupported");
+    if (feedback && chromeWebStoreInstall && !shouldCheckChromeStore) {
+      setChromeStoreUpdate({ status: "idle" });
+    }
+    const storeResult = shouldCheckChromeStore ? await requestChromeWebStoreUpdate() : undefined;
+    if (storeResult) setChromeStoreUpdate(storeResult);
+
+    if (storeResult?.status === "update_ready") {
+      const version = storeResult.version
+        || (result.status === "available" || result.status === "unsupported" ? result.manifest.latestVersion : undefined);
+      setChromeStoreUpdate({ status: "installing", version });
+      showToast(text(
+        version ? `正在保存数据并安装 WhyNavo ${version}` : "正在保存数据并安装 Chrome 商店更新",
+        version ? `Saving your data and installing WhyNavo ${version}.` : "Saving your data and installing the Chrome Web Store update."
+      ));
+      try {
+        await persistenceQueueRef.current;
+        await mergeAndSaveStateForAccount(stateRef.current, activeUserIdRef.current);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "本机数据保存失败";
+        setChromeStoreUpdate({ status: "error", checkedAt: new Date().toISOString(), message });
+        showToast(text(
+          "更新已下载，但本机数据尚未安全保存，未重载页面。请稍后重试。",
+          "The update is ready, but local data was not safely saved. The page was not reloaded; please try again."
+        ));
+        return;
+      }
+      window.setTimeout(() => {
+        if (!reloadChromeWebStoreExtension()) {
+          setChromeStoreUpdate({ status: "error", checkedAt: new Date().toISOString(), message: "Chrome 未接受扩展重载请求" });
+          showToast(text("Chrome 未能完成更新重载，请稍后重试", "Chrome could not finish the update reload. Please try again."));
+        }
+      }, 450);
+      return;
+    }
+
+    if (storeResult?.status === "update_available") {
+      const version = storeResult.version
+        || (result.status === "available" || result.status === "unsupported" ? result.manifest.latestVersion : undefined);
+      showToast(text(
+        version ? `已找到 WhyNavo ${version}，Chrome 正在准备安装；完成后会自动更新` : "已找到 Chrome 商店更新，Chrome 正在准备安装",
+        version ? `WhyNavo ${version} was found. Chrome is preparing it and will install it automatically.` : "A Chrome Web Store update was found. Chrome is preparing it for automatic installation."
+      ));
+      return;
+    }
+
     const canRefreshHostedApp = window.location.origin === HOSTED_APP_ORIGIN;
     const updateAction = canRefreshHostedApp
-      ? { label: "刷新更新", onClick: () => window.location.reload() }
+      ? { label: text("刷新更新", "Refresh update"), onClick: () => window.location.reload() }
+      : chromeWebStoreInstall
+        ? undefined
       : result.status === "available" || result.status === "unsupported"
         ? {
-            label: "获取更新",
+            label: text("获取更新", "Get update"),
             onClick: () => window.open(
               result.manifest.updateUrl || result.manifest.releaseNotesUrl || UPDATE_TARGET_URL,
               "_blank",
@@ -2597,26 +2650,52 @@ export default function App() {
           }
         : undefined;
     if (feedback) {
+      if (storeResult?.status === "no_update") {
+        if (result.status === "available" || result.status === "unsupported") {
+          showToast(text(
+            `WhyNavo ${result.manifest.latestVersion} 尚未由 Chrome 商店下发到本设备；发布后 Chrome 会自动重试`,
+            `WhyNavo ${result.manifest.latestVersion} is not available to this device from the Chrome Web Store yet. Chrome will retry automatically.`
+          ));
+        } else {
+          showToast(text("当前已是 Chrome 商店最新版，后续版本也会自动更新", "You have the latest Chrome Web Store version. Future versions will update automatically."));
+        }
+        return;
+      }
+      if (storeResult?.status === "throttled") {
+        showToast(text("检查过于频繁，Chrome 已暂时限制手动检查；自动更新仍然有效", "Chrome temporarily limited frequent manual checks. Automatic updates remain active."));
+        return;
+      }
+      if (storeResult?.status === "error") {
+        showToast(text("Chrome 暂时无法检查商店更新，之后仍会自动重试", "Chrome could not check the store right now and will retry automatically."));
+        return;
+      }
       if (result.status === "available") {
-        const instruction = canRefreshHostedApp ? "刷新后生效" : "请获取并重新加载发布包";
+        const instruction = canRefreshHostedApp
+          ? text("刷新后生效", "Refresh to apply it")
+          : text("请获取并重新加载发布包", "Get and reload the release package");
         showToast(
           result.critical
-            ? `发现重要更新 ${result.manifest.latestVersion}，${instruction}`
-            : `发现新版本 ${result.manifest.latestVersion}，${instruction}`,
+            ? text(`发现重要更新 ${result.manifest.latestVersion}，${instruction}`, `Important update ${result.manifest.latestVersion} is available. ${instruction}.`)
+            : text(`发现新版本 ${result.manifest.latestVersion}，${instruction}`, `Version ${result.manifest.latestVersion} is available. ${instruction}.`),
           updateAction
         );
       }
-      if (result.status === "current") showToast("当前已是最新版本");
-      if (result.status === "unsupported") showToast("当前版本过旧，请先升级", updateAction);
+      if (result.status === "current") showToast(text("当前已是最新版本", "You are up to date"));
+      if (result.status === "unsupported") showToast(text("当前版本过旧，请先升级", "This version is no longer supported. Update first."), updateAction);
       if (result.status === "error") showToast(result.message);
     } else if (result.status === "available" && canRefreshHostedApp) {
-      showToast(`新版本 ${result.manifest.latestVersion} 已准备好`, updateAction);
+      showToast(text(`新版本 ${result.manifest.latestVersion} 已准备好`, `Version ${result.manifest.latestVersion} is ready`), updateAction);
+    } else if (result.status === "available" && chromeWebStoreInstall) {
+      showToast(text(
+        `发现新版本 ${result.manifest.latestVersion}，Chrome 会自动更新，也可在设置中立即检查`,
+        `Version ${result.manifest.latestVersion} is available. Chrome will update automatically, or you can check now in Settings.`
+      ));
     } else if (result.status === "available" && result.critical) {
-      showToast(`发现重要更新 ${result.manifest.latestVersion}`, updateAction);
+      showToast(text(`发现重要更新 ${result.manifest.latestVersion}`, `Important update ${result.manifest.latestVersion} is available`), updateAction);
     } else if (result.status === "unsupported") {
-      showToast("当前版本已停止云同步，请先升级", updateAction);
+      showToast(text("当前版本已停止云同步，请先升级", "Cloud sync is disabled for this version. Update first."), updateAction);
     }
-  }, []);
+  }, [chromeWebStoreInstall, text]);
 
   useEffect(() => {
     if (!ready) return;
@@ -4732,6 +4811,8 @@ export default function App() {
           searchProvider={searchProvider}
           onSearchProviderChange={setSearchProvider}
           updateCheck={updateCheck}
+          chromeStoreUpdate={chromeStoreUpdate}
+          chromeWebStoreInstall={chromeWebStoreInstall}
           migrationBackupAvailable={migrationBackupAvailable}
           updateState={updateState}
           onImport={() => setDialog("import")}
@@ -7903,12 +7984,14 @@ function PageManagerDialog({
   );
 }
 
-function SettingsDialog({ state, clock, searchProvider, onSearchProviderChange, updateCheck, migrationBackupAvailable, updateState, onImport, onImportBackup, onExport, onRestoreMigrationBackup, onCheckUpdate, onOpenTimeZone, onOpenWallpapers, onWeatherUseLocationChange, onClose }: {
+function SettingsDialog({ state, clock, searchProvider, onSearchProviderChange, updateCheck, chromeStoreUpdate, chromeWebStoreInstall, migrationBackupAvailable, updateState, onImport, onImportBackup, onExport, onRestoreMigrationBackup, onCheckUpdate, onOpenTimeZone, onOpenWallpapers, onWeatherUseLocationChange, onClose }: {
   state: AppState;
   clock: Date;
   searchProvider: WebSearchProvider;
   onSearchProviderChange: (provider: WebSearchProvider) => void;
   updateCheck: UpdateCheckResult;
+  chromeStoreUpdate: ChromeWebStoreUpdateState;
+  chromeWebStoreInstall: boolean;
   migrationBackupAvailable: boolean;
   updateState: (updater: (state: AppState) => AppState) => void;
   onImport: () => void;
@@ -7961,7 +8044,28 @@ function SettingsDialog({ state, clock, searchProvider, onSearchProviderChange, 
   const setSetting = <K extends keyof AppState["settings"]>(key: K, value: AppState["settings"][K]) => {
     updateState((current) => ({ ...current, settings: { ...current.settings, [key]: value, updatedAt: nowIso() } }));
   };
-  const updateMessage = updateCheck.status === "checking"
+  const hostedApp = window.location.origin === HOSTED_APP_ORIGIN;
+  const updateBusy = updateCheck.status === "checking" || chromeStoreUpdate.status === "checking" || chromeStoreUpdate.status === "installing";
+  const updateMessage = chromeStoreUpdate.status === "checking"
+    ? text("正在连接 Chrome 商店…", "Connecting to the Chrome Web Store...")
+    : chromeStoreUpdate.status === "installing"
+      ? text(
+          chromeStoreUpdate.version ? `正在安装 ${chromeStoreUpdate.version}…` : "正在安装更新…",
+          chromeStoreUpdate.version ? `Installing ${chromeStoreUpdate.version}...` : "Installing update..."
+        )
+      : chromeStoreUpdate.status === "update_ready"
+        ? text("更新已下载，准备安装", "Update downloaded and ready to install")
+        : chromeStoreUpdate.status === "update_available"
+          ? text("已找到更新，Chrome 正在准备安装", "Update found; Chrome is preparing it")
+      : chromeStoreUpdate.status === "no_update"
+        ? updateCheck.status === "available" || updateCheck.status === "unsupported"
+          ? text(`等待 Chrome 商店下发 ${updateCheck.manifest.latestVersion}`, `Waiting for Chrome Web Store delivery of ${updateCheck.manifest.latestVersion}`)
+          : text("Chrome 商店版本已是最新", "Chrome Web Store version is current")
+        : chromeStoreUpdate.status === "throttled"
+          ? text("Chrome 已限制频繁检查，自动更新仍有效", "Chrome limited frequent checks; automatic updates remain active")
+          : chromeStoreUpdate.status === "error"
+            ? text("Chrome 商店检查暂时不可用", "Chrome Web Store check is temporarily unavailable")
+            : updateCheck.status === "checking"
     ? text("正在检查更新…", "Checking for updates...")
     : updateCheck.status === "available"
       ? text(`发现新版本 ${updateCheck.manifest.latestVersion}`, `Version ${updateCheck.manifest.latestVersion} is available`)
@@ -7971,7 +8075,14 @@ function SettingsDialog({ state, clock, searchProvider, onSearchProviderChange, 
           ? text("当前已是最新版本", "You are up to date")
           : updateCheck.status === "error"
             ? updateCheck.message
-            : text("可手动检查是否有新版", "Check manually for a new version");
+            : chromeWebStoreInstall
+              ? text("Chrome 会自动更新，也可以立即检查", "Chrome updates automatically, or you can check now")
+              : text("可手动检查是否有新版", "Check manually for a new version");
+  const updateChannel = chromeWebStoreInstall
+    ? text("Chrome 商店自动更新", "Chrome Web Store automatic updates")
+    : hostedApp
+      ? text("网页版自动更新", "Automatic web updates")
+      : text("手动安装发布包", "Manual release package");
   const updateTarget = updateCheck.status === "available" || updateCheck.status === "unsupported"
     ? updateCheck.manifest.updateUrl || updateCheck.manifest.releaseNotesUrl || UPDATE_TARGET_URL
     : UPDATE_TARGET_URL;
@@ -8176,10 +8287,11 @@ function SettingsDialog({ state, clock, searchProvider, onSearchProviderChange, 
               <dl className="lucid-version-list">
                 <div><dt>{text("应用版本", "App version")}</dt><dd>{APP_VERSION}</dd></div>
                 <div><dt>{text("数据版本", "Data version")}</dt><dd>{state.dataSchemaVersion || DATA_SCHEMA_VERSION}</dd></div>
+                <div><dt>{text("更新方式", "Update channel")}</dt><dd>{updateChannel}</dd></div>
                 <div><dt>{text("更新状态", "Update status")}</dt><dd className={updateCheck.status}>{updateMessage}</dd></div>
               </dl>
               <div className="lucid-version-actions">
-                <button type="button" disabled={updateCheck.status === "checking"} onClick={onCheckUpdate}><RefreshCcw size={16} />{text("检查更新", "Check for updates")}</button>
+                <button type="button" className={chromeWebStoreInstall ? "lucid-update-primary" : ""} disabled={updateBusy} aria-busy={updateBusy} onClick={onCheckUpdate}><RefreshCcw className={updateBusy ? "is-spinning" : ""} size={16} />{chromeWebStoreInstall ? text("一键检查并更新", "Check and update") : hostedApp ? text("检查并刷新", "Check and refresh") : text("检查更新", "Check for updates")}</button>
                 <button type="button" onClick={() => window.open(updateTarget, "_blank", "noopener,noreferrer")}><Globe2 size={16} />{text("发布页面", "Release page")}</button>
               </div>
             </section>

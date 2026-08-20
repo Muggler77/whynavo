@@ -524,7 +524,43 @@
 }
 
 .lucid-version-actions button {
+  display: inline-flex;
+  min-width: 0;
   min-height: 44px;
+  padding-inline: 12px;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.lucid-version-actions button svg {
+  flex: 0 0 auto;
+}
+
+.lucid-version-actions .lucid-update-primary {
+  color: var(--lucid-surface-solid);
+  background: var(--lucid-brand-strong, var(--lucid-brand));
+  border-color: transparent;
+}
+
+.lucid-version-actions .lucid-update-primary:hover:not(:disabled) {
+  color: var(--lucid-surface-solid);
+  background: color-mix(in srgb, var(--lucid-brand-strong, var(--lucid-brand)) 88%, var(--lucid-ink));
+}
+
+.lucid-version-actions button:disabled {
+  cursor: wait;
+  opacity: 0.62;
+}
+
+.lucid-version-actions .is-spinning {
+  animation: lucid-update-spin 800ms linear infinite;
+}
+
+@keyframes lucid-update-spin {
+  to { transform: rotate(360deg); }
 }
 
 .lucid-settings-footer {
@@ -723,5 +759,9 @@
   .lucid-data-actions > button,
   .lucid-data-action {
     transition: none;
+  }
+
+  .lucid-version-actions .is-spinning {
+    animation: none;
   }
 }

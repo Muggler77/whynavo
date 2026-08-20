@@ -86,6 +86,14 @@ if (!/\.site-header\s*\{[\s\S]*?width:\s*100%;[\s\S]*?padding-right:\s*max\(/.te
   fail("site header background is not full-width with constrained inner gutters");
 }
 
+const siteScript = await readFile(path.join(outputRoot, "site.js"), "utf8");
+if (/IntersectionObserver|querySelectorAll\(["']\.reveal|\.animate\(/.test(siteScript)) {
+  fail("site scroll reveal animation may reintroduce text flicker while scrolling");
+}
+if (!/\.reveal\s*\{[\s\S]*?opacity:\s*1;[\s\S]*?transform:\s*none;/.test(styles)) {
+  fail("site reveal fallback must keep content visible without runtime animation");
+}
+
 const headers = await readFile(path.join(outputRoot, "_headers"), "utf8");
 for (const requiredHeader of ["Content-Security-Policy", "Strict-Transport-Security", "Referrer-Policy", "Permissions-Policy", "X-Content-Type-Options"]) {
   if (!headers.includes(requiredHeader)) fail(`_headers is missing ${requiredHeader}`);
