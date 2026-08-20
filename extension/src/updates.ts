@@ -44,6 +44,7 @@ export type ChromeWebStoreUpdateState = ChromeWebStoreUpdateResult
 
 const RELEASE_VERSION = /^\d+\.\d+\.\d+$/;
 export const CHROME_WEB_STORE_EXTENSION_ID = "paepohbilpilnaaobeeadkjbobkldhke";
+export const CHROME_WEB_STORE_URL = `https://chromewebstore.google.com/detail/${CHROME_WEB_STORE_EXTENSION_ID}`;
 const UPDATE_READY_TIMEOUT_MS = 15_000;
 const UPDATE_SEVERITIES = new Set<UpdateSeverity>(["normal", "important", "critical"]);
 const MAX_UPDATE_MANIFEST_BYTES = 64 * 1024;

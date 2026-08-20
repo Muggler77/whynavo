@@ -301,11 +301,20 @@
 }
 
 .lucid-inline-button {
+  display: inline-flex;
   padding: 0 11px;
-  justify-content: flex-start;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
   overflow: hidden;
+  line-height: 1;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.lucid-inline-button svg {
+  display: block;
+  align-self: center;
 }
 
 .lucid-setting-row .lucid-switch {
@@ -518,6 +527,107 @@
   min-height: 54px;
 }
 
+.lucid-update-channel {
+  padding: 16px 0 18px;
+  border-bottom: 1px solid var(--lucid-line);
+}
+
+.lucid-update-channel-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.lucid-update-channel-heading strong {
+  color: var(--lucid-ink);
+  font-size: 12px;
+  font-weight: 620;
+}
+
+.lucid-update-channel-heading span {
+  color: var(--lucid-faint);
+  font-size: 10px;
+  text-align: right;
+}
+
+.lucid-update-channel-options {
+  display: grid;
+  margin-top: 10px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.lucid-update-channel-options button {
+  display: grid;
+  min-width: 0;
+  min-height: 58px;
+  padding: 8px 10px;
+  grid-template-columns: 20px minmax(0, 1fr) 16px;
+  align-items: center;
+  gap: 8px;
+  color: var(--lucid-soft);
+  background: color-mix(in srgb, var(--lucid-surface-solid) 64%, transparent);
+  border: 1px solid var(--lucid-line-strong);
+  border-radius: 7px;
+  text-align: left;
+  transition: color 160ms ease, background-color 160ms ease, border-color 160ms ease;
+}
+
+.lucid-update-channel-options button:hover {
+  color: var(--lucid-ink);
+  background: color-mix(in srgb, var(--lucid-hover) 58%, transparent);
+}
+
+.lucid-update-channel-options button.active {
+  color: var(--lucid-brand-strong, var(--lucid-brand));
+  background: color-mix(in srgb, var(--lucid-brand) 9%, var(--lucid-surface-solid));
+  border-color: color-mix(in srgb, var(--lucid-brand) 32%, var(--lucid-line-strong));
+}
+
+.lucid-update-channel-options button > svg {
+  display: block;
+}
+
+.lucid-update-channel-options button > span {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.lucid-update-channel-options button strong,
+.lucid-update-channel-options button small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lucid-update-channel-options button strong {
+  color: inherit;
+  font-size: 11px;
+  font-weight: 620;
+}
+
+.lucid-update-channel-options button small {
+  color: var(--lucid-faint);
+  font-size: 9px;
+}
+
+.lucid-update-channel > p {
+  display: flex;
+  margin: 9px 0 0;
+  align-items: flex-start;
+  gap: 6px;
+  color: var(--lucid-faint);
+  font-size: 10px;
+  line-height: 1.5;
+}
+
+.lucid-update-channel > p svg {
+  margin-top: 1px;
+  flex: 0 0 auto;
+}
+
 .lucid-version-actions {
   margin-top: 16px;
   gap: 8px;
@@ -724,6 +834,20 @@
 
   .shortcut-label-preview {
     min-height: 88px;
+  }
+
+  .lucid-update-channel-heading {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 3px;
+  }
+
+  .lucid-update-channel-heading span {
+    text-align: left;
+  }
+
+  .lucid-update-channel-options {
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .lucid-settings-footer > span {

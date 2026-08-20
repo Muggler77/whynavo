@@ -96,7 +96,7 @@ import { checkWebTaskReminders, isRecurringTodoDueOn, isTodoCompletedForDate, ne
 import { CAPTCHA_CONFIGURED, DEFAULT_AUTH_REDIRECT_URL } from "./projectConfig";
 import TurnstileChallenge, { type TurnstileChallengeHandle } from "./TurnstileChallenge";
 import { fetchWeather, fetchWeatherByCoordinates, getCachedWeather, getDevicePosition, requestDeviceLocationPermission, weatherLabel } from "./weather";
-import { checkForUpdate, isChromeWebStoreInstall, reloadChromeWebStoreExtension, requestChromeWebStoreUpdate, type ChromeWebStoreUpdateState, type UpdateCheckResult } from "./updates";
+import { CHROME_WEB_STORE_URL, checkForUpdate, isChromeWebStoreInstall, reloadChromeWebStoreExtension, requestChromeWebStoreUpdate, type ChromeWebStoreUpdateState, type UpdateCheckResult } from "./updates";
 import { APP_VERSION, DATA_SCHEMA_VERSION, UPDATE_TARGET_URL } from "./version";
 import { searchWeb, type WebSearchProvider } from "./browserSearch";
 import {
@@ -8078,11 +8078,20 @@ function SettingsDialog({ state, clock, searchProvider, onSearchProviderChange, 
             : chromeWebStoreInstall
               ? text("Chrome 会自动更新，也可以立即检查", "Chrome updates automatically, or you can check now")
               : text("可手动检查是否有新版", "Check manually for a new version");
-  const updateChannel = chromeWebStoreInstall
-    ? text("Chrome 商店自动更新", "Chrome Web Store automatic updates")
+  const automaticUpdatesActive = chromeWebStoreInstall || hostedApp;
+  const automaticUpdateDetail = chromeWebStoreInstall
+    ? text("已启用 · Chrome 商店", "Active · Chrome Web Store")
     : hostedApp
-      ? text("网页版自动更新", "Automatic web updates")
-      : text("手动安装发布包", "Manual release package");
+      ? text("已启用 · 网页版", "Active · Web app")
+      : text("安装商店版后启用", "Install the Store version to enable");
+  const manualUpdateDetail = automaticUpdatesActive
+    ? text("备用发布包", "Backup release package")
+    : text("当前方式 · 本地版", "Current · Local install");
+  const updateChannelExplanation = chromeWebStoreInstall
+    ? text("Chrome 会在后台自动更新；也可以点击自动更新立即请求检查。", "Chrome updates in the background; select Automatic to request a check now.")
+    : hostedApp
+      ? text("网页版刷新后自动使用最新版本，手动发布包仅用于浏览器扩展。", "The web app uses the latest version after refresh; manual packages are only for the browser extension.")
+      : text("当前是本地未打包版，Chrome 不会自动更新。安装正式商店版后会由 Chrome 自动接管。", "This is a local unpacked build, which Chrome cannot auto-update. Install the official Store version to let Chrome manage updates.");
   const updateTarget = updateCheck.status === "available" || updateCheck.status === "unsupported"
     ? updateCheck.manifest.updateUrl || updateCheck.manifest.releaseNotesUrl || UPDATE_TARGET_URL
     : UPDATE_TARGET_URL;
@@ -8287,9 +8296,37 @@ function SettingsDialog({ state, clock, searchProvider, onSearchProviderChange, 
               <dl className="lucid-version-list">
                 <div><dt>{text("应用版本", "App version")}</dt><dd>{APP_VERSION}</dd></div>
                 <div><dt>{text("数据版本", "Data version")}</dt><dd>{state.dataSchemaVersion || DATA_SCHEMA_VERSION}</dd></div>
-                <div><dt>{text("更新方式", "Update channel")}</dt><dd>{updateChannel}</dd></div>
                 <div><dt>{text("更新状态", "Update status")}</dt><dd className={updateCheck.status}>{updateMessage}</dd></div>
               </dl>
+              <div className="lucid-update-channel">
+                <div className="lucid-update-channel-heading">
+                  <strong>{text("更新方式", "Update method")}</strong>
+                  <span>{automaticUpdatesActive ? text("自动更新已启用", "Automatic updates are active") : text("当前使用手动更新", "Manual updates are currently used")}</span>
+                </div>
+                <div className="lucid-update-channel-options" role="group" aria-label={text("选择更新方式", "Choose an update method")}>
+                  <button
+                    type="button"
+                    className={automaticUpdatesActive ? "active" : ""}
+                    aria-pressed={automaticUpdatesActive}
+                    onClick={automaticUpdatesActive ? onCheckUpdate : () => window.open(CHROME_WEB_STORE_URL, "_blank", "noopener,noreferrer")}
+                  >
+                    <RefreshCcw className={automaticUpdatesActive && updateBusy ? "is-spinning" : ""} size={17} />
+                    <span><strong>{text("自动更新", "Automatic")}</strong><small>{automaticUpdateDetail}</small></span>
+                    {automaticUpdatesActive && <Check size={15} aria-hidden="true" />}
+                  </button>
+                  <button
+                    type="button"
+                    className={!automaticUpdatesActive ? "active" : ""}
+                    aria-pressed={!automaticUpdatesActive}
+                    onClick={() => window.open(updateTarget, "_blank", "noopener,noreferrer")}
+                  >
+                    <Download size={17} />
+                    <span><strong>{text("手动安装", "Manual")}</strong><small>{manualUpdateDetail}</small></span>
+                    {!automaticUpdatesActive && <Check size={15} aria-hidden="true" />}
+                  </button>
+                </div>
+                <p><ShieldCheck size={14} />{updateChannelExplanation}</p>
+              </div>
               <div className="lucid-version-actions">
                 <button type="button" className={chromeWebStoreInstall ? "lucid-update-primary" : ""} disabled={updateBusy} aria-busy={updateBusy} onClick={onCheckUpdate}><RefreshCcw className={updateBusy ? "is-spinning" : ""} size={16} />{chromeWebStoreInstall ? text("一键检查并更新", "Check and update") : hostedApp ? text("检查并刷新", "Check and refresh") : text("检查更新", "Check for updates")}</button>
                 <button type="button" onClick={() => window.open(updateTarget, "_blank", "noopener,noreferrer")}><Globe2 size={16} />{text("发布页面", "Release page")}</button>

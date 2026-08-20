@@ -2065,7 +2065,7 @@ try {
   const versionManifestLibrary = await readFile(join(repoRoot, "scripts/version-manifest.mjs"), "utf8");
   const previousVersionManifest = JSON.parse(await readFile(join(repoRoot, "extension/public/previous-version.json"), "utf8"));
   assert.match(stagedVersionManifest, /previous-version\.json[\s\S]*validatePublishedPredecessorManifest[\s\S]*writeFile/, "staged deployment must use the reviewed repository predecessor manifest instead of writing network responses");
-  assert.equal(previousVersionManifest.latestVersion, "0.9.32", "the current predecessor manifest must track the last public release until activation");
+  assert.equal(previousVersionManifest.latestVersion, "0.9.33", "the current predecessor manifest must track the last public release until activation");
   assert.ok(!/fetch\(/.test(stagedVersionManifest), "staged manifest generation must not fetch untrusted network content");
   assert.match(versionManifestLibrary, /compareReleaseVersions\(latestVersion, nextVersion\) >= 0/, "the staged manifest validator must reject current and newer versions");
   assert.match(versionManifestLibrary, /latestVersion[\s\S]*minimumSupportedVersion[\s\S]*dataSchemaVersion: 1[\s\S]*releaseNotesUrl: OFFICIAL_RELEASE_URL[\s\S]*updateUrl: OFFICIAL_RELEASE_URL/, "the staged manifest must be rebuilt from the official public release destination");

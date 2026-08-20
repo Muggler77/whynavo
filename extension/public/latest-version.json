@@ -1,8 +1,8 @@
 {
-  "latestVersion": "0.9.33",
+  "latestVersion": "0.9.34",
   "minimumSupportedVersion": "0.9.32",
   "dataSchemaVersion": 1,
-  "severity": "important",
+  "severity": "normal",
   "releaseNotesUrl": "https://github.com/Muggler77/whynavo/releases/latest",
   "updateUrl": "https://github.com/Muggler77/whynavo/releases/latest"
 }

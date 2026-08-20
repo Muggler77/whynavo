@@ -4,7 +4,7 @@ export const SITE = {
   appUrl: "https://whynavo.com/",
   githubUrl: "https://github.com/Muggler77/whynavo",
   releaseUrl: "https://github.com/Muggler77/whynavo/releases/latest",
-  version: "0.9.33"
+  version: "0.9.34"
 };
 
 export const CONTENT = {
@@ -143,8 +143,8 @@ export const CONTENT = {
       heading: "A product that explains its changes.",
       intro: "The public repository is the source of truth for release notes, security documentation and build provenance.",
       current: "Current release",
-      versionText: "0.9.33",
-      versionSummary: "The current release stabilizes website typography while scrolling and adds a Chrome Web Store-aware update control that waits for the package to be ready and saves local data before reloading.",
+      versionText: "0.9.34",
+      versionSummary: "The current release aligns settings icons precisely and presents automatic Store updates and manual local packages as two honest, clearly explained update channels.",
       viewRelease: "Read the release notes",
       viewGithub: "View the public repository",
       cadenceTitle: "How updates work",
@@ -301,8 +301,8 @@ export const CONTENT = {
       heading: "每次变化，都应该说清楚。",
       intro: "公开仓库是版本说明、安全文档和构建来源证明的真实来源。",
       current: "当前版本",
-      versionText: "0.9.33",
-      versionSummary: "当前版本修复官网滚动时文字闪烁，并加入识别 Chrome 商店正式安装的更新入口；新包准备完成且本机数据安全保存后才会重载。",
+      versionText: "0.9.34",
+      versionSummary: "当前版本修正设置图标对齐，并将 Chrome 商店自动更新与本地发布包手动更新作为两种真实渠道清楚展示。",
       viewRelease: "阅读版本说明",
       viewGithub: "查看公开仓库",
       cadenceTitle: "更新如何工作",
