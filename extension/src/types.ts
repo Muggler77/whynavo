@@ -127,6 +127,7 @@ export type Settings = {
   wallpaperPreset?: string;
   wallpaperRotation?: boolean;
   wallpaperMotion?: boolean;
+  wallpaperBlur?: boolean;
   photoFrameImage?: string;
   customWallpapers?: CustomWallpaper[];
   wallpaperCollection?: string[];

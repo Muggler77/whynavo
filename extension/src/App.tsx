@@ -200,22 +200,16 @@ const SEARCH_PROVIDER_OPTIONS: ReadonlyArray<{
   id: WebSearchProvider;
   zh: string;
   en: string;
-  zhHint: string;
-  enHint: string;
 }> = [
   {
     id: "browser",
     zh: "Google",
-    en: "Google",
-    zhHint: "遵循浏览器当前的默认搜索设置",
-    enHint: "Uses the browser's current default setting"
+    en: "Google"
   },
   {
     id: "baidu",
     zh: "百度",
-    en: "Baidu",
-    zhHint: "仅在你主动选择时打开百度",
-    enHint: "Opens Baidu only when you choose it"
+    en: "Baidu"
   }
 ];
 
@@ -1559,7 +1553,6 @@ export default function App() {
   const [widgetMenu, setWidgetMenu] = useState<WidgetMenuState>(null);
   const [searchText, setSearchText] = useState("");
   const [searchProvider, setSearchProvider] = useState<WebSearchProvider>("browser");
-  const [spaceSearchText, setSpaceSearchText] = useState("");
   const [clock, setClock] = useState(() => new Date());
   const [activeLayer, setActiveLayer] = useState("all");
   const [layoutEditing, setLayoutEditing] = useState(false);
@@ -2808,20 +2801,7 @@ export default function App() {
     const linkTiles = shortcuts.map((shortcut) => ({ kind: "shortcut" as const, shortcut, order: shortcut.order }));
     return [...folderTiles, ...linkTiles].sort((a, b) => a.order - b.order);
   }, [allShortcuts, shortcuts, visibleFolders]);
-  const filteredShortcutTiles = useMemo(() => {
-    const query = spaceSearchText.trim().toLocaleLowerCase(uiLanguage);
-    if (!query) return shortcutTiles;
-    return shortcutTiles.filter((item) => {
-      if (item.kind === "shortcut") {
-        return `${item.shortcut.title} ${item.shortcut.url}`.toLocaleLowerCase(uiLanguage).includes(query);
-      }
-      if (item.folder.name.toLocaleLowerCase(uiLanguage).includes(query)) return true;
-      return allShortcuts.some((shortcut) => (
-        shortcut.folderId === item.folder.id
-        && `${shortcut.title} ${shortcut.url}`.toLocaleLowerCase(uiLanguage).includes(query)
-      ));
-    });
-  }, [allShortcuts, shortcutTiles, spaceSearchText, uiLanguage]);
+  const filteredShortcutTiles = shortcutTiles;
   const renderedShortcutTiles = useMemo(
     () => filteredShortcutTiles.length <= SHORTCUT_STABLE_RENDER_LIMIT
       ? filteredShortcutTiles
@@ -2830,7 +2810,7 @@ export default function App() {
   );
   useEffect(() => {
     setShortcutRenderLimit(SHORTCUT_STABLE_RENDER_LIMIT);
-  }, [activeCustomPageId, activeLayer, spaceSearchText]);
+  }, [activeCustomPageId, activeLayer]);
   const homeShortcutTiles = useMemo(() => {
     const folderTiles = allFolders.map((folder) => {
       const firstChildOrder = allShortcuts
@@ -4245,10 +4225,11 @@ export default function App() {
   return (
     <UiLanguageContext.Provider value={uiLanguage}>
       <main
-        className={`app ${state.settings.theme} nav-${navigationDisplay} nav-${navigationSide} ${navigationOpen ? "nav-open" : ""}`}
+        className={`app ${state.settings.theme} nav-${navigationDisplay} nav-${navigationSide} ${navigationOpen ? "nav-open" : ""} ${state.settings.wallpaperBlur !== false ? "wallpaper-blur" : ""}`}
         style={backgroundStyle}
         onContextMenuCapture={handleAppContextMenu}
       >
+      <div className="wallpaper-backdrop" aria-hidden="true" />
       <LocalVideoWallpaper wallpaper={activeVideoWallpaper} ownerId={sync.user?.id} enabled={state.settings.wallpaperMotion !== false} />
       <a className="skip-link" href="#whynavo-workspace">{text("跳到主要内容", "Skip to main content")}</a>
       <div className="shell" ref={shellRef}>
@@ -4330,18 +4311,21 @@ export default function App() {
               </form>
             </>
           ) : activePage === "shortcuts" ? (
-            <label className="space-search">
-              <Search size={19} aria-hidden="true" />
+            <form className="search hero-search space-search" onSubmit={(event) => { event.preventDefault(); runSearch(); }}>
+              <SearchProviderControl value={searchProvider} onChange={setSearchProvider} />
               <input
-                value={spaceSearchText}
-                onChange={(event) => setSpaceSearchText(event.target.value)}
-                placeholder={text("搜索网站和文件夹", "Search sites and folders")}
-                aria-label={text("搜索网站和文件夹", "Search sites and folders")}
+                value={searchText}
+                onChange={(event) => setSearchText(event.target.value)}
+                placeholder=""
+                aria-label={text("搜索网络", "Search the web")}
               />
-              {spaceSearchText && (
-                <button type="button" onClick={() => setSpaceSearchText("")} aria-label={text("清除搜索", "Clear search")} title={text("清除搜索", "Clear search")}><X size={16} /></button>
-              )}
-            </label>
+              <button
+                type="submit"
+                className="search-submit"
+                aria-label={searchProvider === "baidu" ? text("使用百度搜索", "Search with Baidu") : text("使用 Google 搜索", "Search with Google")}
+                title={searchProvider === "baidu" ? text("使用百度搜索", "Search with Baidu") : text("使用 Google 搜索", "Search with Google")}
+              ><Search size={18} /></button>
+            </form>
           ) : (
             <div className="compact-page-heading">
               <span>{activeCustomNavPage ? text("自定义空间", "Custom space") : systemNavLabel(activePage)}</span>
@@ -4494,11 +4478,16 @@ export default function App() {
               searchProvider={searchProvider}
               onSearchProviderChange={setSearchProvider}
               shortcuts={allShortcuts}
+              folders={allFolders}
               notes={state.notes}
               todos={state.todos}
               onAddShortcut={() => openNewShortcut()}
               onOpenNotes={() => goToPage("notes")}
               onOpenTasks={() => goToPage("tasks")}
+              onOpenFolder={(folder) => {
+                goToPage("shortcuts");
+                setOpenFolderId(folder.id);
+              }}
             />
           ) : activePage === "notes" ? (
             <NotesWorkspace state={state} updateState={updateState} />
@@ -4572,11 +4561,6 @@ export default function App() {
                     <ShortcutRenderSentinel
                       onVisible={() => setShortcutRenderLimit((current) => Math.min(filteredShortcutTiles.length, current + SHORTCUT_RENDER_BATCH))}
                     />
-                  )}
-                  {!filteredShortcutTiles.length && (
-                    spaceSearchText
-                      ? <div className="empty-shortcut search-empty"><Search size={22} />{text("没有匹配的网站或文件夹", "No matching sites or folders")}</div>
-                      : null
                   )}
                   <button
                     type="button"
@@ -5394,6 +5378,8 @@ function SearchProviderControl({ value, onChange }: { value: WebSearchProvider; 
               aria-selected={value === option.id}
               className={`search-provider-option ${value === option.id ? "is-selected" : ""}`}
               data-provider={option.id}
+              aria-label={localized(language, option.zh, option.en)}
+              title={localized(language, option.zh, option.en)}
               onPointerDown={(event) => {
                 event.stopPropagation();
                 chooseProvider(option.id);
@@ -5403,11 +5389,6 @@ function SearchProviderControl({ value, onChange }: { value: WebSearchProvider; 
               key={option.id}
             >
               <SearchProviderMark provider={option.id} />
-              <span className="search-provider-option-copy">
-                <strong>{localized(language, option.zh, option.en)}</strong>
-                <small>{localized(language, option.zhHint, option.enHint)}</small>
-              </span>
-              {value === option.id && <Check size={15} aria-hidden="true" />}
             </button>
           ))}
         </div>
@@ -5416,24 +5397,33 @@ function SearchProviderControl({ value, onChange }: { value: WebSearchProvider; 
   );
 }
 
-function SearchWorkspace({ query, onQueryChange, onWebSearch, searchProvider, onSearchProviderChange, shortcuts, notes, todos, onAddShortcut, onOpenNotes, onOpenTasks }: {
+function SearchWorkspace({ query, onQueryChange, onWebSearch, searchProvider, onSearchProviderChange, shortcuts, folders, notes, todos, onAddShortcut, onOpenNotes, onOpenTasks, onOpenFolder }: {
   query: string;
   onQueryChange: (value: string) => void;
   onWebSearch: () => void;
   searchProvider: WebSearchProvider;
   onSearchProviderChange: (provider: WebSearchProvider) => void;
   shortcuts: Shortcut[];
+  folders: ShortcutFolder[];
   notes: Note[];
   todos: Todo[];
   onAddShortcut: () => void;
   onOpenNotes: () => void;
   onOpenTasks: () => void;
+  onOpenFolder: (folder: ShortcutFolder) => void;
 }) {
   const language = useUiLanguage();
   const text = (zh: string, en: string) => localized(language, zh, en);
   const normalizedQuery = query.trim().toLowerCase();
   const matchedShortcuts = normalizedQuery
     ? shortcuts.filter((shortcut) => `${shortcut.title} ${shortcut.url}`.toLowerCase().includes(normalizedQuery)).slice(0, 12)
+    : [];
+  const matchedFolders = normalizedQuery
+    ? folders
+      .filter((folder) => !folder.deletedAt)
+      .filter((folder) => folder.name.toLowerCase().includes(normalizedQuery))
+      .sort((left, right) => left.order - right.order)
+      .slice(0, 8)
     : [];
   const matchedNotes = normalizedQuery
     ? notes
@@ -5449,7 +5439,7 @@ function SearchWorkspace({ query, onQueryChange, onWebSearch, searchProvider, on
       .sort((left, right) => Number(left.done) - Number(right.done) || left.order - right.order)
       .slice(0, 8)
     : [];
-  const resultCount = matchedShortcuts.length + matchedNotes.length + matchedTodos.length;
+  const resultCount = matchedShortcuts.length + matchedFolders.length + matchedNotes.length + matchedTodos.length;
 
   return (
     <section className="lucid-search-workspace">
@@ -5460,7 +5450,7 @@ function SearchWorkspace({ query, onQueryChange, onWebSearch, searchProvider, on
           autoFocus
           value={query}
           onChange={(event) => onQueryChange(event.target.value)}
-          placeholder={text("查找网站、笔记、任务，或直接搜索网络", "Find sites, notes, tasks, or search the web")}
+          placeholder={text("查找网站、文件夹、笔记、任务，或直接搜索网络", "Find sites, folders, notes, tasks, or search the web")}
           aria-label={text("搜索 WhyNavo 内容", "Search WhyNavo content")}
         />
         <button
@@ -5494,6 +5484,19 @@ function SearchWorkspace({ query, onQueryChange, onWebSearch, searchProvider, on
               </a>
             ))}
             {!matchedShortcuts.length && <p className="lucid-result-empty">{text("没有匹配的网站", "No matching sites")}</p>}
+          </div>
+        </section>
+
+        <section className="lucid-result-group">
+          <header><span><Folder size={16} />{text("文件夹", "Folders")}</span><small>{matchedFolders.length}</small></header>
+          <div className="lucid-folder-results lucid-text-results">
+            {matchedFolders.map((folder) => (
+              <button type="button" onClick={() => onOpenFolder(folder)} key={folder.id}>
+                <span><strong>{folder.name}</strong><small>{text("在空间中打开", "Open in Spaces")}</small></span>
+                <Folder size={15} aria-hidden="true" />
+              </button>
+            ))}
+            {!matchedFolders.length && <p className="lucid-result-empty">{text("没有匹配的文件夹", "No matching folders")}</p>}
           </div>
         </section>
 
@@ -8137,22 +8140,13 @@ function SettingsDialog({ state, clock, searchProvider, onSearchProviderChange, 
                   <button type="button" role="radio" aria-checked={settings.theme === "dark"} className={settings.theme === "dark" ? "active" : ""} onClick={() => setSetting("theme", "dark")}><Moon size={15} />{text("深色", "Dark")}</button>
                 </div>
               </div>
-              <label className="lucid-setting-row search-provider-setting">
+              <div className="lucid-setting-row search-provider-setting">
                 <div>
                   <strong>{text("网页搜索", "Web search")}</strong>
-                  <span>{text("当前页面会话可切换；Google 项遵循浏览器搜索设置", "Choose for this page session; Google follows the browser search setting")}</span>
+                  <span>{text("搜索引擎", "Search provider")}</span>
                 </div>
-                <select
-                  className="lucid-compact-input"
-                  value={searchProvider}
-                  onChange={(event) => onSearchProviderChange(event.target.value as WebSearchProvider)}
-                  aria-label={text("网页搜索引擎", "Web search provider")}
-                >
-                  {SEARCH_PROVIDER_OPTIONS.map((option) => (
-                    <option value={option.id} key={option.id}>{localized(language, option.zh, option.en)}</option>
-                  ))}
-                </select>
-              </label>
+                <SearchProviderControl value={searchProvider} onChange={onSearchProviderChange} />
+              </div>
               <div className="lucid-setting-row lucid-wallpaper-row">
                 <div><strong>{text("壁纸", "Wallpaper")}</strong><span>{text("当前背景与壁纸库", "Current background and wallpaper library")}</span></div>
                 <button type="button" className="lucid-wallpaper-button" onClick={onOpenWallpapers}>
@@ -8160,6 +8154,10 @@ function SettingsDialog({ state, clock, searchProvider, onSearchProviderChange, 
                   <b>{wallpaperName}</b>
                   <ChevronRight size={16} />
                 </button>
+              </div>
+              <div className="lucid-setting-row lucid-toggle-row">
+                <div><strong>{text("壁纸雾化", "Wallpaper blur")}</strong><span>{text("柔化当前壁纸，让内容更清晰", "Soften the current wallpaper for clearer content")}</span></div>
+                <label className="lucid-switch"><input type="checkbox" aria-label={text("开启壁纸雾化", "Enable wallpaper blur")} checked={settings.wallpaperBlur ?? true} onChange={(event) => setSetting("wallpaperBlur", event.target.checked)} /><span /></label>
               </div>
               <label className="lucid-setting-row lucid-range-row">
                 <div><strong>{text("图标尺寸", "Icon size")}</strong><span>{text(`主页与空间统一为 ${settings.iconSize}px`, `Home and Spaces use ${settings.iconSize}px`)}</span></div>

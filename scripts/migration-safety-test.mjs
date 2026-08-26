@@ -189,6 +189,7 @@ try {
   assert.equal(migrated.state.notes[0].body, "重要数据", "note data must be preserved");
   assert.equal(migrated.state.shortcutFolders[0].name, "工作资料", "folder data must be preserved");
   assert.equal(migrated.state.countdowns[0].title, "项目上线", "countdown data must be preserved");
+  assert.equal(normalizeState(migrated.state).settings.wallpaperBlur, true, "legacy state must default to wallpaper blur during normal loading");
   assert.equal(migrated.backup?.state.notes[0].body, "重要数据", "backup must preserve original state");
   assert.equal(stateSchemaVersion(migrated.state), 1, "schema version should remain supported");
   assert.doesNotThrow(() => validateAppStatePayload(migrated.state, "test state"), "valid app data must pass structural validation");
@@ -239,6 +240,11 @@ try {
     () => validateAppStatePayload({ ...recurringState, shortcuts: [{ ...recurringState.shortcuts[0], homeVisible: "yes" }] }, "test state"),
     /记录字段/,
     "home visibility must remain a boolean before persistence"
+  );
+  assert.throws(
+    () => validateAppStatePayload({ ...recurringState, settings: { ...recurringState.settings, wallpaperBlur: "yes" } }, "test state"),
+    /设置字段类型/,
+    "wallpaper blur must remain a boolean before persistence and synchronization"
   );
   const normalizedLegacyImages = normalizeState({
     ...migrated.state,
@@ -533,6 +539,7 @@ try {
       ],
       city: "Hangzhou",
       weatherUseLocation: true,
+      wallpaperBlur: false,
       fieldUpdatedAt: {
         ...(legacyState.settings.fieldUpdatedAt || {}),
         city: now,
@@ -550,6 +557,7 @@ try {
   assert.deepEqual(cloudState.settings.wallpaperCollection, ["aurora-lake"], "cloud wallpaper collection must exclude local assets");
   assert.equal(cloudState.settings.city, "Shanghai", "selected weather cities must not be uploaded");
   assert.equal(cloudState.settings.weatherUseLocation, false, "location-weather preferences must not be uploaded");
+  assert.equal(cloudState.settings.wallpaperBlur, false, "wallpaper blur preference must remain in cloud snapshots");
   assert.equal(cloudState.settings.fieldUpdatedAt?.city, undefined, "weather city clocks must remain device-local");
   assert.equal(cloudState.settings.fieldUpdatedAt?.weatherUseLocation, undefined, "location preference clocks must remain device-local");
   assert.equal(cloudState.settings.supabaseUrl, undefined, "service URLs must not be stored in user snapshots");
@@ -602,6 +610,7 @@ try {
   );
   assert.equal(completeBackup.settings.photoFrameImage, completeBackupSource.settings.photoFrameImage, "complete backups must include local photos");
   assert.equal(completeBackup.settings.customWallpapers?.[0]?.dataUrl, completeBackupSource.settings.customWallpapers?.[0]?.dataUrl, "complete backups must include custom wallpapers");
+  assert.equal(completeBackup.settings.wallpaperBlur, false, "complete backups must retain the wallpaper blur preference");
   assert.equal(completeBackup.shortcuts[0].iconUrl, completeBackupSource.shortcuts[0].iconUrl, "complete backups must include uploaded shortcut icons");
   assert.equal(completeBackup.settings.city, "Shanghai", "complete backups must exclude device-local weather cities");
   assert.equal(completeBackup.settings.supabaseUrl, undefined, "complete backups must exclude service URLs");
@@ -1381,6 +1390,7 @@ try {
   const iconControlCss = await readFile(join(repoRoot, "extension/src/ui-v0930.css"), "utf8");
   const responsiveLayoutCss = await readFile(join(repoRoot, "extension/src/ui-v0931.css"), "utf8");
   const dynamicWallpaperCss = await readFile(join(repoRoot, "extension/src/ui-v0932.css"), "utf8");
+  const unifiedSearchCss = await readFile(join(repoRoot, "extension/src/ui-v0935.css"), "utf8");
   const wallpaperMediaSource = await readFile(join(repoRoot, "extension/src/wallpaperMedia.ts"), "utf8");
   const refinedSettingsCss = await readFile(join(repoRoot, "extension/src/ui-settings-refined.css"), "utf8");
   const mainSource = await readFile(join(repoRoot, "extension/src/main.tsx"), "utf8");
@@ -1482,8 +1492,9 @@ try {
   assert.doesNotMatch(browserSearchSource, /google\.com\/search/, "the extension must never hard-code Google in place of Chrome's configured default provider");
   assert.match(urlsSource, /chrome\.tabs\.create\(\{ url: target \}\)/, "extension shortcut navigation must create a separate browser tab without requesting the sensitive tabs permission");
   assert.ok((appSource.match(/onClick=\{\(event\) => openShortcutInNewTab\(event,/g) || []).length >= 6, "every shortcut surface must enforce new-tab navigation");
-  assert.match(appSource, /placeholder=\{text\("搜索网站和文件夹", "Search sites and folders"\)\}/, "the Spaces search behavior and prompt must remain unchanged");
-  assert.match(appSource, /function SearchWorkspace[\s\S]*查找网站、笔记、任务，或直接搜索网络[\s\S]*使用 Google 搜索网络/, "the Search page must keep universal local search and expose the Google-labelled provider action");
+  assert.doesNotMatch(appSource, /spaceSearchText|搜索网站和文件夹|Search sites and folders/, "Spaces must no longer filter sites or folders locally");
+  assert.match(appSource, /activePage === "shortcuts"[\s\S]*className="search hero-search space-search"[\s\S]*runSearch\(\)/, "Spaces must reuse the Home web-search behavior");
+  assert.match(appSource, /function SearchWorkspace[\s\S]*查找网站、文件夹、笔记、任务，或直接搜索网络[\s\S]*matchedFolders[\s\S]*onOpenFolder/, "the Search page must include directly openable folder results alongside universal local search");
   assert.doesNotMatch(appSource, /spaces-canvas-toolbar/, "Spaces must not keep a detached floating Add site toolbar");
   assert.match(appSource, /className="shortcut-add-tile"[\s\S]*添加网站/, "Spaces must expose Add site as an integrated icon-canvas tile");
   assert.match(appSource, /starter-icons\/baidu\.svg/, "the Baidu provider trigger must use a bundled brand icon");
@@ -1492,12 +1503,15 @@ try {
   assert.match(searchPolicyCss, /@media \(max-width: 620px\)[\s\S]*grid-template-columns: var\(--whynavo-search-provider-width\) minmax\(0, 1fr\) 42px/, "the provider selector and search action must remain contained on mobile");
   assert.match(mainSource, /import "\.\/ui-v0928\.css";[\s\S]*import "\.\/ui-v0929\.css";[\s\S]*import "\.\/ui-v0930\.css";[\s\S]*import "\.\/ui-v0931\.css";/, "the responsive layout safety layer must load after the search, alignment, and icon-control layers");
   assert.match(searchInteractionCss, /\.search-provider-menu[\s\S]*backdrop-filter: blur\(22px\)/, "the provider menu must use a contained translucent surface");
-  assert.match(searchInteractionCss, /\.search-provider-option[\s\S]*min-height: 54px/, "provider choices must retain a comfortable keyboard and touch target");
+  assert.match(unifiedSearchCss, /\.search-provider-option \{[\s\S]*width: 44px;[\s\S]*min-height: 44px;/, "icon-only provider choices must retain a comfortable keyboard and touch target");
   assert.match(searchInteractionCss, /\.workspace\.page-shortcuts,[\s\S]*\.workspace\.page-custom[\s\S]*width: min\(92vw/, "wide Spaces must use the expanded reference canvas without changing mobile widths");
   assert.match(alignmentCss, /--whynavo-search-provider-width: 96px[\s\S]*@media \(max-width: 620px\)[\s\S]*--whynavo-search-provider-width: 92px/, "Google must remain fully visible in a stable provider slot on desktop and mobile");
   assert.match(alignmentCss, /\.topbar,[\s\S]*\.workspace\.page-shortcuts,[\s\S]*\.workspace\.page-custom[\s\S]*width: var\(--whynavo-wide-content\)/, "the wide header and Spaces canvas must share one responsive alignment rail");
   assert.match(alignmentCss, /\.spaces-canvas-toolbar[\s\S]*padding-inline: 4px[\s\S]*\.page-shortcuts \.shortcut-grid,[\s\S]*padding-inline: 4px/, "the Add site action and shortcut grid must share the same content edge");
   assert.match(iconControlCss, /--whynavo-search-provider-width: 44px[\s\S]*\.search-provider-trigger \.search-provider-label[\s\S]*clip: rect\(0, 0, 0, 0\)/, "search provider triggers must use icon-only visuals while retaining accessible names");
+  assert.doesNotMatch(appSource, /search-provider-option-copy|zhHint|enHint/, "provider menus must not expose redundant labels or explanatory copy");
+  assert.match(unifiedSearchCss, /\.app\.wallpaper-blur \.wallpaper-backdrop[\s\S]*filter: blur\(16px\)/, "enabled wallpaper blur must soften a dedicated background layer instead of blurring content");
+  assert.match(mainSource, /import "\.\/ui-v0935\.css";/, "the wallpaper and unified-search layer must load after earlier versioned styles");
   assert.match(iconControlCss, /\.shortcut-add-tile[\s\S]*\.shortcut-add-icon[\s\S]*border: 1px dashed/, "the integrated Add site tile must share the icon canvas language");
   assert.match(appSource, /sample-a-canvas \$\{homeShortcutTiles\.length \? "with-sites" : "without-sites"\}/, "Home must expose an explicit empty-canvas state instead of reserving an invisible shortcut column");
   assert.match(responsiveLayoutCss, /\.sample-a-canvas\.without-sites[\s\S]*grid-template-columns: minmax\(0, 1fr\)[\s\S]*\.home-sites-empty[\s\S]*position: static/, "an empty Home canvas must collapse to a compact add action before the widget grid");

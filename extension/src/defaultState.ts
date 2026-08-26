@@ -87,6 +87,7 @@ export const defaultState = (): AppState => {
       wallpaperPreset: "lucid-room",
       wallpaperRotation: false,
       wallpaperMotion: true,
+      wallpaperBlur: true,
       customWallpapers: [],
       wallpaperCollection: ["lucid-room", "coastal-glass", "neon-rain", "aurora-lake"],
       quickNote: "",

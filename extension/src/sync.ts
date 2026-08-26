@@ -415,6 +415,7 @@ const SETTINGS_KEYS = new Set([
   "wallpaperPreset",
   "wallpaperRotation",
   "wallpaperMotion",
+  "wallpaperBlur",
   "customWallpapers",
   "wallpaperCollection",
   "quickNote",
@@ -767,6 +768,7 @@ export function validateAppStatePayload(value: unknown, label = "数据"): asser
     || (settings.visualRefreshVersion !== undefined && !Number.isSafeInteger(settings.visualRefreshVersion))
     || !validOptionalBoolean(settings.wallpaperRotation)
     || !validOptionalBoolean(settings.wallpaperMotion)
+    || !validOptionalBoolean(settings.wallpaperBlur)
     || !validOptionalBoolean(settings.weatherUseLocation)
     || !validOptionalBoolean(settings.remoteIconLookup)
     || !validOptionalBoolean(settings.homeSiteFloating)
@@ -1593,6 +1595,7 @@ export function normalizeState(state: AppState): AppState {
         : state.settings.wallpaperPreset || "lucid-room",
     wallpaperRotation: visualVersion < 5 ? false : state.settings.wallpaperRotation ?? false,
     wallpaperMotion: state.settings.wallpaperMotion ?? true,
+    wallpaperBlur: state.settings.wallpaperBlur ?? true,
     visualRefreshVersion: 18,
     iconSize: Math.min(80, Math.max(48, visualVersion < 8 && state.settings.iconSize === 64 ? 58 : state.settings.iconSize || 58)),
     glass: Math.min(88, Math.max(28, state.settings.glass || 42)),

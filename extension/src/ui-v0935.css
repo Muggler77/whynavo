@@ -1,0 +1,129 @@
+/* WhyNavo 0.9.35: optional wallpaper blur and unified local/web search. */
+
+.wallpaper-backdrop {
+  position: fixed;
+  inset: -24px;
+  z-index: -3;
+  pointer-events: none;
+  background-color: var(--wt-canvas);
+  background-image: var(--wallpaper-image);
+  background-position: center;
+  background-size: cover;
+  opacity: 0;
+}
+
+.app.wallpaper-blur {
+  background-image: none;
+}
+
+.app.wallpaper-blur .wallpaper-backdrop {
+  opacity: 1;
+  filter: blur(16px);
+  transform: scale(1.035);
+}
+
+.app.wallpaper-blur .wallpaper-video {
+  filter: blur(16px);
+  transform: scale(1.035);
+}
+
+.space-search.search {
+  display: grid;
+  width: min(640px, calc(100vw - 280px));
+  min-height: 56px;
+  padding: 0 8px 0 0;
+  grid-template-columns: var(--whynavo-search-provider-width, 44px) minmax(0, 1fr) 44px;
+  gap: 0;
+}
+
+.space-search.search input {
+  height: 54px;
+  padding-inline: 14px;
+}
+
+.space-search.search .search-submit {
+  width: 40px;
+  height: 40px;
+}
+
+.search-provider-menu {
+  width: auto;
+  min-width: 60px;
+  max-width: calc(100vw - 24px);
+  grid-template-columns: repeat(2, 44px);
+  padding: 6px;
+  gap: 4px;
+}
+
+.search-provider-option {
+  display: grid;
+  width: 44px;
+  min-height: 44px;
+  padding: 0;
+  grid-template-columns: 1fr;
+  place-items: center;
+  text-align: center;
+}
+
+.search-provider-option.is-selected {
+  box-shadow: inset 0 -2px var(--lucid-brand, var(--wt-brand));
+}
+
+.search-provider-option > .search-provider-mark {
+  width: 30px;
+  height: 30px;
+  flex-basis: 30px;
+}
+
+.search-provider-setting > .search-provider-control {
+  justify-self: end;
+}
+
+.search-provider-setting .search-provider-menu {
+  inset-inline: auto 0;
+}
+
+.lucid-search-command {
+  grid-template-columns: 26px var(--whynavo-search-provider-width, 44px) minmax(0, 1fr) 44px;
+}
+
+.lucid-search-results {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 28px 32px;
+}
+
+@media (max-width: 760px) {
+  .space-search.search {
+    width: min(640px, calc(100vw - 24px));
+  }
+}
+
+@media (max-width: 620px) {
+  .lucid-search-command {
+    padding-left: 10px;
+    grid-template-columns: 22px 44px minmax(0, 1fr) 40px;
+    gap: 4px;
+  }
+
+  .lucid-search-results {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 20px;
+  }
+
+  .search-provider-menu {
+    width: auto;
+  }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .app.wallpaper-blur .wallpaper-backdrop,
+  .app.wallpaper-blur .wallpaper-video {
+    filter: blur(10px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app.wallpaper-blur .wallpaper-video {
+    transform: scale(1.035);
+  }
+}
